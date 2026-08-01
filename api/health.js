@@ -1,1 +1,0 @@
-import{cors,FIXED_MODEL}from'./_lib.js';export default function handler(req,res){if(cors(req,res))return;res.status(200).json({ok:true,configured:Boolean(process.env.OPENROUTER_API_KEY),model:FIXED_MODEL,time:new Date().toISOString()})}

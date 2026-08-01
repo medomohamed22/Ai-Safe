@@ -1,1 +1,0 @@
-import{cors,FIXED_MODEL}from'./_lib.js';export default function handler(req,res){if(cors(req,res))return;if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});res.status(200).json({models:[{id:FIXED_MODEL,label:'Laguna XS 2.1 (free)'}],default:FIXED_MODEL,locked:true})}
