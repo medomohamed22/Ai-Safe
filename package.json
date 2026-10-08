@@ -1,7 +1,7 @@
 {
   "name": "robomind-g1-fixed",
   "private": true,
-  "version": "0.4.1",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "predev": "node scripts/prepare.mjs",
@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@mujoco/mujoco": "^3.3.0",
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "onnxruntime-web": "^1.22.0"
   },
   "devDependencies": {
     "vite": "^7.0.0"

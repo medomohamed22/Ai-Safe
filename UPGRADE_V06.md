@@ -1,0 +1,1 @@
+Replace **src/main.js**, **index.html**, **package.json**, **scripts/prepare.mjs** on GitHub. Add **POLICY_INTEGRATION.md** and optional **policy_manifest_template.json**. Vercel must perform a fresh `npm install` and `npm run build`. No walking checkpoint bundled; you must supply compatible trained model and verified manifest.
