@@ -2,7 +2,12 @@ import loadMujoco from "@mujoco/mujoco";
 import * as ort from "onnxruntime-web/wasm";
 
 import * as THREE from 'three';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-const $=id=>document.getElementById(id);const log=(msg,bad=false)=>{const d=document.createElement('div');d.className=bad?'error':'ok';d.textContent=(new Date()).toLocaleTimeString('en-GB')+'  '+msg;$('log').prepend(d);while($('log').children.length>15)$('log').lastChild.remove()};
+const $=id=>document.getElementById(id);
+const allLogs=[];
+const log=(msg,bad=false)=>{const line=(new Date()).toLocaleTimeString('en-GB')+'  '+msg;allLogs.push(line);const d=document.createElement('div');d.className=bad?'error':'ok';d.textContent=line;$('log').prepend(d);while($('log').children.length>100)$('log').lastChild.remove()};
+async function copyLogs(){const content=allLogs.join('\n')||'لا توجد سجلات بعد';try{await navigator.clipboard.writeText(content);$('copyLogs').textContent='✓ تم النسخ';setTimeout(()=>$('copyLogs').textContent='⧉ نسخ كل السجل',1700)}catch(e){const a=document.createElement('textarea');a.value=content;a.style.cssText='position:fixed;top:0;opacity:0';document.body.append(a);a.select();const ok=document.execCommand('copy');a.remove();$('copyLogs').textContent=ok?'✓ تم النسخ':'تعذر النسخ';if(!ok)log('فشل النسخ: يتطلب HTTPS وإذن الحافظة',true)}}
+$('copyLogs').addEventListener('click',copyLogs);
+
 let neural=null, neuralBusy=false, neuralTick=0, neuralLastAction=[], velocityCommand=[0,0,0], neuralFailures=0;
 let driveDirection="stop",drivePhase=0,driveActive=false,driveStart=0,driveMap=new Map(),fallTriggered=false,imuMap=new Map();
 let cruise=false, pushTrials=[], pushCount=0;
@@ -127,12 +132,20 @@ async function installNeural(files){
  let dims=session.inputMetadata?.[m.inputName]?.dimensions;
  if(dims&&dims.at(-1)!==expected&&typeof dims.at(-1)==='number')throw Error('ONNX يتوقع '+dims.at(-1)+' ملاحظة وليس '+expected);
  neural={manifest:m,joints,session};cruise=false;updateCruiseUI();neuralLastAction=new Array(29).fill(0);velocityCommand=[0,0,0];neuralTick=0;policyActive=false;setDrive('stop');
- $('policyStatus').textContent='ONNX جاهز / '+expected+' obs';$('policySteps').textContent='29 DoF';
+ $('policyStatus').textContent='ONNX جاهز / '+expected+' obs';$('policyTabHint').textContent='السياسة محملة. ابدأ بالوقوف قبل اختبار المشي والدفع.';$('policySteps').textContent='29 DoF';
  $('driveStatus').textContent='سياسة ONNX محمّلة. اختبر الوقوف أولًا ثم جرّب أوامر السرعة بحذر.';
  log('ONNX '+m.trainingModelId+' loaded, '+expected+' observations, 29 actions');
 }
 function pushRobot(){
- if(!ready||!running){log('شغّل المحاكاة أولًا لتجربة الدفع',true);return}
+ if(!ready){log('انتظر تحميل G1 أولًا',true);return}
+ if(!running){
+   if(fallTriggered||data.qpos[2]<.4){
+     if(!window.confirm('الروبوت ساقط أو المحاكاة متوقفة. هل تريد إعادة الوضع الابتدائي وتشغيل المحاكاة ثم تطبيق الدفع؟')){log('تم إلغاء اختبار الدفع');return}
+     $('reset').click();
+   }
+   running=true;$('play').textContent='Ⅱ إيقاف';status('محاكاة تعمل',true);
+   log('تم تشغيل المحاكاة تلقائيًا من أجل اختبار الدفع');
+ }
  // A velocity impulse on the free root, not a fake teleport; world X/Y axes.
  // Applied at center of mass; this is a disturbance test, not a literal hand contact.
  const mag=Number($('pushStrength').value), axis=pushCount++%2===0?0:1;
@@ -146,7 +159,7 @@ function pushRobot(){
 function updateCruiseUI(){const b=$('cruise');if(!b)return;b.textContent=cruise?'■ إيقاف المشي':'▶ مشي مستمر';b.classList.toggle('active',cruise)}
 function toggleCruise(){
  if(!ready){log('انتظر تحميل G1',true);return}
- if(!neural){log('المشي المتزن يتطلب ONNX مدرّبًا ومتوافقًا. لن أشغّل حركة جيبية بدلًا منه.',true);$('walkState').textContent='يلزم تحميل سياسة ONNX متوافقة';return}
+ if(!neural){log('لا توجد سياسة مشي ONNX محمّلة. افتح تبويب السياسات واختر ONNX وملف manifest مطابقًا لـG1.',true);$('walkState').textContent='المشي غير متاح: حمّل ONNX متوافقة + manifest من تبويب السياسات';$('policyTabHint').textContent='الخطوة المطلوبة: تحميل سياسة ONNX متوافقة، وليس تفعيل زر المشي فقط.';return}
  cruise=!cruise;
  if(cruise){if(!running)$('play').click();driveStart=simTime;velocityCommand=[Number($('cruiseSpeed').value),0,0];$('walkState').textContent='السياسة تعمل · سرعة مطلوبة '+velocityCommand[0].toFixed(2)+' m/s'}
  else{velocityCommand=[0,0,0];$('walkState').textContent='توقف طلب الحركة'}
@@ -169,6 +182,6 @@ $('policyFile').onchange=async e=>{
 };
 $('stopPolicy').onclick=()=>{cruise=false;updateCruiseUI();neural=null;neuralBusy=false;neuralLastAction=[];velocityCommand=[0,0,0];policyActive=false;pose('stand');$('policyStatus').textContent='متوقفة'};
 $('verify').onclick=()=>{if(!ready){$('verifyOutput').textContent='المحرك لم يحمّل بعد';return}let before=data.time,z0=data.qpos[2];running=false;mj.mj_step(model,data);mj.mj_forward(model,data);let okGravity=Math.abs(model.opt.gravity[2]+9.81)<.001&&model.opt.gravity[0]===0&&model.opt.gravity[1]===0;let okStep=data.time>before;let okModel=model.nu>0&&model.njnt>20;$('verifyOutput').innerHTML=`<div class="minirow"><b>الجاذبية: −Z</b><span>${okGravity?'PASS':'FAIL'}</span></div><div class="minirow"><b>تقدم MuJoCo step</b><span>${okStep?'PASS':'FAIL'}</span></div><div class="minirow"><b>G1 model / actuators</b><span>${okModel?'PASS':'FAIL'}</span></div><div class="micro">Pelvis Z: ${z0.toFixed(3)} → ${data.qpos[2].toFixed(3)} m. هذا لا يثبت استقرار المشي.</div>`;log('فحص: '+[okGravity,okStep,okModel].map(x=>x?'PASS':'FAIL').join(' / '));sync();telemetry()};
-$('evaluate').onclick=async()=>{if(neural){$('evalResult').textContent='لتقييم ONNX: اعمل عدة تشغيلات منفصلة وصدّر JSON لكل تجربة. التقييم الآلي المتكرر يتطلب حلقة inference متزامنة مع خطوات المحاكاة؛ غير متاح بعد.';return}if(!ready||evalBusy)return;evalBusy=true;running=false;let results=[];const steps=Math.round(2/model.opt.timestep);for(let trial=0;trial<5;trial++){mj.mj_resetData(model,data);mj.mj_forward(model,data);policyIndex=0;let t=0,fallen=false;for(let k=0;k<steps;k++){stepOnce();t+=model.opt.timestep;if(data.qpos[2]<.38){fallen=true;break}}results.push({trial:trial+1,fallen,time:t,finalHeight:data.qpos[2]});await new Promise(r=>setTimeout(r,0))}policyActive=false;let success=results.filter(r=>!r.fallen).length;$('evalResult').textContent=`النتيجة: ${success}/5 لم تسقط خلال ثانيتين. ${results.map(r=>'#'+r.trial+': '+r.time.toFixed(2)+'s').join(' · ')}. ملاحظة: التجارب الخمس متطابقة مبدئيًا ما لم يُضف تغيير للحالة الابتدائية؛ ليست تقييم تعميم إحصائي.`;log('التقييم: '+success+'/5 بدون سقوط');evalBusy=false;sync();telemetry()};
+$('evaluate').onclick=async()=>{if(!neural){$('evalResult').textContent='لا يمكن تقييم الاتزان أو المشي دون سياسة ONNX متوافقة. الاختبارات السابقة 5/5 كانت تكرارًا لنفس الحالة وليست إثبات توازن.';log('تم منع تقييم اتزان مضلل: لا توجد سياسة مشي مدرّبة',true);return}if(neural){$('evalResult').textContent='لتقييم ONNX: اعمل عدة تشغيلات منفصلة وصدّر JSON لكل تجربة. التقييم الآلي المتكرر يتطلب حلقة inference متزامنة مع خطوات المحاكاة؛ غير متاح بعد.';return}if(!ready||evalBusy)return;evalBusy=true;running=false;let results=[];const steps=Math.round(2/model.opt.timestep);for(let trial=0;trial<5;trial++){mj.mj_resetData(model,data);mj.mj_forward(model,data);policyIndex=0;let t=0,fallen=false;for(let k=0;k<steps;k++){stepOnce();t+=model.opt.timestep;if(data.qpos[2]<.38){fallen=true;break}}results.push({trial:trial+1,fallen,time:t,finalHeight:data.qpos[2]});await new Promise(r=>setTimeout(r,0))}policyActive=false;let success=results.filter(r=>!r.fallen).length;$('evalResult').textContent=`النتيجة: ${success}/5 لم تسقط خلال ثانيتين. ${results.map(r=>'#'+r.trial+': '+r.time.toFixed(2)+'s').join(' · ')}. ملاحظة: التجارب الخمس متطابقة مبدئيًا ما لم يُضف تغيير للحالة الابتدائية؛ ليست تقييم تعميم إحصائي.`;log('التقييم: '+success+'/5 بدون سقوط');evalBusy=false;sync();telemetry()};
 $('export').onclick=()=>{let blob=new Blob([JSON.stringify({model:'Unitree G1 29 DoF MJCF (Menagerie)',physics:'MuJoCo WASM',gravity:[0,0,-9.81],policyLoaded:!!policy,history,pushTrials,policyManifest:neural?.manifest?.trainingModelId||null},null,2)],{type:'application/json'});let url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='robomind_g1_trial.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 boot();
