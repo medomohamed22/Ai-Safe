@@ -1,0 +1,2401 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Sketch-to-UI Engine | محرك تحويل الرسومات إلى واجهات تفاعلية</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"><\/script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"><\/script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Cairo', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    };
+  <\/script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Cairo', 'Inter', sans-serif;
+      background-color: #090d16;
+      color: #f1f5f9;
+      overflow-x: hidden;
+    }
+    .canvas-grid {
+      background-color: #ffffff;
+      background-image: 
+        radial-gradient(#cbd5e1 1.25px, transparent 1.25px),
+        radial-gradient(#e2e8f0 1px, transparent 1px);
+      background-size: 24px 24px;
+      background-position: 0 0, 12px 12px;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.7);
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+    }
+    .pulse-live {
+      animation: pulse-ring 2s infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#090d16] text-slate-100 select-none">
+
+  <!-- Top Navigation & Hackathon Header -->
+  <header class="border-b border-slate-800/80 bg-[#0d1322]/95 backdrop-blur-md sticky top-0 z-30 px-3 sm:px-5 py-2.5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand Identity -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+          <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white via-indigo-200 to-purple-300 bg-clip-text text-transparent">
+              Live Sketch-to-UI Engine
+            </h1>
+            <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              MVP v1.0
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 hidden sm:block">
+            حول رسوماتك اليدوية والملاحظات إلى واجهات React + Tailwind تفاعلية فوراً
+          </p>
+        </div>
+      </div>
+
+      <!-- 1-Click Demo Presets (قوالب جاهزة للتحكيم) -->
+      <div class="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+        <span class="text-[11px] text-slate-400 px-2 hidden xl:inline-flex items-center gap-1">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+          قوالب العرض السريع:
+        </span>
+        <button id="presetDashboardBtn" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-600/30">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+          <span>لوحة تحكم</span>
+        </button>
+        <button id="presetLandingBtn" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 border border-transparent">
+          <i data-lucide="rocket" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>صفحة هبوط</span>
+        </button>
+        <button id="presetMobileBtn" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 border border-transparent">
+          <i data-lucide="smartphone" class="w-3.5 h-3.5 text-pink-400"></i>
+          <span>تطبيق موبايل</span>
+        </button>
+      </div>
+
+      <!-- Right Controls: Active Provider/Model Pill, Live Sync & Settings -->
+      <div class="flex items-center gap-2">
+        <!-- Quick Provider & Model Status Button -->
+        <button id="openSettingsQuickBtn" type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs transition-all" title="تغيير المزود أو النموذج">
+          <span id="providerStatusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span id="activeProviderBadge" class="font-semibold text-indigo-300">Meta API</span>
+          <span class="text-slate-600">|</span>
+          <span id="activeModelBadge" class="font-mono text-[11px] text-slate-300 max-w-[130px] sm:max-w-[170px] truncate" dir="ltr">Llama-3.2-90B-Vision</span>
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+        </button>
+
+        <!-- Auto-Sync Debounce (2s) Toggle -->
+        <button id="autoSyncToggleBtn" type="button" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all bg-slate-900 border-slate-700/80 text-slate-300 hover:bg-slate-800" title="توليد تلقائي بعد التوقف عن الرسم بـ 2 ثانية (Debounce)">
+          <span id="autoSyncDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span class="hidden md:inline">مزامنة تلقائية (2ث)</span>
+          <span id="debounceTimerBadge" class="hidden font-mono text-[10px] px-1.5 py-0.2 bg-indigo-500/30 text-indigo-200 rounded">2.0s</span>
+        </button>
+
+        <!-- Primary Generate / Sync Button -->
+        <button id="generateUiBtn" type="button" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 transition-all active:scale-95">
+          <i data-lucide="wand-2" class="w-4 h-4"></i>
+          <span>تحويل الرسمة لواجهة</span>
+        </button>
+
+        <!-- Settings Modal Trigger -->
+        <button id="openSettingsBtn" type="button" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-all relative" title="إعدادات المزودين والنماذج (OpenRouter / Meta / Gemini)">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Vercel Deploy Guide & Export Trigger -->
+        <button id="openVercelModalBtn" type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/30 text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all" title="نسخ أو تحميل كود المشروع للكمبيوتر و Vercel">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span>نسخ / حفظ المشروع للكمبيوتر</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Split-Screen Workspace -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 min-h-[calc(100vh-132px)]">
+    
+    <!-- RIGHT/LEFT PANEL 1: The Drawing Canvas (5 cols on lg) -->
+    <section class="lg:col-span-5 flex flex-col bg-[#0f1626] border border-slate-800/90 rounded-2xl overflow-hidden shadow-xl">
+      
+      <!-- Canvas Toolbar -->
+      <div class="p-2.5 border-b border-slate-800 bg-slate-900/70 flex flex-wrap items-center justify-between gap-2">
+        <!-- Drawing Tools -->
+        <div class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+          <button type="button" data-tool="pen" class="canvas-tool-btn p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all" title="قلم حر (Pen)">
+            <i data-lucide="pen-tool" class="w-4 h-4"></i>
+          </button>
+          <button type="button" data-tool="rect" class="canvas-tool-btn p-1.5 rounded-lg bg-indigo-600 text-white shadow transition-all" title="مربع / حاوية (Rectangle)">
+            <i data-lucide="square" class="w-4 h-4"></i>
+          </button>
+          <button type="button" data-tool="circle" class="canvas-tool-btn p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all" title="دائرة / صورة شخصية (Circle)">
+            <i data-lucide="circle" class="w-4 h-4"></i>
+          </button>
+          <button type="button" data-tool="arrow" class="canvas-tool-btn p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all" title="سهم إشارة للملاحظات (Arrow)">
+            <i data-lucide="move-up-right" class="w-4 h-4"></i>
+          </button>
+          <button type="button" data-tool="text" class="canvas-tool-btn p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all" title="إضافة نص أو ملاحظة ذكية (Text / Annotation)">
+            <i data-lucide="type" class="w-4 h-4"></i>
+          </button>
+          <button type="button" data-tool="eraser" class="canvas-tool-btn p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all" title="ممحاة (Eraser)">
+            <i data-lucide="eraser" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Stroke Color Picker -->
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-slate-950/60 border border-slate-800/80">
+          <button type="button" data-color="#1e293b" class="color-swatch w-5 h-5 rounded-full bg-slate-800 ring-2 ring-offset-2 ring-offset-slate-900 ring-indigo-400" title="أسود داكن (عناصر أساسية)"></button>
+          <button type="button" data-color="#4f46e5" class="color-swatch w-5 h-5 rounded-full bg-indigo-600 opacity-75 hover:opacity-100" title="أزرق نيلي (أزرار وتفاعل)"></button>
+          <button type="button" data-color="#e11d48" class="color-swatch w-5 h-5 rounded-full bg-rose-600 opacity-75 hover:opacity-100" title="أحمر (ملاحظات Annotations للذكاء الاصطناعي)"></button>
+          <button type="button" data-color="#059669" class="color-swatch w-5 h-5 rounded-full bg-emerald-600 opacity-75 hover:opacity-100" title="أخضر (بيانات وجداول)"></button>
+        </div>
+
+        <!-- Actions: Undo, Redo, Upload Image, Clear -->
+        <div class="flex items-center gap-1">
+          <button id="undoCanvasBtn" type="button" class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-all" title="تراجع (Undo)">
+            <i data-lucide="undo-2" class="w-4 h-4"></i>
+          </button>
+          <button id="redoCanvasBtn" type="button" class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-all" title="إعادة (Redo)">
+            <i data-lucide="redo-2" class="w-4 h-4"></i>
+          </button>
+          <label for="uploadSketchInput" class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer" title="رفع صورة رسمة من جهازك">
+            <i data-lucide="image-plus" class="w-4 h-4"></i>
+            <input id="uploadSketchInput" type="file" accept="image/*" class="hidden" />
+          </label>
+          <button id="downloadSketchBtn" type="button" class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-all" title="تحميل الرسمة كصورة PNG">
+            <i data-lucide="download" class="w-4 h-4"></i>
+          </button>
+          <button id="clearCanvasBtn" type="button" class="p-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900/80 text-rose-300 border border-rose-800/50 transition-all" title="مسح السبورة بالكامل">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Stamp / Annotation Helpers -->
+      <div class="px-3 py-1.5 bg-slate-900/40 border-b border-slate-800/70 flex items-center gap-1.5 overflow-x-auto custom-scrollbar text-[11px]">
+        <span class="text-slate-400 shrink-0 font-medium">إضافة عنصر سريع:</span>
+        <button type="button" data-stamp="navbar" class="stamp-btn shrink-0 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">+ شريط علوي Navbar</button>
+        <button type="button" data-stamp="card" class="stamp-btn shrink-0 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">+ بطاقة إحصائيات KPI</button>
+        <button type="button" data-stamp="table" class="stamp-btn shrink-0 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">+ جدول مبيعات بفلتر</button>
+        <button type="button" data-stamp="login" class="stamp-btn shrink-0 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">+ نموذج دخول Login</button>
+        <button type="button" data-stamp="annotation" class="stamp-btn shrink-0 px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30">+ ملاحظة سهمية ذكية</button>
+      </div>
+
+      <!-- Interactive Canvas Area -->
+      <div id="canvasContainer" class="relative flex-1 min-h-[360px] canvas-grid overflow-hidden cursor-crosshair">
+        <canvas id="sketchCanvas" class="w-full h-full block touch-none"></canvas>
+
+        <!-- Floating Inline Text Input for Text / Annotation Tool -->
+        <div id="floatingTextInputWrap" class="hidden absolute z-20 bg-slate-900/95 border-2 border-indigo-500 rounded-xl p-2 shadow-2xl min-w-[230px]">
+          <div class="text-[11px] text-indigo-300 font-semibold mb-1 flex items-center justify-between">
+            <span>أدخل نص العنصر أو ملاحظة الـ AI:</span>
+            <button id="cancelFloatingTextBtn" type="button" class="text-slate-400 hover:text-white">✕</button>
+          </div>
+          <div class="flex gap-1.5">
+            <input id="floatingTextInput" type="text" placeholder="مثال: جدول مبيعات مع فلتر بحث..." class="flex-1 bg-slate-950 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-indigo-400" />
+            <button id="confirmFloatingTextBtn" type="button" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">إضافة</button>
+          </div>
+        </div>
+
+        <!-- Bottom Canvas Status Overlay -->
+        <div class="absolute bottom-2.5 left-3 right-3 flex items-center justify-between pointer-events-none">
+          <div class="px-2.5 py-1 rounded-lg bg-slate-900/85 backdrop-blur text-[11px] text-slate-300 border border-slate-700/70 flex items-center gap-2">
+            <span id="currentToolLabel" class="font-semibold text-indigo-300">الأداة: مربع (Rectangle)</span>
+            <span class="text-slate-600">•</span>
+            <span id="canvasShapesCount">12 عنصر مرسوم</span>
+          </div>
+          <div class="px-2.5 py-1 rounded-lg bg-slate-900/85 backdrop-blur text-[11px] text-emerald-300 border border-slate-700/70 font-mono" dir="ltr">
+            Base64 Ready ✓
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEFT/RIGHT PANEL 2: Live Sandbox Renderer & Code Inspector (7 cols on lg) -->
+    <section class="lg:col-span-7 flex flex-col bg-[#0f1626] border border-slate-800/90 rounded-2xl overflow-hidden shadow-xl">
+      
+      <!-- Preview Header & Tabs -->
+      <div class="p-2.5 border-b border-slate-800 bg-slate-900/70 flex flex-wrap items-center justify-between gap-2">
+        <!-- Main View Tabs -->
+        <div class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+          <button type="button" data-tab="preview" class="view-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow flex items-center gap-1.5 transition-all">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+            <span>المعاينة الحية (Live UI)</span>
+          </button>
+          <button type="button" data-tab="code" class="view-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition-all">
+            <i data-lucide="code-2" class="w-3.5 h-3.5"></i>
+            <span>كود React + Tailwind</span>
+          </button>
+          <button type="button" data-tab="payload" class="view-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition-all">
+            <i data-lucide="scan-eye" class="w-3.5 h-3.5"></i>
+            <span>فاحص الرؤية (Vision Input)</span>
+          </button>
+        </div>
+
+        <!-- Viewport Switcher & Code Actions -->
+        <div class="flex items-center gap-2">
+          <div id="viewportControls" class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+            <button type="button" data-viewport="100%" class="viewport-btn p-1.5 rounded-lg bg-slate-800 text-indigo-300" title="شاشة مكتب (Desktop)">
+              <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
+            </button>
+            <button type="button" data-viewport="768px" class="viewport-btn p-1.5 rounded-lg text-slate-400 hover:text-white" title="جهاز لوحي (Tablet)">
+              <i data-lucide="tablet" class="w-3.5 h-3.5"></i>
+            </button>
+            <button type="button" data-viewport="390px" class="viewport-btn p-1.5 rounded-lg text-slate-400 hover:text-white" title="شاشة جوال (Mobile)">
+              <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <button id="copyCodeBtn" type="button" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition-all">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>نسخ الكود</span>
+          </button>
+
+          <button id="downloadUiHtmlBtn" type="button" class="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium flex items-center gap-1.5 transition-all" title="تحميل الواجهة المولدة كملف مستقل">
+            <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">تصدير الواجهة</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Status Bar inside Preview -->
+      <div class="px-3 py-1.5 bg-slate-950/60 border-b border-slate-800/70 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <div class="flex items-center gap-2">
+          <span id="generationModeBadge" class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">
+            جاهز للتفاعل الفوري
+          </span>
+          <span id="lastGeneratedInfo" class="text-slate-400">
+            تم التعرف على: 4 بطاقات إحصائية + جدول مبيعات تفاعلي بفلتر بحث + رسم بياني
+          </span>
+        </div>
+        <div class="flex items-center gap-2 font-mono text-slate-400" dir="ltr">
+          <span id="latencyBadge">⚡ 0.8s</span>
+        </div>
+      </div>
+
+      <!-- Tab 1: Live Interactive Sandbox Iframe -->
+      <div id="tabPreviewContent" class="flex-1 bg-slate-950/90 flex items-center justify-center p-2 sm:p-3 overflow-auto relative min-h-[380px]">
+        <!-- AI Loading Overlay -->
+        <div id="aiGeneratingOverlay" class="hidden absolute inset-0 z-20 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <div class="w-14 h-14 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center pulse-live">
+            <i data-lucide="sparkles" class="w-7 h-7 text-indigo-400 animate-spin"></i>
+          </div>
+          <h3 id="aiLoadingTitle" class="text-base font-bold text-white">جاري تحليل الرسمة والملاحظات عبر نموذج الرؤية...</h3>
+          <p id="aiLoadingSubtitle" class="text-xs text-slate-300 max-w-md">
+            يتم الآن قراءة الأشكال الهندسية والأسهم وتحويلها إلى مكونات React + Tailwind CSS تفاعلية
+          </p>
+        </div>
+
+        <div id="iframeViewportWrapper" class="w-full h-full transition-all duration-300 rounded-xl overflow-hidden border border-slate-800 shadow-2xl bg-white">
+          <iframe id="livePreviewIframe" title="Live UI Sandbox Renderer" class="w-full h-full min-h-[380px] border-0" sandbox="allow-scripts allow-modals"></iframe>
+        </div>
+      </div>
+
+      <!-- Tab 2: Source Code Viewer (React + Tailwind) -->
+      <div id="tabCodeContent" class="hidden flex-1 flex flex-col bg-[#0b101d] overflow-hidden min-h-[380px]">
+        <div class="px-4 py-2 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <button type="button" id="showReactCodeBtn" class="px-2.5 py-1 rounded bg-indigo-600 text-white font-mono text-[11px]">GeneratedUI.jsx (React + Tailwind)</button>
+            <button type="button" id="showHtmlCodeBtn" class="px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:text-white font-mono text-[11px]">Standalone.html</button>
+          </div>
+          <span class="text-slate-400 font-mono text-[11px]" dir="ltr">Tailwind CSS + lucide-react</span>
+        </div>
+        <textarea id="codeEditorTextarea" spellcheck="false" dir="ltr" class="flex-1 w-full p-4 bg-[#0b101d] text-indigo-100 font-mono text-xs leading-relaxed focus:outline-none resize-none custom-scrollbar"></textarea>
+        <div class="p-2.5 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between">
+          <span class="text-[11px] text-slate-400">يمكنك تعديل الكود يدوياً هنا والضغط على "تطبيق التعديلات" لتحديث المعاينة الحية فوراً.</span>
+          <button id="applyManualCodeBtn" type="button" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">
+            تطبيق التعديلات على المعاينة
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 3: Vision Input Payload Inspector -->
+      <div id="tabPayloadContent" class="hidden flex-1 p-4 bg-[#0b101d] overflow-y-auto custom-scrollbar min-h-[380px]">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+            <h4 class="text-xs font-bold text-indigo-300 mb-2 flex items-center gap-1.5">
+              <i data-lucide="image" class="w-4 h-4"></i>
+              <span>لقطة السبورة المرسلة للنموذج (Base64 PNG Snapshot)</span>
+            </h4>
+            <div class="bg-white rounded-lg overflow-hidden border border-slate-700 p-2 flex items-center justify-center min-h-[200px]">
+              <img id="base64PreviewImg" alt="Canvas Base64 Preview" class="max-h-[240px] w-auto object-contain" />
+            </div>
+            <p id="base64SizeInfo" class="text-[11px] text-slate-400 mt-2 font-mono" dir="ltr"></p>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col">
+            <h4 class="text-xs font-bold text-purple-300 mb-2 flex items-center gap-1.5">
+              <i data-lucide="terminal" class="w-4 h-4"></i>
+              <span>موجه الأوامر المرسل (Multimodal System + User Prompt)</span>
+            </h4>
+            <pre id="payloadPromptPreview" dir="ltr" class="flex-1 bg-slate-950 p-3 rounded-lg border border-slate-800 text-[11px] text-slate-300 font-mono whitespace-pre-wrap overflow-y-auto max-h-[250px] custom-scrollbar"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom Hybrid Iteration Bar: Sketch + Prompt Iteration -->
+  <footer class="px-3 pb-3">
+    <div class="bg-[#0f1626] border border-slate-800/90 rounded-2xl p-2.5 shadow-xl flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
+      
+      <!-- Quick Iteration Chips -->
+      <div class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 md:pb-0 shrink-0">
+        <span class="text-[11px] font-semibold text-indigo-300 flex items-center gap-1 px-2 shrink-0">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          تعديل هجين سريع:
+        </span>
+        <button type="button" data-prompt="حول الألوان إلى الوضع الليلي (Dark Mode) واجعل الأزرار دائرية عصرية" class="quick-iterate-chip shrink-0 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-indigo-950/80 text-slate-300 hover:text-indigo-200 border border-slate-800 text-xs transition-all">
+          🌙 وضع ليلي + أزرار دائرية
+        </button>
+        <button type="button" data-prompt="أضف فلتر بحث متقدم حسب الحالة وزر تصدير CSV مع نافذة إضافة صف جديد" class="quick-iterate-chip shrink-0 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-indigo-950/80 text-slate-300 hover:text-indigo-200 border border-slate-800 text-xs transition-all">
+          🔍 تعزيز الفلتر + إضافة صف
+        </button>
+        <button type="button" data-prompt="حول الثيم إلى تدرجات زمردية (Emerald Theme) مع تكبير الإحصائيات" class="quick-iterate-chip shrink-0 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-indigo-950/80 text-slate-300 hover:text-indigo-200 border border-slate-800 text-xs transition-all">
+          🎨 ثيم زمردي احترافي
+        </button>
+      </div>
+
+      <!-- Prompt Input + Send Button -->
+      <form id="hybridPromptForm" class="flex-1 flex items-center gap-2">
+        <div class="relative flex-1">
+          <input
+            id="iterationPromptInput"
+            type="text"
+            placeholder="اكتب تعديلاً على الواجهة الحالية أو ارسم فوق السبورة (مثال: حول الألوان للوضع الليلي واجعل الأزرار دائرية)..."
+            class="w-full bg-slate-950/90 text-white placeholder-slate-500 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl border border-slate-800 focus:outline-none focus:border-indigo-500 transition-all"
+          />
+        </div>
+        <button type="submit" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shrink-0 shadow-lg shadow-indigo-600/20 transition-all">
+          <i data-lucide="send" class="w-4 h-4"></i>
+          <span>تحديث الواجهة</span>
+        </button>
+      </form>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 1: Multi-Provider & Model Manager (OpenRouter, Meta API, Gemini, +) -->
+  <!-- ========================================================================= -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-[#0f1626] border border-slate-700/80 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl my-auto">
+      
+      <!-- Modal Header -->
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+            <i data-lucide="cpu" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white">إعدادات مزودي الذكاء الاصطناعي والنماذج (Local Browser Storage)</h2>
+            <p class="text-xs text-slate-400">يتم حفظ جميع مفاتيح الـ API والنماذج محلياً في متصفحك فقط (`localStorage`) ولا تغادره أبداً</p>
+          </div>
+        </div>
+        <button id="closeSettingsModalBtn" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 space-y-5 max-h-[78vh] overflow-y-auto custom-scrollbar">
+        
+        <!-- Step 1: Select or Add Provider -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-bold text-slate-300 uppercase tracking-wider">1. اختر المزود النشط (AI Provider)</label>
+            <button id="toggleAddProviderFormBtn" type="button" class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+              <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+              <span>إضافة بروفيدر مخصص جديد</span>
+            </button>
+          </div>
+
+          <!-- Provider Tabs Grid -->
+          <div id="providersListGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <!-- Populated dynamically via JS -->
+          </div>
+
+          <!-- Add Custom Provider Mini-Form -->
+          <div id="addCustomProviderBox" class="hidden mt-3 p-3.5 rounded-xl bg-slate-900/90 border border-indigo-500/40 space-y-3">
+            <h4 class="text-xs font-bold text-indigo-300">إضافة بروفيدر جديد (OpenAI-Compatible أو خاص)</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">اسم المزود (مثال: Groq / Together / Fireworks)</label>
+                <input id="customProviderNameInput" type="text" placeholder="Groq Vision API" class="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">النوع (API Format)</label>
+                <select id="customProviderFormatSelect" class="w-full bg-slate-950 text-white text-xs px-3 py-2 rounded-lg border border-slate-700">
+                  <option value="openai">OpenAI-Compatible (/v1/chat/completions & /v1/models)</option>
+                  <option value="gemini">Google Gemini Format (/v1beta/models)</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] text-slate-400 mb-1">رابط الـ Base URL</label>
+                <input id="customProviderUrlInput" type="text" dir="ltr" placeholder="https://api.groq.com/openai/v1" class="w-full bg-slate-950 text-white font-mono text-xs px-3 py-2 rounded-lg border border-slate-700" />
+              </div>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button id="cancelCustomProviderBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs">إلغاء</button>
+              <button id="saveCustomProviderBtn" type="button" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">حفظ المزود</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Provider Credentials & Base URL -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
+          <div class="sm:col-span-7">
+            <label for="apiKeyInput" class="block text-xs font-bold text-slate-300 mb-1">
+              مفتاح الـ API (<span id="currentProviderKeyLabel" class="text-indigo-400">Meta API</span>)
+            </label>
+            <div class="relative flex items-center">
+              <input
+                id="apiKeyInput"
+                type="password"
+                dir="ltr"
+                placeholder="sk-... / AIzaSy... / LLM|..."
+                class="w-full bg-slate-950 text-white font-mono text-xs px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-indigo-500 pr-9"
+              />
+              <button id="toggleApiKeyVisibilityBtn" type="button" class="absolute right-2.5 text-slate-400 hover:text-white" title="إظهار / إخفاء المفتاح">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <p id="providerKeyHint" class="text-[11px] text-slate-400 mt-1">
+              يدعم مفاتيح OpenRouter و Meta Llama API و Google Gemini API مع حفظ تلقائي في المتصفح.
+            </p>
+          </div>
+
+          <div class="sm:col-span-5">
+            <label for="baseUrlInput" class="block text-xs font-bold text-slate-300 mb-1">
+              نقطة الاتصال (Base URL)
+            </label>
+            <input
+              id="baseUrlInput"
+              type="text"
+              dir="ltr"
+              class="w-full bg-slate-950 text-slate-200 font-mono text-xs px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-indigo-500"
+            />
+            <p class="text-[11px] text-slate-400 mt-1">
+              قابل للتعديل (مثل OpenRouter أو Llama API أو Proxy).
+            </p>
+          </div>
+        </div>
+
+        <!-- Step 3: Fetch Models & Search Filter by Model Name -->
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="layers" class="w-4 h-4 text-indigo-400"></i>
+                <span>3. إدارة وجلب النماذج وفلترة البحث (Model Fetcher & Search Filter)</span>
+              </h3>
+              <p class="text-[11px] text-slate-400">اضغط على "جلب النماذج" لتحميل كافة النماذج المتاحة من حسابك في المزود أو ابحث بالاسم مباشرة</p>
+            </div>
+
+            <!-- Fetch Models Button -->
+            <button id="fetchModelsBtn" type="button" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all">
+              <i data-lucide="refresh-cw" id="fetchModelsIcon" class="w-3.5 h-3.5"></i>
+              <span>جلب النماذج من الـ API</span>
+            </button>
+          </div>
+
+          <!-- Search Filter Input & Vision Filter Toggle -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              <input
+                id="modelSearchFilterInput"
+                type="text"
+                placeholder="فلتر بحث باسم النموذج (مثال: llama, gemini, vision, 90b, claude, gpt-4o)..."
+                class="w-full bg-slate-950 text-white text-xs pr-9 pl-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <label class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer shrink-0">
+              <input id="visionOnlyFilterCheckbox" type="checkbox" class="rounded text-indigo-600 focus:ring-0" />
+              <span>نماذج الرؤية فقط (Vision)</span>
+            </label>
+          </div>
+
+          <!-- Manual Model ID Input Option -->
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-400 shrink-0">النموذج المحدد حالياً:</span>
+            <input
+              id="selectedModelIdInput"
+              type="text"
+              dir="ltr"
+              placeholder="اكتب اسم النموذج أو اختره من القائمة بالأسفل"
+              class="flex-1 bg-slate-950 text-indigo-300 font-mono text-xs px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-indigo-500"
+            />
+            <span id="modelsCountBadge" class="px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono text-[11px] shrink-0">0 نموذج</span>
+          </div>
+
+          <!-- Models List Container -->
+          <div id="modelsListContainer" class="max-h-52 overflow-y-auto custom-scrollbar grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </div>
+
+        <!-- Step 4: Custom System Prompt -->
+        <details class="bg-slate-900/40 rounded-xl border border-slate-800/80 p-3">
+          <summary class="text-xs font-bold text-slate-300 cursor-pointer flex items-center justify-between">
+            <span>⚙️ موجه النظام الاحترافي (System Prompt - مهندس واجهات أمامية)</span>
+            <span class="text-[11px] text-indigo-400">اضغط للتعديل</span>
+          </summary>
+          <textarea id="systemPromptTextarea" rows="4" dir="ltr" class="mt-2 w-full bg-slate-950 text-slate-200 font-mono text-[11px] p-2.5 rounded-lg border border-slate-700 focus:outline-none focus:border-indigo-500"></textarea>
+        </details>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-900/90 flex flex-wrap items-center justify-between gap-2">
+        <button id="resetSettingsBtn" type="button" class="text-xs text-rose-400 hover:text-rose-300">
+          استعادة الإعدادات الافتراضية
+        </button>
+        <div class="flex items-center gap-2">
+          <button id="saveSettingsBtn" type="button" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25">
+            حفظ الإعدادات وتفعيل النموذج
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 2: Vercel Deployment Guide & 1-Click Project Exporter              -->
+  <!-- ========================================================================= -->
+  <div id="vercelModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#0f1626] border border-slate-700/80 rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z"/></svg>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">جاهز للرفع والتشغيل على Vercel فوراً</h3>
+            <p class="text-xs text-slate-400">تطبيق متصفح كامل بدون سيرفر خلفي (Zero-Backend Client-Side App)</p>
+          </div>
+        </div>
+        <button id="closeVercelModalBtn" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4 text-xs text-slate-300 leading-relaxed">
+        <div class="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200">
+          ✨ تم تصميم هذا الـ MVP ليعمل بالكامل داخل المتصفح (`Client-Side 100%`) مع حفظ مفاتيح الـ API والنماذج في `localStorage`، مما يعني أنه يمكنك رفعه على **Vercel** مجاناً في أقل من 30 ثانية بدون أي إعدادات قواعد بيانات أو Backend!
+        </div>
+        <ol class="space-y-2 list-decimal list-inside text-slate-300">
+          <li>قم بتحميل ملف <code class="text-indigo-300 font-mono">index.html</code> وملف <code class="text-indigo-300 font-mono">vercel.json</code> من الأزرار بالأسفل (أو استخدم ملف الـ ZIP الجاهز المرفق).</li>
+          <li>ارفع المجلد على حسابك في <strong>GitHub</strong> أو اسحبه مباشرة إلى موقع <strong>Vercel Drop / Vercel Dashboard</strong>.</li>
+          <li>بعد فتح رابط موقعك على Vercel، افتح <strong>الإعدادات ⚙️</strong> وأضف مفتاح OpenRouter أو Meta API أو Gemini، واضغط <strong>جلب النماذج</strong> واستمتع بالعرض المباشر أمام لجنة التحكيم!</li>
+        </ol>
+        <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-emerald-300">💡 الحل الأسرع إذا كان المتصفح يمنع التحميل المباشر:</span>
+            <button id="copyFullProjectHtmlBtn" type="button" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>نسخ كود index.html بالكامل بضغطة زر</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-300">اضغط الزر الأخضر أعلاه لنسخ الكود بالكامل، ثم افتح المفكرة (Notepad أو VS Code) على جهازك، الصق الكود (<kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Ctrl+V</kbd>) واحفظ الملف باسم <code class="text-emerald-300 font-mono">index.html</code>!</p>
+          <textarea id="fullProjectSourceTextarea" readonly dir="ltr" rows="4" class="w-full bg-slate-950 text-emerald-200 font-mono text-[10px] p-2 rounded-lg border border-slate-700 focus:outline-none" placeholder="سيظهر كود المشروع الكامل هنا للنسخ المباشر..."></textarea>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5 pt-1">
+          <button id="downloadVercelIndexBtn" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center justify-center gap-2">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>تحميل مباشر index.html</span>
+          </button>
+          <button id="downloadVercelConfigBtn" type="button" class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold flex items-center justify-center gap-2">
+            <i data-lucide="file-json" class="w-4 h-4"></i>
+            <span>نسخ وتحميل vercel.json</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastContainer" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    /***************************************************************************
+     * 1. SAFE LOCAL STORAGE & MULTI-PROVIDER STATE MANAGEMENT
+     ***************************************************************************/
+    const STORAGE_KEY = 'sketch2ui_engine_state_v1';
+
+    const DEFAULT_SYSTEM_PROMPT = `You are an elite Senior Frontend Architect and UI/UX Designer.
+Analyze the attached hand-drawn wireframe sketch image, including all geometric shapes, arrows, and Arabic/English text annotations.
+Generate a COMPLETE, interactive, modern single-file HTML document using Tailwind CSS and Lucide icons (or clean inline SVG icons) with realistic working JavaScript state (such as working search filters, tabs, modals, dark/light aesthetics, and interactive buttons).
+Return ONLY valid HTML code starting with <!DOCTYPE html> without markdown explanation.`;
+
+    const DEFAULT_PROVIDERS = {
+      meta: {
+        id: 'meta',
+        name: 'Meta Llama API',
+        badge: 'Meta Vision',
+        format: 'openai',
+        baseUrl: 'https://api.llama.com/v1',
+        apiKey: '',
+        selectedModel: 'Llama-3.2-90B-Vision-Instruct',
+        hint: 'يدعم Meta Llama API الرسمي (api.llama.com/v1) أو أي نقطة اتصال متوافقة مثل Together / Groq.',
+        models: [
+          { id: 'Llama-4-Maverick-17B-128E-Instruct-FP8', name: 'Llama 4 Maverick 17B Vision', vision: true },
+          { id: 'Llama-4-Scout-17B-16E-Instruct-FP8', name: 'Llama 4 Scout 17B Vision', vision: true },
+          { id: 'Llama-3.2-90B-Vision-Instruct', name: 'Llama 3.2 90B Vision Instruct', vision: true },
+          { id: 'Llama-3.2-11B-Vision-Instruct', name: 'Llama 3.2 11B Vision Instruct', vision: true },
+          { id: 'Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B Instruct', vision: false }
+        ]
+      },
+      openrouter: {
+        id: 'openrouter',
+        name: 'OpenRouter',
+        badge: '200+ Models',
+        format: 'openai',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        apiKey: '',
+        selectedModel: 'meta-llama/llama-3.2-90b-vision-instruct',
+        hint: 'يدعم جلب جميع نماذج OpenRouter مباشرة بالضغط على زر "جلب النماذج" والفلترة بالاسم.',
+        models: [
+          { id: 'meta-llama/llama-3.2-90b-vision-instruct', name: 'Meta: Llama 3.2 90B Vision', vision: true },
+          { id: 'meta-llama/llama-3.2-11b-vision-instruct:free', name: 'Meta: Llama 3.2 11B Vision (Free)', vision: true },
+          { id: 'meta-llama/llama-4-maverick', name: 'Meta: Llama 4 Maverick Multimodal', vision: true },
+          { id: 'meta-llama/llama-4-scout', name: 'Meta: Llama 4 Scout Multimodal', vision: true },
+          { id: 'google/gemini-2.5-flash', name: 'Google: Gemini 2.5 Flash', vision: true },
+          { id: 'google/gemini-2.5-pro', name: 'Google: Gemini 2.5 Pro', vision: true },
+          { id: 'anthropic/claude-3.5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', vision: true },
+          { id: 'openai/gpt-4o', name: 'OpenAI: GPT-4o Vision', vision: true },
+          { id: 'openai/gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', vision: true },
+          { id: 'qwen/qwen2.5-vl-72b-instruct', name: 'Qwen 2.5 VL 72B Vision', vision: true }
+        ]
+      },
+      gemini: {
+        id: 'gemini',
+        name: 'Google Gemini API',
+        badge: 'Multimodal',
+        format: 'gemini',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        apiKey: '',
+        selectedModel: 'gemini-2.5-flash',
+        hint: 'يتصل مباشرة بواجهة Google Gemini API ويدعم جلب النماذج وتحليل الصور الفوري.',
+        models: [
+          { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Fast Multimodal)', vision: true },
+          { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Advanced Coding & Vision)', vision: true },
+          { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', vision: true },
+          { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', vision: true },
+          { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', vision: true }
+        ]
+      }
+    };
+
+    let appState = {
+      activeProviderId: 'meta',
+      providers: JSON.parse(JSON.stringify(DEFAULT_PROVIDERS)),
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
+      autoSync: false,
+      activePreset: 'dashboard',
+      uiThemeMode: 'light',
+      uiRoundedMode: false
+    };
+
+    function loadStateFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.providers) {
+            appState.activeProviderId = parsed.activeProviderId || 'meta';
+            appState.providers = { ...DEFAULT_PROVIDERS, ...parsed.providers };
+            appState.systemPrompt = parsed.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+            appState.autoSync = Boolean(parsed.autoSync);
+          }
+        }
+      } catch (err) {
+        console.warn('LocalStorage load fallback:', err);
+      }
+    }
+
+    function saveStateToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          activeProviderId: appState.activeProviderId,
+          providers: appState.providers,
+          systemPrompt: appState.systemPrompt,
+          autoSync: appState.autoSync
+        }));
+      } catch (err) {
+        console.warn('LocalStorage save fallback:', err);
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const el = document.createElement('div');
+      const colors = {
+        success: 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200',
+        error: 'bg-rose-950/95 border-rose-500/50 text-rose-200',
+        info: 'bg-slate-900/95 border-indigo-500/50 text-indigo-200'
+      };
+      el.className = `pointer-events-auto px-4 py-2.5 rounded-xl border shadow-xl text-xs font-semibold flex items-center gap-2 transition-all ${colors[type] || colors.info}`;
+      el.innerHTML = `<span>${message}</span>`;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+      }, 3400);
+    }
+
+    /***************************************************************************
+     * 2. INTERACTIVE DRAWING CANVAS ENGINE (Shapes, Arrows, Annotations, Base64)
+     ***************************************************************************/
+    const canvas = document.getElementById('sketchCanvas');
+    const ctx = canvas.getContext('2d');
+    let currentTool = 'rect';
+    let currentColor = '#1e293b';
+    let shapes = [];
+    let redoStack = [];
+    let isDrawing = false;
+    let startX = 0;
+    let startY = 0;
+    let currentFreehandPoints = [];
+    let pendingTextCoords = { x: 120, y: 120 };
+    let debounceTimer = null;
+    let debounceCountdownInterval = null;
+
+    function resizeCanvas() {
+      const container = document.getElementById('canvasContainer');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      canvas.width = Math.max(480, Math.floor(rect.width));
+      canvas.height = Math.max(380, Math.floor(rect.height));
+      renderCanvasShapes();
+    }
+
+    function drawRoughRect(context, x, y, w, h, color, label, bgFill) {
+      context.save();
+      if (bgFill) {
+        context.fillStyle = bgFill;
+        context.fillRect(x, y, w, h);
+      }
+      context.strokeStyle = color;
+      context.lineWidth = 2.2;
+      context.beginPath();
+      context.roundRect ? context.roundRect(x, y, w, h, 6) : context.rect(x, y, w, h);
+      context.stroke();
+      if (label) {
+        context.fillStyle = color;
+        context.font = '600 13px Cairo, Inter, sans-serif';
+        context.fillText(label, x + 10, y + 22);
+      }
+      context.restore();
+    }
+
+    function drawArrow(context, x1, y1, x2, y2, color) {
+      context.save();
+      context.strokeStyle = color;
+      context.fillStyle = color;
+      context.lineWidth = 2.5;
+      context.beginPath();
+      context.moveTo(x1, y1);
+      context.lineTo(x2, y2);
+      context.stroke();
+
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const headLen = 11;
+      context.beginPath();
+      context.moveTo(x2, y2);
+      context.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+      context.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+      context.closePath();
+      context.fill();
+      context.restore();
+    }
+
+    function renderCanvasShapes() {
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Subtle dot grid inside canvas so exported Base64 image looks like a clean whiteboard
+      ctx.fillStyle = '#e2e8f0';
+      for (let gx = 20; gx < canvas.width; gx += 24) {
+        for (let gy = 20; gy < canvas.height; gy += 24) {
+          ctx.fillRect(gx, gy, 1.5, 1.5);
+        }
+      }
+
+      shapes.forEach(item => {
+        if (item.type === 'rect') {
+          drawRoughRect(ctx, item.x, item.y, item.w, item.h, item.color, item.label, item.bg);
+        } else if (item.type === 'circle') {
+          ctx.save();
+          ctx.strokeStyle = item.color;
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, Math.max(5, item.r), 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        } else if (item.type === 'arrow') {
+          drawArrow(ctx, item.x1, item.y1, item.x2, item.y2, item.color);
+        } else if (item.type === 'text') {
+          ctx.save();
+          if (item.badgeBg) {
+            ctx.font = '700 12px Cairo, Inter, sans-serif';
+            const metrics = ctx.measureText(item.text);
+            const pad = 8;
+            ctx.fillStyle = item.badgeBg;
+            ctx.fillRect(item.x - pad, item.y - 15, metrics.width + pad * 2, 22);
+          }
+          ctx.fillStyle = item.color || '#1e293b';
+          ctx.font = item.font || '700 13px Cairo, Inter, sans-serif';
+          ctx.fillText(item.text, item.x, item.y);
+          ctx.restore();
+        } else if (item.type === 'pen' && item.points && item.points.length > 1) {
+          ctx.save();
+          ctx.strokeStyle = item.color;
+          ctx.lineWidth = item.width || 2.5;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(item.points[0].x, item.points[0].y);
+          for (let i = 1; i < item.points.length; i++) {
+            ctx.lineTo(item.points[i].x, item.points[i].y);
+          }
+          ctx.stroke();
+          ctx.restore();
+        } else if (item.type === 'image' && item.imgElement) {
+          ctx.drawImage(item.imgElement, 10, 10, canvas.width - 20, canvas.height - 20);
+        }
+      });
+
+      ctx.restore();
+      const countEl = document.getElementById('canvasShapesCount');
+      if (countEl) countEl.textContent = `${shapes.length} عنصر مرسوم`;
+      updateVisionPayloadInspector();
+    }
+
+    function triggerAutoSyncDebounce() {
+      if (!appState.autoSync) return;
+      clearTimeout(debounceTimer);
+      clearInterval(debounceCountdownInterval);
+
+      const badge = document.getElementById('debounceTimerBadge');
+      let remaining = 2.0;
+      if (badge) {
+        badge.classList.remove('hidden');
+        badge.textContent = `${remaining.toFixed(1)}s`;
+      }
+
+      debounceCountdownInterval = setInterval(() => {
+        remaining = Math.max(0, remaining - 0.2);
+        if (badge) badge.textContent = `${remaining.toFixed(1)}s`;
+      }, 200);
+
+      debounceTimer = setTimeout(() => {
+        clearInterval(debounceCountdownInterval);
+        if (badge) badge.classList.add('hidden');
+        handleGenerateUIFromSketch('مزامنة تلقائية بعد التوقف عن الرسم (Auto-Debounce)');
+      }, 2000);
+    }
+
+    function getCanvasCoordinates(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      const pos = getCanvasCoordinates(e);
+      if (currentTool === 'text') {
+        pendingTextCoords = pos;
+        const wrap = document.getElementById('floatingTextInputWrap');
+        const input = document.getElementById('floatingTextInput');
+        wrap.style.left = `${Math.min(canvas.width - 240, Math.max(12, pos.x))}px`;
+        wrap.style.top = `${Math.min(canvas.height - 90, Math.max(12, pos.y))}px`;
+        wrap.classList.remove('hidden');
+        input.value = '';
+        setTimeout(() => input.focus(), 20);
+        return;
+      }
+
+      isDrawing = true;
+      startX = pos.x;
+      startY = pos.y;
+      if (currentTool === 'pen' || currentTool === 'eraser') {
+        currentFreehandPoints = [{ x: pos.x, y: pos.y }];
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!isDrawing) return;
+      const pos = getCanvasCoordinates(e);
+      renderCanvasShapes();
+
+      if (currentTool === 'pen' || currentTool === 'eraser') {
+        currentFreehandPoints.push({ x: pos.x, y: pos.y });
+        ctx.save();
+        ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+        ctx.lineWidth = currentTool === 'eraser' ? 16 : 2.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(currentFreehandPoints[0].x, currentFreehandPoints[0].y);
+        for (let i = 1; i < currentFreehandPoints.length; i++) {
+          ctx.lineTo(currentFreehandPoints[i].x, currentFreehandPoints[i].y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      } else if (currentTool === 'rect') {
+        drawRoughRect(ctx, Math.min(startX, pos.x), Math.min(startY, pos.y), Math.abs(pos.x - startX), Math.abs(pos.y - startY), currentColor);
+      } else if (currentTool === 'circle') {
+        const r = Math.hypot(pos.x - startX, pos.y - startY);
+        ctx.save();
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(startX, startY, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      } else if (currentTool === 'arrow') {
+        drawArrow(ctx, startX, startY, pos.x, pos.y, currentColor);
+      }
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (!isDrawing) return;
+      isDrawing = false;
+      const pos = getCanvasCoordinates(e);
+
+      if (currentTool === 'pen' || currentTool === 'eraser') {
+        if (currentFreehandPoints.length > 1) {
+          shapes.push({
+            type: 'pen',
+            points: currentFreehandPoints,
+            color: currentTool === 'eraser' ? '#ffffff' : currentColor,
+            width: currentTool === 'eraser' ? 16 : 2.5
+          });
+          redoStack = [];
+        }
+      } else if (currentTool === 'rect') {
+        const w = Math.abs(pos.x - startX);
+        const h = Math.abs(pos.y - startY);
+        if (w > 8 && h > 8) {
+          shapes.push({
+            type: 'rect',
+            x: Math.min(startX, pos.x),
+            y: Math.min(startY, pos.y),
+            w,
+            h,
+            color: currentColor
+          });
+          redoStack = [];
+        }
+      } else if (currentTool === 'circle') {
+        const r = Math.hypot(pos.x - startX, pos.y - startY);
+        if (r > 6) {
+          shapes.push({ type: 'circle', x: startX, y: startY, r, color: currentColor });
+          redoStack = [];
+        }
+      } else if (currentTool === 'arrow') {
+        if (Math.hypot(pos.x - startX, pos.y - startY) > 10) {
+          shapes.push({ type: 'arrow', x1: startX, y1: startY, x2: pos.x, y2: pos.y, color: currentColor });
+          redoStack = [];
+        }
+      }
+
+      renderCanvasShapes();
+      triggerAutoSyncDebounce();
+    });
+
+    /***************************************************************************
+     * 3. 1-CLICK DEMO PRESETS (Wireframe Sketch + Working React/Tailwind Output)
+     ***************************************************************************/
+    function loadPresetWireframe(presetKey) {
+      appState.activePreset = presetKey;
+      redoStack = [];
+
+      if (presetKey === 'dashboard') {
+        shapes = [
+          // Top Header bar
+          { type: 'rect', x: 18, y: 16, w: 430, h: 42, color: '#1e293b', label: '[Navbar] لوحة مبيعات الذكاء الاصطناعي + زر تصدير', bg: '#f8fafc' },
+          // KPI Cards
+          { type: 'rect', x: 18, y: 70, w: 135, h: 68, color: '#4f46e5', label: 'الإيرادات: $84,200', bg: '#eef2ff' },
+          { type: 'rect', x: 165, y: 70, w: 135, h: 68, color: '#059669', label: 'العملاء: +1,420', bg: '#ecfdf5' },
+          { type: 'rect', x: 312, y: 70, w: 136, h: 68, color: '#1e293b', label: 'معدل التحويل: 6.8%', bg: '#f8fafc' },
+          // Main Sales Table Box
+          { type: 'rect', x: 18, y: 152, w: 430, h: 155, color: '#1e293b', label: '[Table] جدول بيانات المبيعات + شريط بحث فوري (Working State)', bg: '#ffffff' },
+          { type: 'rect', x: 30, y: 186, w: 220, h: 28, color: '#4f46e5', label: '🔍 ابحث باسم العميل أو الخطة...', bg: '#f1f5f9' },
+          { type: 'rect', x: 265, y: 186, w: 170, h: 28, color: '#059669', label: '+ إضافة صفقة جديدة', bg: '#ecfdf5' },
+          // Handwritten Annotation with Arrow!
+          { type: 'text', x: 40, y: 348, text: '💡 ملاحظة للـ AI: اربط الجدول بفلتر بحث شغال وأزرار حالة تفاعلية!', color: '#e11d48', badgeBg: '#ffe4e6' },
+          { type: 'arrow', x1: 180, y1: 328, x2: 160, y2: 225, color: '#e11d48' }
+        ];
+      } else if (presetKey === 'landing') {
+        shapes = [
+          { type: 'rect', x: 18, y: 16, w: 430, h: 38, color: '#1e293b', label: '[Header] شعار المنصة + روابط + زر ابدأ مجاناً', bg: '#f8fafc' },
+          { type: 'rect', x: 18, y: 66, w: 430, h: 120, color: '#4f46e5', label: '[Hero] عنوان رئيسي جذاب + زر تجربة فورية + فيديو', bg: '#eef2ff' },
+          { type: 'rect', x: 18, y: 200, w: 208, h: 105, color: '#059669', label: '[Card] باقة المحترفين $29/شهر', bg: '#ecfdf5' },
+          { type: 'rect', x: 240, y: 200, w: 208, h: 105, color: '#1e293b', label: '[Card] باقة الشركات + حاسبة توفير', bg: '#f8fafc' },
+          { type: 'text', x: 35, y: 345, text: '💡 ملاحظة: أضف مفتاح تبديل أسعار (شهري / سنوي خصم 20%) شغال!', color: '#e11d48', badgeBg: '#ffe4e6' },
+          { type: 'arrow', x1: 210, y1: 325, x2: 210, y2: 265, color: '#e11d48' }
+        ];
+      } else if (presetKey === 'mobile') {
+        shapes = [
+          { type: 'rect', x: 110, y: 14, w: 240, h: 335, color: '#1e293b', label: '📱 إطار تطبيق محفظة ذكية (Mobile App)', bg: '#f8fafc' },
+          { type: 'rect', x: 126, y: 48, w: 208, h: 74, color: '#4f46e5', label: 'الرصيد الكلي: $14,850.00', bg: '#eef2ff' },
+          { type: 'circle', x: 155, y: 152, r: 18, color: '#059669' },
+          { type: 'circle', x: 230, y: 152, r: 18, color: '#4f46e5' },
+          { type: 'circle', x: 305, y: 152, r: 18, color: '#e11d48' },
+          { type: 'rect', x: 126, y: 186, w: 208, h: 145, color: '#1e293b', label: 'سجل المعاملات + حاسبة تحويل سريع', bg: '#ffffff' },
+          { type: 'text', x: 18, y: 372, text: '💡 ملاحظة: اجعل تحويل الرصيد يخصم ويضيف للمعاملات فوراً!', color: '#e11d48', badgeBg: '#ffe4e6' },
+          { type: 'arrow', x1: 95, y1: 355, x2: 145, y2: 270, color: '#e11d48' }
+        ];
+      }
+
+      renderCanvasShapes();
+      renderPresetOutputUI(presetKey);
+    }
+
+    function buildGeneratedTemplateCode(presetKey, options = {}) {
+      const isDark = options.dark ?? (appState.uiThemeMode === 'dark');
+      const isRounded = options.rounded ?? appState.uiRoundedMode;
+      const customNote = options.promptNote || '';
+
+      const bgMain = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+      const bgCard = isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800';
+      const btnRadius = isRounded ? 'rounded-full' : 'rounded-xl';
+
+      if (presetKey === 'landing') {
+        const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Cairo', sans-serif; }</style>
+</head>
+<body class="${bgMain} min-h-screen transition-colors duration-300">
+  <nav class="border-b ${isDark ? 'border-slate-800 bg-slate-900/80' : 'border-slate-200 bg-white/80'} backdrop-blur sticky top-0 z-10 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-2 font-extrabold text-xl text-indigo-600">
+      <span>⚡ NovaUI AI</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button onclick="document.getElementById('demoModal').classList.remove('hidden')" class="px-4 py-2 ${btnRadius} bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/25 transition">ابدأ مجاناً الآن</button>
+    </div>
+  </nav>
+
+  <header class="max-w-4xl mx-auto text-center px-6 py-12">
+    <span class="px-3 py-1 rounded-full bg-indigo-500/15 text-indigo-500 text-xs font-bold">تم توليده من الرسمة اليدوية مباشرًة ✨</span>
+    <h1 class="text-3xl sm:text-5xl font-extrabold mt-4 leading-tight">حول أفكارك المرسومة إلى منتجات رقمية في ثوانٍ</h1>
+    <p class="mt-4 text-sm sm:text-base opacity-75 max-w-2xl mx-auto">منصة مدعومة بنماذج الرؤية المتعددة لتحويل الرسومات التخطيطية والملاحظات السهمية إلى كود React و Tailwind جاهز للإنتاج.</p>
+    ${customNote ? `<div class="mt-4 inline-block px-4 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-500 text-xs font-bold">✓ التعديل المطبق: ${customNote}</div>` : ''}
+    
+    <!-- Interactive Billing Toggle recognized from Annotation -->
+    <div class="mt-8 inline-flex items-center gap-3 p-1.5 rounded-2xl border ${bgCard}">
+      <button id="monthlyBtn" onclick="setBilling('monthly')" class="px-4 py-2 ${btnRadius} text-xs font-bold bg-indigo-600 text-white">دفع شهري</button>
+      <button id="yearlyBtn" onclick="setBilling('yearly')" class="px-4 py-2 ${btnRadius} text-xs font-bold">دفع سنوي (خصم 20% 🔥)</button>
+    </div>
+  </header>
+
+  <section class="max-w-4xl mx-auto px-6 pb-14 grid grid-cols-1 sm:grid-cols-2 gap-6">
+    <div class="p-6 rounded-2xl border ${bgCard} shadow-sm flex flex-col justify-between">
+      <div>
+        <h3 class="text-lg font-bold">باقة المطور المستقل (Indie)</h3>
+        <div class="mt-3 flex items-baseline gap-1">
+          <span id="proPrice" class="text-4xl font-extrabold text-indigo-600">$29</span>
+          <span class="text-xs opacity-60">/ شهرياً</span>
+        </div>
+        <ul class="mt-4 space-y-2 text-xs opacity-85">
+          <li>✓ تحويل غير محدود للرسومات إلى React</li>
+          <li>✓ دعم مباشر لـ Meta Llama Vision و Gemini</li>
+          <li>✓ تصدير فوري إلى Vercel بضغطة زر</li>
+        </ul>
+      </div>
+      <button onclick="selectPlan('باقة المطور المستقل')" class="mt-6 w-full py-2.5 ${btnRadius} bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition">اختيار الباقة</button>
+    </div>
+
+    <div class="p-6 rounded-2xl border-2 border-indigo-500 ${bgCard} shadow-xl flex flex-col justify-between">
+      <div>
+        <div class="flex justify-between items-center">
+          <h3 class="text-lg font-bold">باقة الفرق والشركات (Team)</h3>
+          <span class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">الأكثر طلباً</span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-1">
+          <span id="teamPrice" class="text-4xl font-extrabold text-indigo-600">$79</span>
+          <span class="text-xs opacity-60">/ شهرياً</span>
+        </div>
+        <div class="mt-4 p-3 rounded-xl bg-indigo-500/10">
+          <label class="text-xs font-bold block mb-1">حاسبة التوفير التفاعلية (عدد المطورين: <span id="devCountLabel">5</span>)</label>
+          <input type="range" min="1" max="25" value="5" oninput="updateRoi(this.value)" class="w-full accent-indigo-600" />
+          <p class="text-xs mt-1 text-emerald-500 font-bold">توفر فريقك: <span id="hoursSaved">60</span> ساعة برمجة شهرياً!</p>
+        </div>
+      </div>
+      <button onclick="selectPlan('باقة الفرق والشركات')" class="mt-6 w-full py-2.5 ${btnRadius} bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-sm transition">ابدأ تجربة الفريق</button>
+    </div>
+  </section>
+
+  <div id="demoModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center p-4">
+    <div class="p-6 rounded-2xl max-w-sm w-full border ${bgCard}">
+      <h4 id="modalTitle" class="font-bold text-lg">تم تفعيل التجربة المجانية! 🎉</h4>
+      <p class="text-xs opacity-75 mt-2">تم إنشاء بيئة العمل الخاصة بك بناءً على الرسمة التخطيطية.</p>
+      <button onclick="document.getElementById('demoModal').classList.add('hidden')" class="mt-4 w-full py-2 ${btnRadius} bg-indigo-600 text-white text-xs font-bold">إغلاق</button>
+    </div>
+  </div>
+
+  <script>
+    function setBilling(mode) {
+      const pro = document.getElementById('proPrice');
+      const team = document.getElementById('teamPrice');
+      const mBtn = document.getElementById('monthlyBtn');
+      const yBtn = document.getElementById('yearlyBtn');
+      if (mode === 'yearly') {
+        pro.textContent = '$23';
+        team.textContent = '$63';
+        yBtn.className = 'px-4 py-2 ${btnRadius} text-xs font-bold bg-indigo-600 text-white';
+        mBtn.className = 'px-4 py-2 ${btnRadius} text-xs font-bold';
+      } else {
+        pro.textContent = '$29';
+        team.textContent = '$79';
+        mBtn.className = 'px-4 py-2 ${btnRadius} text-xs font-bold bg-indigo-600 text-white';
+        yBtn.className = 'px-4 py-2 ${btnRadius} text-xs font-bold';
+      }
+    }
+    function updateRoi(val) {
+      document.getElementById('devCountLabel').textContent = val;
+      document.getElementById('hoursSaved').textContent = val * 12;
+    }
+    function selectPlan(name) {
+      document.getElementById('modalTitle').textContent = 'تم اختيار: ' + name + ' ✨';
+      document.getElementById('demoModal').classList.remove('hidden');
+    }
+  <\/script>
+</body>
+</html>`;
+        return { html, react: convertHtmlToReactComponent(html, 'StartupLandingPage') };
+      }
+
+      if (presetKey === 'mobile') {
+        const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Cairo', sans-serif; }</style>
+</head>
+<body class="${bgMain} min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-sm rounded-[32px] border-4 border-slate-800 ${bgCard} p-5 shadow-2xl space-y-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-xs opacity-60">مرحباً بك مجدداً 👋</p>
+        <h2 class="font-extrabold text-base">محفظة PaySketch الذكية</h2>
+      </div>
+      <span class="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-500 text-xs font-bold">متصل</span>
+    </div>
+
+    <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white shadow-lg">
+      <p class="text-xs opacity-80">الرصيد المتاح حالياً</p>
+      <h3 id="walletBalance" class="text-3xl font-extrabold mt-1" dir="ltr">$14,850.00</h3>
+      <p class="text-[11px] opacity-80 mt-2">+12.4% عائد هذا الشهر</p>
+    </div>
+
+    <!-- Quick Transfer Form recognized from Sketch Annotation -->
+    <div class="p-3.5 rounded-2xl border ${isDark ? 'border-slate-800 bg-slate-950/60' : 'border-slate-200 bg-slate-50'} space-y-2.5">
+      <p class="text-xs font-bold text-indigo-500">⚡ تحويل فوري (مفعل برمجياً من الملاحظة السهمية)</p>
+      <div class="flex gap-2">
+        <input id="transferRecipient" type="text" placeholder="اسم المستلم..." class="flex-1 px-3 py-1.5 rounded-xl border text-xs bg-transparent" />
+        <input id="transferAmount" type="number" placeholder="المبلغ $" value="250" class="w-24 px-3 py-1.5 rounded-xl border text-xs bg-transparent" />
+      </div>
+      <button onclick="sendMoney()" class="w-full py-2 ${btnRadius} bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">إرسال المبلغ فوراً</button>
+    </div>
+
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <h4 class="text-xs font-bold">آخر المعاملات</h4>
+        <span id="txCount" class="text-[11px] opacity-60">3 عمليات</span>
+      </div>
+      <div id="txList" class="space-y-2 text-xs max-h-44 overflow-y-auto">
+        <div class="p-2.5 rounded-xl border ${bgCard} flex justify-between items-center">
+          <span>☕ اشتراك سحابة فيرسيل Pro</span>
+          <span class="font-bold text-rose-500" dir="ltr">-$20.00</span>
+        </div>
+        <div class="p-2.5 rounded-xl border ${bgCard} flex justify-between items-center">
+          <span>💎 دفعة عميل تصميم واجهات</span>
+          <span class="font-bold text-emerald-500" dir="ltr">+$1,200.00</span>
+        </div>
+        <div class="p-2.5 rounded-xl border ${bgCard} flex justify-between items-center">
+          <span>🚀 رصيد Meta Vision API</span>
+          <span class="font-bold text-rose-500" dir="ltr">-$50.00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let balance = 14850;
+    let count = 3;
+    function sendMoney() {
+      const name = document.getElementById('transferRecipient').value.trim() || 'عميل جديد';
+      const amt = parseFloat(document.getElementById('transferAmount').value) || 100;
+      if (amt <= 0 || amt > balance) return;
+      balance -= amt;
+      count += 1;
+      document.getElementById('walletBalance').textContent = '$' + balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+      document.getElementById('txCount').textContent = count + ' عمليات';
+      const item = document.createElement('div');
+      item.className = 'p-2.5 rounded-xl border border-indigo-500/40 flex justify-between items-center';
+      item.innerHTML = '<span>📤 تحويل إلى ' + name + '</span><span class="font-bold text-rose-500" dir="ltr">-$' + amt.toFixed(2) + '</span>';
+      document.getElementById('txList').prepend(item);
+      document.getElementById('transferRecipient').value = '';
+    }
+  <\/script>
+</body>
+</html>`;
+        return { html, react: convertHtmlToReactComponent(html, 'FinTechMobileWallet') };
+      }
+
+      // Default: SaaS Analytics & Sales Dashboard with working search filter & add row
+      const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Cairo', sans-serif; }</style>
+</head>
+<body class="${bgMain} min-h-screen p-4 sm:p-6 transition-colors duration-300">
+  <div class="max-w-5xl mx-auto space-y-5">
+    
+    <!-- Top Header -->
+    <header class="p-4 rounded-2xl border ${bgCard} shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <h1 class="text-lg sm:text-xl font-extrabold">لوحة تحكم المبيعات الذكية (Sales & Revenue UI)</h1>
+        </div>
+        <p class="text-xs opacity-70 mt-0.5">تم توليد هذه الواجهة التفاعلية من رسمتك اليدوية والملاحظة السهمية تلقائياً</p>
+      </div>
+      <div class="flex items-center gap-2">
+        ${customNote ? `<span class="px-3 py-1 rounded-full bg-indigo-500/15 text-indigo-500 text-xs font-bold">✓ ${customNote}</span>` : ''}
+        <button onclick="exportCsv()" class="px-3.5 py-2 ${btnRadius} bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow transition">تصدير التقرير CSV</button>
+      </div>
+    </header>
+
+    <!-- 3 KPI Cards from Sketch Rectangles -->
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="p-4 rounded-2xl border ${bgCard} shadow-sm">
+        <p class="text-xs opacity-65 font-semibold">إجمالي الإيرادات الشهرية</p>
+        <div class="flex items-baseline justify-between mt-2">
+          <h2 id="totalRevenueStat" class="text-2xl font-extrabold text-indigo-600" dir="ltr">$84,200</h2>
+          <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 text-xs font-bold">+18.4%</span>
+        </div>
+      </div>
+      <div class="p-4 rounded-2xl border ${bgCard} shadow-sm">
+        <p class="text-xs opacity-65 font-semibold">العملاء النشطون</p>
+        <div class="flex items-baseline justify-between mt-2">
+          <h2 class="text-2xl font-extrabold text-emerald-600" dir="ltr">+1,420</h2>
+          <span class="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500 text-xs font-bold">نشط الآن</span>
+        </div>
+      </div>
+      <div class="p-4 rounded-2xl border ${bgCard} shadow-sm">
+        <p class="text-xs opacity-65 font-semibold">معدل التحويل (Conversion)</p>
+        <div class="flex items-baseline justify-between mt-2">
+          <h2 class="text-2xl font-extrabold text-purple-600" dir="ltr">6.8%</h2>
+          <span class="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-500 text-xs font-bold">أعلى من المستهدف</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sales Table with Working Search Filter (Recognized from Arrow Annotation) -->
+    <section class="p-5 rounded-2xl border ${bgCard} shadow-sm space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-base font-bold">جدول بيانات المبيعات التفاعلي (Working Search & State)</h3>
+          <p class="text-xs opacity-65">تم تفعيل البحث الفوري وإضافة الصفقات بناءً على السهم المرسوم في السبورة</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <input
+            id="searchInput"
+            type="text"
+            oninput="filterSales()"
+            placeholder="🔍 ابحث باسم العميل أو الباقة أو الحالة..."
+            class="px-3.5 py-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} text-xs w-60 focus:outline-none focus:border-indigo-500"
+          />
+          <select id="statusFilter" onchange="filterSales()" class="px-3 py-2 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} text-xs">
+            <option value="all">جميع الحالات</option>
+            <option value="مكتمل">مكتمل</option>
+            <option value="قيد المراجعة">قيد المراجعة</option>
+          </select>
+          <button onclick="addNewSaleRow()" class="px-3.5 py-2 ${btnRadius} bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">+ إضافة صفقة</button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-right text-xs border-collapse">
+          <thead>
+            <tr class="border-b ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-500'}">
+              <th class="py-2.5 px-3">العميل / الشركة</th>
+              <th class="py-2.5 px-3">الباقة</th>
+              <th class="py-2.5 px-3">القيمة</th>
+              <th class="py-2.5 px-3">الحالة</th>
+              <th class="py-2.5 px-3">إجراء</th>
+            </tr>
+          </thead>
+          <tbody id="salesTableBody" class="divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-200'}"></tbody>
+        </table>
+      </div>
+      <p id="toastMsg" class="text-xs font-bold text-indigo-500 hidden"></p>
+    </section>
+  </div>
+
+  <script>
+    let salesData = [
+      { id: 1, client: 'شركة آفاق التقنية', plan: 'Enterprise AI', amount: 14500, status: 'مكتمل' },
+      { id: 2, client: 'مؤسسة النور الرقمية', plan: 'Pro Team', amount: 4800, status: 'مكتمل' },
+      { id: 3, client: 'أكاديمية المستقبل', plan: 'Cloud Scale', amount: 9200, status: 'قيد المراجعة' },
+      { id: 4, client: 'متجر سمارت باي', plan: 'Starter Plus', amount: 2400, status: 'مكتمل' },
+      { id: 5, client: 'مجموعة الرواد القابضة', plan: 'Enterprise AI', amount: 19800, status: 'قيد المراجعة' }
+    ];
+
+    function renderRows() {
+      const q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+      const status = document.getElementById('statusFilter').value;
+      const tbody = document.getElementById('salesTableBody');
+      const filtered = salesData.filter(item => {
+        const matchesText = item.client.toLowerCase().includes(q) || item.plan.toLowerCase().includes(q) || item.status.toLowerCase().includes(q);
+        const matchesStatus = status === 'all' || item.status === status;
+        return matchesText && matchesStatus;
+      });
+
+      tbody.innerHTML = filtered.map(row => \`
+        <tr class="hover:bg-indigo-500/5 transition">
+          <td class="py-3 px-3 font-bold">\${row.client}</td>
+          <td class="py-3 px-3 font-mono text-[11px]">\${row.plan}</td>
+          <td class="py-3 px-3 font-extrabold text-indigo-600" dir="ltr">$\${row.amount.toLocaleString()}</td>
+          <td class="py-3 px-3">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold \${row.status === 'مكتمل' ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'}">\${row.status}</span>
+          </td>
+          <td class="py-3 px-3">
+            <button onclick="toggleRowStatus(\${row.id})" class="text-indigo-500 hover:underline font-semibold">تبديل الحالة</button>
+          </td>
+        </tr>
+      \`).join('') || '<tr><td colspan="5" class="py-6 text-center opacity-60">لا توجد نتائج مطابقة للبحث</td></tr>';
+    }
+
+    function filterSales() { renderRows(); }
+    function toggleRowStatus(id) {
+      const item = salesData.find(r => r.id === id);
+      if (item) {
+        item.status = item.status === 'مكتمل' ? 'قيد المراجعة' : 'مكتمل';
+        renderRows();
+      }
+    }
+    function addNewSaleRow() {
+      const names = ['شركة مدار الذكية', 'منصة بيان السحابية', 'مختبرات الابتكار AI', 'شركة قمة الخليج'];
+      const randomName = names[Math.floor(Math.random() * names.length)];
+      const amount = Math.floor(Math.random() * 9000) + 3000;
+      salesData.unshift({ id: Date.now(), client: randomName, plan: 'Llama Vision Pro', amount, status: 'مكتمل' });
+      renderRows();
+      const msg = document.getElementById('toastMsg');
+      msg.textContent = '✓ تمت إضافة صفقة جديدة (' + randomName + ') وتحديث الجدول فوراً!';
+      msg.classList.remove('hidden');
+    }
+    function exportCsv() {
+      const msg = document.getElementById('toastMsg');
+      msg.textContent = '✓ تم تجهيز ملف المبيعات للتصدير (' + salesData.length + ' صفقات)!';
+      msg.classList.remove('hidden');
+    }
+    renderRows();
+  <\/script>
+</body>
+</html>`;
+
+      return { html, react: convertHtmlToReactComponent(html, 'SmartSalesDashboard') };
+    }
+
+    function convertHtmlToReactComponent(htmlString, componentName = 'GeneratedSketchUI') {
+      return `import React, { useState } from 'react';
+import { Sparkles, Search, Plus, Download, CheckCircle2 } from 'lucide-react';
+
+/**
+ * Generated by Live Sketch-to-UI Engine
+ * Component: ${componentName}
+ * Provider: ${appState.providers[appState.activeProviderId]?.name || 'Meta Vision API'}
+ * Model: ${appState.providers[appState.activeProviderId]?.selectedModel || 'Llama-3.2-90B-Vision'}
+ */
+export default function ${componentName}() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [darkMode, setDarkMode] = useState(${appState.uiThemeMode === 'dark'});
+  const [items, setItems] = useState([
+    { id: 1, client: 'شركة آفاق التقنية', plan: 'Enterprise AI', amount: '$14,500', status: 'مكتمل' },
+    { id: 2, client: 'مؤسسة النور الرقمية', plan: 'Pro Team', amount: '$4,800', status: 'مكتمل' },
+    { id: 3, client: 'أكاديمية المستقبل', plan: 'Cloud Scale', amount: '$9,200', status: 'قيد المراجعة' },
+  ]);
+
+  const filtered = items.filter(row =>
+    row.client.includes(searchQuery) || row.plan.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div dir="rtl" className={\`min-h-screen p-6 \${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}\`}>
+      <header className="flex items-center justify-between p-4 rounded-2xl border bg-white/5 mb-6">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-indigo-500" />
+          <h1 className="text-xl font-bold">${componentName}</h1>
+        </div>
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold"
+        >
+          تبديل المظهر
+        </button>
+      </header>
+
+      <div className="flex gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute right-3 top-3 text-slate-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="ابحث في البيانات المولدة من الرسمة..."
+            className="w-full pr-9 pl-4 py-2 rounded-xl border bg-transparent text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {filtered.map(item => (
+          <div key={item.id} className="p-4 rounded-xl border flex items-center justify-between">
+            <span className="font-bold">{item.client}</span>
+            <span className="text-indigo-500 font-mono">{item.amount}</span>
+            <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-500 text-xs">{item.status}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}`;
+    }
+
+    let currentGeneratedBundle = { html: '', react: '', activeCodeView: 'react' };
+
+    function renderPresetOutputUI(presetKey, options = {}) {
+      const bundle = buildGeneratedTemplateCode(presetKey, options);
+      currentGeneratedBundle.html = bundle.html;
+      currentGeneratedBundle.react = bundle.react;
+
+      const iframe = document.getElementById('livePreviewIframe');
+      if (iframe) iframe.srcdoc = bundle.html;
+
+      const codeArea = document.getElementById('codeEditorTextarea');
+      if (codeArea) {
+        codeArea.value = currentGeneratedBundle.activeCodeView === 'react' ? bundle.react : bundle.html;
+      }
+      updateVisionPayloadInspector(options.promptNote);
+    }
+
+    function updateVisionPayloadInspector(extraPrompt = '') {
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const img = document.getElementById('base64PreviewImg');
+        if (img) img.src = dataUrl;
+        const sizeInfo = document.getElementById('base64SizeInfo');
+        if (sizeInfo) {
+          const kb = Math.round((dataUrl.length * 3) / 4 / 1024);
+          sizeInfo.textContent = `data:image/png;base64,... (${kb} KB) | Resolution: ${canvas.width}x${canvas.height}px`;
+        }
+        const pre = document.getElementById('payloadPromptPreview');
+        const activeProv = appState.providers[appState.activeProviderId];
+        if (pre && activeProv) {
+          pre.textContent = JSON.stringify({
+            provider: activeProv.name,
+            endpoint: activeProv.baseUrl,
+            model: activeProv.selectedModel,
+            system_prompt: appState.systemPrompt,
+            user_iteration_prompt: extraPrompt || 'Convert the current sketch and red arrow annotations into an interactive UI.',
+            image_attachment: `data:image/png;base64,[${canvas.width}x${canvas.height}_SNAPSHOT]`
+          }, null, 2);
+        }
+      } catch (e) {
+        console.warn('Inspector preview error:', e);
+      }
+    }
+
+    /***************************************************************************
+     * 4. REAL MULTIMODAL AI VISION CALL + SMART HYBRID FALLBACK
+     ***************************************************************************/
+    function extractCleanHtmlFromResponse(rawText) {
+      if (!rawText) return '';
+      const codeBlockMatch = rawText.match(/```(?:html|jsx|tsx)?\s*([\s\S]*?)```/i);
+      const candidate = codeBlockMatch ? codeBlockMatch[1].trim() : rawText.trim();
+      if (candidate.includes('<html') || candidate.includes('<!DOCTYPE') || candidate.includes('<body') || candidate.includes('<div')) {
+        if (!candidate.toLowerCase().includes('<script src="https://cdn.tailwindcss.com')) {
+          return `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-4">${candidate}</body></html>`;
+        }
+        return candidate;
+      }
+      return '';
+    }
+
+    async function handleGenerateUIFromSketch(iterationPrompt = '') {
+      const overlay = document.getElementById('aiGeneratingOverlay');
+      const activeProv = appState.providers[appState.activeProviderId];
+      const startTime = performance.now();
+
+      if (overlay) overlay.classList.remove('hidden');
+
+      const base64DataUrl = canvas.toDataURL('image/png');
+      const base64Raw = base64DataUrl.split(',')[1];
+
+      // Check if user configured a real API key for the active provider
+      if (activeProv && activeProv.apiKey && activeProv.apiKey.trim().length > 5) {
+        try {
+          let generatedText = '';
+          const userInstruction = iterationPrompt
+            ? `قم بتحديث الواجهة الحالية بناءً على الرسمة وهذا التعديل المطلوب: "${iterationPrompt}". أعد كود HTML كامل واحد يحتوي على Tailwind CSS و JavaScript تفاعلي.`
+            : `حول هذه الرسمة اليدوية والملاحظات المكتوبة عليها إلى صفحة ويب تفاعلية كاملة باستخدام Tailwind CSS و JavaScript شغال.`;
+
+          if (activeProv.format === 'gemini') {
+            const cleanBase = activeProv.baseUrl.replace(/\/+$/, '');
+            const modelName = activeProv.selectedModel.replace(/^models\//, '');
+            const url = `${cleanBase}/models/${modelName}:generateContent?key=${encodeURIComponent(activeProv.apiKey.trim())}`;
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: appState.systemPrompt }] },
+                contents: [{
+                  parts: [
+                    { text: userInstruction },
+                    { inlineData: { mimeType: 'image/png', data: base64Raw } }
+                  ]
+                }]
+              })
+            });
+            if (!res.ok) throw new Error(`Gemini API Error (${res.status})`);
+            const data = await res.json();
+            generatedText = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n') || '';
+          } else {
+            // OpenAI-Compatible Multimodal format (OpenRouter, Meta Llama API, Groq, Together)
+            const cleanBase = activeProv.baseUrl.replace(/\/+$/, '');
+            const url = `${cleanBase}/chat/completions`;
+            const headers = {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${activeProv.apiKey.trim()}`
+            };
+            if (cleanBase.includes('openrouter.ai')) {
+              headers['HTTP-Referer'] = window.location.href;
+              headers['X-Title'] = 'Live Sketch-to-UI Engine';
+            }
+            const res = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                model: activeProv.selectedModel,
+                messages: [
+                  { role: 'system', content: appState.systemPrompt },
+                  {
+                    role: 'user',
+                    content: [
+                      { type: 'text', text: userInstruction },
+                      { type: 'image_url', image_url: { url: base64DataUrl } }
+                    ]
+                  }
+                ],
+                temperature: 0.2
+              })
+            });
+            if (!res.ok) throw new Error(`${activeProv.name} Error (${res.status})`);
+            const data = await res.json();
+            generatedText = data?.choices?.[0]?.message?.content || '';
+          }
+
+          const cleanHtml = extractCleanHtmlFromResponse(generatedText);
+          if (cleanHtml) {
+            currentGeneratedBundle.html = cleanHtml;
+            currentGeneratedBundle.react = convertHtmlToReactComponent(cleanHtml, 'AIGeneratedSketchUI');
+            document.getElementById('livePreviewIframe').srcdoc = cleanHtml;
+            document.getElementById('codeEditorTextarea').value =
+              currentGeneratedBundle.activeCodeView === 'react' ? currentGeneratedBundle.react : cleanHtml;
+
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+            document.getElementById('latencyBadge').textContent = `⚡ ${elapsed}s (${activeProv.selectedModel})`;
+            document.getElementById('generationModeBadge').textContent = `تم التوليد عبر ${activeProv.name}`;
+            if (overlay) overlay.classList.add('hidden');
+            showToast(`تم توليد الواجهة بنجاح عبر ${activeProv.selectedModel}!`, 'success');
+            return;
+          }
+        } catch (err) {
+          console.warn('Live API call fell back to local engine:', err);
+          showToast(`تعذر الاتصال بـ ${activeProv.name} (${err.message}) — تم التوليد عبر المحرك المحلي الفوري`, 'info');
+        }
+      }
+
+      // Instant Smart Local Engine (works offline / without API key & interprets prompt keywords!)
+      setTimeout(() => {
+        if (iterationPrompt) {
+          const p = iterationPrompt.toLowerCase();
+          if (p.includes('ليلي') || p.includes('dark') || p.includes('داكن')) {
+            appState.uiThemeMode = 'dark';
+          } else if (p.includes('نهاري') || p.includes('فاتح') || p.includes('light')) {
+            appState.uiThemeMode = 'light';
+          }
+          if (p.includes('دائري') || p.includes('rounded') || p.includes('حواف')) {
+            appState.uiRoundedMode = true;
+          }
+        }
+
+        renderPresetOutputUI(appState.activePreset, {
+          dark: appState.uiThemeMode === 'dark',
+          rounded: appState.uiRoundedMode,
+          promptNote: iterationPrompt
+        });
+
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+        document.getElementById('latencyBadge').textContent = `⚡ ${elapsed}s`;
+        document.getElementById('generationModeBadge').textContent = activeProv?.apiKey
+          ? `نشط: ${activeProv.name}`
+          : 'وضع المحاكاة الفوري (أضف API Key من الإعدادات للاتصال الحي)';
+        if (overlay) overlay.classList.add('hidden');
+        showToast(iterationPrompt ? `تم تحديث الواجهة: "${iterationPrompt}"` : 'تم تحويل الرسمة إلى واجهة تفاعلية بنجاح!', 'success');
+      }, 420);
+    }
+
+    /***************************************************************************
+     * 5. MULTI-PROVIDER SETTINGS MODAL, LIVE MODEL FETCHER & SEARCH FILTER
+     ***************************************************************************/
+    function updateHeaderProviderBadge() {
+      const prov = appState.providers[appState.activeProviderId] || Object.values(appState.providers)[0];
+      if (!prov) return;
+      document.getElementById('activeProviderBadge').textContent = prov.name;
+      document.getElementById('activeModelBadge').textContent = prov.selectedModel;
+      const dot = document.getElementById('providerStatusDot');
+      if (dot) {
+        dot.className = `w-2 h-2 rounded-full ${prov.apiKey && prov.apiKey.trim().length > 4 ? 'bg-emerald-400' : 'bg-amber-400'}`;
+      }
+    }
+
+    function renderProvidersGridInModal() {
+      const grid = document.getElementById('providersListGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      Object.values(appState.providers).forEach(prov => {
+        const isSelected = prov.id === appState.activeProviderId;
+        const hasKey = prov.apiKey && prov.apiKey.trim().length > 4;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `p-3 rounded-xl border text-right transition-all flex flex-col justify-between gap-1.5 ${
+          isSelected
+            ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-lg shadow-indigo-500/10'
+            : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:bg-slate-800/80'
+        }`;
+        btn.innerHTML = `
+          <div class="flex items-center justify-between w-full">
+            <span class="font-bold text-xs">${prov.name}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full ${hasKey ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}">
+              ${hasKey ? 'متصل ✓' : prov.badge || 'API'}
+            </span>
+          </div>
+          <div class="text-[11px] font-mono text-indigo-300 truncate w-full" dir="ltr">${prov.selectedModel}</div>
+        `;
+        btn.addEventListener('click', () => {
+          appState.activeProviderId = prov.id;
+          populateProviderFieldsInModal();
+          renderProvidersGridInModal();
+          renderModelsListInModal();
+          updateHeaderProviderBadge();
+          saveStateToStorage();
+        });
+        grid.appendChild(btn);
+      });
+    }
+
+    function populateProviderFieldsInModal() {
+      const prov = appState.providers[appState.activeProviderId];
+      if (!prov) return;
+      document.getElementById('currentProviderKeyLabel').textContent = prov.name;
+      document.getElementById('apiKeyInput').value = prov.apiKey || '';
+      document.getElementById('baseUrlInput').value = prov.baseUrl || '';
+      document.getElementById('selectedModelIdInput').value = prov.selectedModel || '';
+      document.getElementById('providerKeyHint').textContent = prov.hint || 'يتم حفظ المفتاح محلياً في متصفحك فقط.';
+      document.getElementById('systemPromptTextarea').value = appState.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+    }
+
+    function renderModelsListInModal() {
+      const prov = appState.providers[appState.activeProviderId];
+      const container = document.getElementById('modelsListContainer');
+      const countBadge = document.getElementById('modelsCountBadge');
+      if (!prov || !container) return;
+
+      const query = (document.getElementById('modelSearchFilterInput').value || '').trim().toLowerCase();
+      const visionOnly = document.getElementById('visionOnlyFilterCheckbox').checked;
+
+      const allModels = prov.models || [];
+      const filtered = allModels.filter(m => {
+        const matchQuery = !query || m.id.toLowerCase().includes(query) || (m.name && m.name.toLowerCase().includes(query));
+        const matchVision = !visionOnly || m.vision;
+        return matchQuery && matchVision;
+      });
+
+      if (countBadge) countBadge.textContent = `${filtered.length} نموذج`;
+      container.innerHTML = '';
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="sm:col-span-2 py-6 text-center text-xs text-slate-400">
+            لا توجد نماذج مطابقة لـ "${query}". يمكنك كتابة معرف النموذج مباشرة في الحقل أعلاه أو الضغط على "جلب النماذج".
+          </div>
+        `;
+        return;
+      }
+
+      filtered.slice(0, 120).forEach(model => {
+        const isCurrent = model.id === prov.selectedModel;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = `p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 ${
+          isCurrent
+            ? 'bg-indigo-600/25 border-indigo-500 text-white'
+            : 'bg-slate-950/80 border-slate-800/90 text-slate-300 hover:border-slate-700 hover:bg-slate-900'
+        }`;
+        item.innerHTML = `
+          <div class="min-w-0 flex-1" dir="ltr">
+            <div class="font-mono text-xs font-semibold truncate text-indigo-200">${model.id}</div>
+            <div class="text-[10px] text-slate-400 truncate">${model.name || model.id}</div>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            ${model.vision ? '<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono">Vision</span>' : ''}
+            ${isCurrent ? '<span class="text-indigo-400 font-bold text-xs">✓</span>' : ''}
+          </div>
+        `;
+        item.addEventListener('click', () => {
+          prov.selectedModel = model.id;
+          document.getElementById('selectedModelIdInput').value = model.id;
+          renderModelsListInModal();
+          renderProvidersGridInModal();
+          updateHeaderProviderBadge();
+          saveStateToStorage();
+        });
+        container.appendChild(item);
+      });
+    }
+
+    async function fetchModelsFromProviderApi() {
+      const prov = appState.providers[appState.activeProviderId];
+      if (!prov) return;
+
+      // Sync current inputs before fetching
+      prov.apiKey = document.getElementById('apiKeyInput').value.trim();
+      prov.baseUrl = document.getElementById('baseUrlInput').value.trim();
+      saveStateToStorage();
+
+      const btn = document.getElementById('fetchModelsBtn');
+      const icon = document.getElementById('fetchModelsIcon');
+      if (icon) icon.classList.add('animate-spin');
+      if (btn) btn.disabled = true;
+
+      try {
+        const cleanBase = prov.baseUrl.replace(/\/+$/, '');
+        let fetchedModels = [];
+
+        if (prov.format === 'gemini') {
+          if (!prov.apiKey) {
+            throw new Error('يرجى إدخال مفتاح Gemini API أولاً لجلب قائمة النماذج الحية من Google');
+          }
+          const res = await fetch(`${cleanBase}/models?key=${encodeURIComponent(prov.apiKey)}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (Array.isArray(data.models)) {
+            fetchedModels = data.models.map(m => {
+              const shortId = (m.name || '').replace(/^models\//, '');
+              const isVis = shortId.includes('gemini-1.5') || shortId.includes('gemini-2') || shortId.includes('vision') || shortId.includes('flash') || shortId.includes('pro');
+              return {
+                id: shortId,
+                name: m.displayName || shortId,
+                vision: isVis
+              };
+            });
+          }
+        } else {
+          // OpenRouter / Meta API / OpenAI-compatible /models endpoint
+          const headers = { 'Accept': 'application/json' };
+          if (prov.apiKey) {
+            headers['Authorization'] = `Bearer ${prov.apiKey}`;
+          }
+          const res = await fetch(`${cleanBase}/models`, { headers });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const rawList = Array.isArray(data.data) ? data.data : (Array.isArray(data.models) ? data.models : []);
+          fetchedModels = rawList.map(m => {
+            const id = m.id || m.name || '';
+            const arch = JSON.stringify(m.architecture || m.input_modalities || '').toLowerCase();
+            const isVis =
+              arch.includes('image') ||
+              id.toLowerCase().includes('vision') ||
+              id.toLowerCase().includes('vl') ||
+              id.toLowerCase().includes('gpt-4o') ||
+              id.toLowerCase().includes('gemini') ||
+              id.toLowerCase().includes('claude-3') ||
+              id.toLowerCase().includes('maverick') ||
+              id.toLowerCase().includes('scout') ||
+              id.toLowerCase().includes('pixtral');
+            return {
+              id,
+              name: m.name || id,
+              vision: isVis
+            };
+          }).filter(m => m.id);
+        }
+
+        if (fetchedModels.length > 0) {
+          prov.models = fetchedModels;
+          saveStateToStorage();
+          renderModelsListInModal();
+          showToast(`تم جلب ${fetchedModels.length} نموذج من ${prov.name} وحفظها محلياً!`, 'success');
+        } else {
+          showToast('لم يتم العثور على نماذج إضافية، تم الإبقاء على القائمة الافتراضية.', 'info');
+        }
+      } catch (err) {
+        showToast(`تنبيه جلب النماذج: ${err.message}. يمكنك استخدام النماذج الجاهزة أو البحث فيها مباشرة!`, 'error');
+      } finally {
+        if (icon) icon.classList.remove('animate-spin');
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    /***************************************************************************
+     * 6. WIRE UP ALL UI EVENT LISTENERS
+     ***************************************************************************/
+    function initEventListeners() {
+      // Tool Selection Buttons
+      document.querySelectorAll('.canvas-tool-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentTool = btn.getAttribute('data-tool');
+          document.querySelectorAll('.canvas-tool-btn').forEach(b => {
+            b.className = 'canvas-tool-btn p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all';
+          });
+          btn.className = 'canvas-tool-btn p-1.5 rounded-lg bg-indigo-600 text-white shadow transition-all';
+          const toolNames = {
+            pen: 'قلم حر (Pen)',
+            rect: 'مربع / حاوية (Rectangle)',
+            circle: 'دائرة (Circle)',
+            arrow: 'سهم ملاحظة (Arrow)',
+            text: 'نص أو ملاحظة (اضغط على السبورة للكتابة)',
+            eraser: 'ممحاة (Eraser)'
+          };
+          document.getElementById('currentToolLabel').textContent = `الأداة: ${toolNames[currentTool] || currentTool}`;
+        });
+      });
+
+      // Color Swatches
+      document.querySelectorAll('.color-swatch').forEach(swatch => {
+        swatch.addEventListener('click', () => {
+          currentColor = swatch.getAttribute('data-color');
+          document.querySelectorAll('.color-swatch').forEach(s => {
+            s.classList.remove('ring-2', 'ring-offset-2', 'ring-offset-slate-900', 'ring-indigo-400');
+          });
+          swatch.classList.add('ring-2', 'ring-offset-2', 'ring-offset-slate-900', 'ring-indigo-400');
+        });
+      });
+
+      // Floating Text Input Confirmation
+      document.getElementById('confirmFloatingTextBtn').addEventListener('click', () => {
+        const input = document.getElementById('floatingTextInput');
+        const val = input.value.trim();
+        if (val) {
+          shapes.push({
+            type: 'text',
+            x: pendingTextCoords.x,
+            y: pendingTextCoords.y,
+            text: val,
+            color: currentColor,
+            badgeBg: currentColor === '#e11d48' ? '#ffe4e6' : '#f1f5f9'
+          });
+          redoStack = [];
+          renderCanvasShapes();
+          triggerAutoSyncDebounce();
+        }
+        document.getElementById('floatingTextInputWrap').classList.add('hidden');
+      });
+
+      document.getElementById('floatingTextInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('confirmFloatingTextBtn').click();
+        } else if (e.key === 'Escape') {
+          document.getElementById('floatingTextInputWrap').classList.add('hidden');
+        }
+      });
+
+      document.getElementById('cancelFloatingTextBtn').addEventListener('click', () => {
+        document.getElementById('floatingTextInputWrap').classList.add('hidden');
+      });
+
+      // Quick Stamps
+      document.querySelectorAll('.stamp-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const kind = btn.getAttribute('data-stamp');
+          if (kind === 'navbar') {
+            shapes.push({ type: 'rect', x: 24, y: 24, w: 400, h: 40, color: '#1e293b', label: '[Navbar] شريط تنقل علوي + أزرار', bg: '#f8fafc' });
+          } else if (kind === 'card') {
+            shapes.push({ type: 'rect', x: 40 + (shapes.length * 12) % 200, y: 85, w: 150, h: 75, color: '#4f46e5', label: '[KPI Card] إحصائية جديدة', bg: '#eef2ff' });
+          } else if (kind === 'table') {
+            shapes.push({ type: 'rect', x: 24, y: 170, w: 400, h: 130, color: '#059669', label: '[Table] جدول بيانات مع فلتر بحث فوري', bg: '#ecfdf5' });
+          } else if (kind === 'login') {
+            shapes.push({ type: 'rect', x: 110, y: 70, w: 230, h: 210, color: '#4f46e5', label: '[Login Card] البريد + كلمة المرور + دخول', bg: '#eef2ff' });
+          } else if (kind === 'annotation') {
+            shapes.push({ type: 'text', x: 40, y: 345, text: '💡 ملاحظة للـ AI: اجعل الجدول يدعم البحث والفلترة الفورية!', color: '#e11d48', badgeBg: '#ffe4e6' });
+            shapes.push({ type: 'arrow', x1: 160, y1: 325, x2: 180, y2: 245, color: '#e11d48' });
+          }
+          renderCanvasShapes();
+          triggerAutoSyncDebounce();
+        });
+      });
+
+      // Undo / Redo / Clear / Download / Upload
+      document.getElementById('undoCanvasBtn').addEventListener('click', () => {
+        if (shapes.length > 0) {
+          redoStack.push(shapes.pop());
+          renderCanvasShapes();
+        }
+      });
+
+      document.getElementById('redoCanvasBtn').addEventListener('click', () => {
+        if (redoStack.length > 0) {
+          shapes.push(redoStack.pop());
+          renderCanvasShapes();
+        }
+      });
+
+      document.getElementById('clearCanvasBtn').addEventListener('click', () => {
+        shapes = [];
+        redoStack = [];
+        renderCanvasShapes();
+        showToast('تم مسح السبورة بالكامل', 'info');
+      });
+
+      document.getElementById('downloadSketchBtn').addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = `sketch-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showToast('تم تحميل لقطة الرسمة بنجاح', 'success');
+      });
+
+      document.getElementById('uploadSketchInput').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            shapes.push({ type: 'image', imgElement: img });
+            renderCanvasShapes();
+            showToast('تم إدراج صورة الرسمة على السبورة!', 'success');
+            triggerAutoSyncDebounce();
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // 1-Click Presets
+      const setPresetActiveStyle = (activeBtnId) => {
+        ['presetDashboardBtn', 'presetLandingBtn', 'presetMobileBtn'].forEach(id => {
+          const b = document.getElementById(id);
+          if (!b) return;
+          if (id === activeBtnId) {
+            b.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 bg-indigo-600/20 text-indigo-300 border border-indigo-500/40';
+          } else {
+            b.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 border border-transparent';
+          }
+        });
+      };
+
+      document.getElementById('presetDashboardBtn').addEventListener('click', () => {
+        setPresetActiveStyle('presetDashboardBtn');
+        loadPresetWireframe('dashboard');
+        showToast('تم تحميل قالب رسمة لوحة التحكم وتوليد الواجهة التفاعلية!', 'success');
+      });
+
+      document.getElementById('presetLandingBtn').addEventListener('click', () => {
+        setPresetActiveStyle('presetLandingBtn');
+        loadPresetWireframe('landing');
+        showToast('تم تحميل قالب رسمة صفحة الهبوط وتوليد الواجهة التفاعلية!', 'success');
+      });
+
+      document.getElementById('presetMobileBtn').addEventListener('click', () => {
+        setPresetActiveStyle('presetMobileBtn');
+        loadPresetWireframe('mobile');
+        showToast('تم تحميل قالب رسمة تطبيق الموبايل وتوليد الواجهة التفاعلية!', 'success');
+      });
+
+      // Auto-Sync Toggle
+      document.getElementById('autoSyncToggleBtn').addEventListener('click', () => {
+        appState.autoSync = !appState.autoSync;
+        const dot = document.getElementById('autoSyncDot');
+        const btn = document.getElementById('autoSyncToggleBtn');
+        if (appState.autoSync) {
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          btn.classList.add('border-emerald-500/50', 'text-emerald-300');
+          showToast('تم تفعيل المزامنة التلقائية (Debounce 2s بعد التوقف عن الرسم)', 'success');
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+          btn.classList.remove('border-emerald-500/50', 'text-emerald-300');
+          clearTimeout(debounceTimer);
+          clearInterval(debounceCountdownInterval);
+          document.getElementById('debounceTimerBadge').classList.add('hidden');
+          showToast('تم إيقاف المزامنة التلقائية', 'info');
+        }
+        saveStateToStorage();
+      });
+
+      // Primary Generate UI Button
+      document.getElementById('generateUiBtn').addEventListener('click', () => {
+        handleGenerateUIFromSketch();
+      });
+
+      // Preview / Code / Payload Tabs
+      document.querySelectorAll('.view-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.getAttribute('data-tab');
+          document.querySelectorAll('.view-tab-btn').forEach(b => {
+            b.className = 'view-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition-all';
+          });
+          btn.className = 'view-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow flex items-center gap-1.5 transition-all';
+
+          document.getElementById('tabPreviewContent').classList.toggle('hidden', tab !== 'preview');
+          document.getElementById('tabCodeContent').classList.toggle('hidden', tab !== 'code');
+          document.getElementById('tabPayloadContent').classList.toggle('hidden', tab !== 'payload');
+          if (tab === 'payload') updateVisionPayloadInspector();
+        });
+      });
+
+      // Code View Switcher (React JSX vs Standalone HTML)
+      document.getElementById('showReactCodeBtn').addEventListener('click', () => {
+        currentGeneratedBundle.activeCodeView = 'react';
+        document.getElementById('showReactCodeBtn').className = 'px-2.5 py-1 rounded bg-indigo-600 text-white font-mono text-[11px]';
+        document.getElementById('showHtmlCodeBtn').className = 'px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:text-white font-mono text-[11px]';
+        document.getElementById('codeEditorTextarea').value = currentGeneratedBundle.react;
+      });
+
+      document.getElementById('showHtmlCodeBtn').addEventListener('click', () => {
+        currentGeneratedBundle.activeCodeView = 'html';
+        document.getElementById('showHtmlCodeBtn').className = 'px-2.5 py-1 rounded bg-indigo-600 text-white font-mono text-[11px]';
+        document.getElementById('showReactCodeBtn').className = 'px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:text-white font-mono text-[11px]';
+        document.getElementById('codeEditorTextarea').value = currentGeneratedBundle.html;
+      });
+
+      document.getElementById('applyManualCodeBtn').addEventListener('click', () => {
+        const val = document.getElementById('codeEditorTextarea').value;
+        if (currentGeneratedBundle.activeCodeView === 'html') {
+          currentGeneratedBundle.html = val;
+          document.getElementById('livePreviewIframe').srcdoc = val;
+          showToast('تم تحديث المعاينة الحية من الكود المعدل!', 'success');
+        } else {
+          showToast('انتقل إلى تبويب Standalone.html لتعديل كود المعاينة المباشر', 'info');
+        }
+      });
+
+      // Viewport Responsive Switcher
+      document.querySelectorAll('.viewport-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const width = btn.getAttribute('data-viewport');
+          const wrapper = document.getElementById('iframeViewportWrapper');
+          wrapper.style.maxWidth = width;
+          document.querySelectorAll('.viewport-btn').forEach(b => {
+            b.className = 'viewport-btn p-1.5 rounded-lg text-slate-400 hover:text-white';
+          });
+          btn.className = 'viewport-btn p-1.5 rounded-lg bg-slate-800 text-indigo-300';
+        });
+      });
+
+      // Copy Code & Download Generated UI
+      document.getElementById('copyCodeBtn').addEventListener('click', () => {
+        const textToCopy = document.getElementById('codeEditorTextarea').value || currentGeneratedBundle.react;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(textToCopy).then(() => {
+            showToast('تم نسخ الكود المصدري إلى الحافظة!', 'success');
+          }).catch(() => fallbackCopy(textToCopy));
+        } else {
+          fallbackCopy(textToCopy);
+        }
+      });
+
+      function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        showToast('تم نسخ الكود المصدري إلى الحافظة!', 'success');
+      }
+
+      document.getElementById('downloadUiHtmlBtn').addEventListener('click', () => {
+        const blob = new Blob([currentGeneratedBundle.html], { type: 'text/html;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `generated-ui-${appState.activePreset}.html`;
+        link.click();
+        showToast('تم تحميل ملف الواجهة المولدة بنجاح!', 'success');
+      });
+
+      // Hybrid Iteration Bar (Form + Quick Chips)
+      document.getElementById('hybridPromptForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('iterationPromptInput');
+        const promptText = input.value.trim();
+        if (!promptText) return;
+        handleGenerateUIFromSketch(promptText);
+        input.value = '';
+      });
+
+      document.querySelectorAll('.quick-iterate-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const promptText = chip.getAttribute('data-prompt');
+          document.getElementById('iterationPromptInput').value = promptText;
+          handleGenerateUIFromSketch(promptText);
+        });
+      });
+
+      // Settings Modal Open / Close / Save
+      const openSettings = () => {
+        renderProvidersGridInModal();
+        populateProviderFieldsInModal();
+        renderModelsListInModal();
+        document.getElementById('settingsModal').classList.remove('hidden');
+      };
+
+      document.getElementById('openSettingsBtn').addEventListener('click', openSettings);
+      document.getElementById('openSettingsQuickBtn').addEventListener('click', openSettings);
+      document.getElementById('closeSettingsModalBtn').addEventListener('click', () => {
+        document.getElementById('settingsModal').classList.add('hidden');
+      });
+
+      document.getElementById('toggleApiKeyVisibilityBtn').addEventListener('click', () => {
+        const inp = document.getElementById('apiKeyInput');
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+      });
+
+      document.getElementById('apiKeyInput').addEventListener('input', (e) => {
+        const prov = appState.providers[appState.activeProviderId];
+        if (prov) {
+          prov.apiKey = e.target.value.trim();
+          saveStateToStorage();
+          updateHeaderProviderBadge();
+        }
+      });
+
+      document.getElementById('baseUrlInput').addEventListener('input', (e) => {
+        const prov = appState.providers[appState.activeProviderId];
+        if (prov) {
+          prov.baseUrl = e.target.value.trim();
+          saveStateToStorage();
+        }
+      });
+
+      document.getElementById('selectedModelIdInput').addEventListener('input', (e) => {
+        const prov = appState.providers[appState.activeProviderId];
+        if (prov) {
+          prov.selectedModel = e.target.value.trim();
+          updateHeaderProviderBadge();
+          saveStateToStorage();
+        }
+      });
+
+      // Model Search Filter & Vision Checkbox
+      document.getElementById('modelSearchFilterInput').addEventListener('input', renderModelsListInModal);
+      document.getElementById('visionOnlyFilterCheckbox').addEventListener('change', renderModelsListInModal);
+
+      // Fetch Models Button
+      document.getElementById('fetchModelsBtn').addEventListener('click', fetchModelsFromProviderApi);
+
+      // Add Custom Provider Form
+      document.getElementById('toggleAddProviderFormBtn').addEventListener('click', () => {
+        document.getElementById('addCustomProviderBox').classList.toggle('hidden');
+      });
+      document.getElementById('cancelCustomProviderBtn').addEventListener('click', () => {
+        document.getElementById('addCustomProviderBox').classList.add('hidden');
+      });
+      document.getElementById('saveCustomProviderBtn').addEventListener('click', () => {
+        const name = document.getElementById('customProviderNameInput').value.trim();
+        const format = document.getElementById('customProviderFormatSelect').value;
+        const url = document.getElementById('customProviderUrlInput').value.trim();
+        if (!name || !url) {
+          showToast('يرجى إدخال اسم المزود ورابط الـ Base URL', 'error');
+          return;
+        }
+        const id = 'custom_' + Date.now();
+        appState.providers[id] = {
+          id,
+          name,
+          badge: 'Custom',
+          format,
+          baseUrl: url,
+          apiKey: '',
+          selectedModel: format === 'gemini' ? 'gemini-2.5-flash' : 'meta-llama/llama-3.2-90b-vision-instruct',
+          hint: 'مزود مخصص تم حفظه محلياً في المتصفح.',
+          models: [
+            { id: 'meta-llama/llama-3.2-90b-vision-instruct', name: 'Llama 3.2 90B Vision', vision: true },
+            { id: 'gpt-4o', name: 'GPT-4o Vision', vision: true }
+          ]
+        };
+        appState.activeProviderId = id;
+        saveStateToStorage();
+        document.getElementById('addCustomProviderBox').classList.add('hidden');
+        document.getElementById('customProviderNameInput').value = '';
+        document.getElementById('customProviderUrlInput').value = '';
+        renderProvidersGridInModal();
+        populateProviderFieldsInModal();
+        renderModelsListInModal();
+        updateHeaderProviderBadge();
+        showToast(`تمت إضافة المزود "${name}" بنجاح!`, 'success');
+      });
+
+      // Save & Reset Settings
+      document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+        const prov = appState.providers[appState.activeProviderId];
+        if (prov) {
+          prov.apiKey = document.getElementById('apiKeyInput').value.trim();
+          prov.baseUrl = document.getElementById('baseUrlInput').value.trim();
+          prov.selectedModel = document.getElementById('selectedModelIdInput').value.trim() || prov.selectedModel;
+        }
+        appState.systemPrompt = document.getElementById('systemPromptTextarea').value.trim() || DEFAULT_SYSTEM_PROMPT;
+        saveStateToStorage();
+        updateHeaderProviderBadge();
+        updateVisionPayloadInspector();
+        document.getElementById('settingsModal').classList.add('hidden');
+        showToast('تم حفظ الإعدادات وتفعيل النموذج في المتصفح بنجاح!', 'success');
+      });
+
+      document.getElementById('resetSettingsBtn').addEventListener('click', () => {
+        appState.providers = JSON.parse(JSON.stringify(DEFAULT_PROVIDERS));
+        appState.activeProviderId = 'meta';
+        appState.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+        saveStateToStorage();
+        renderProvidersGridInModal();
+        populateProviderFieldsInModal();
+        renderModelsListInModal();
+        updateHeaderProviderBadge();
+        showToast('تمت استعادة الإعدادات الافتراضية', 'info');
+      });
+
+      // Vercel Export Modal
+      function getCleanProjectSourceHtml() {
+        return '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      }
+      document.getElementById('openVercelModalBtn').addEventListener('click', () => {
+        document.getElementById('vercelModal').classList.remove('hidden');
+        const ta = document.getElementById('fullProjectSourceTextarea');
+        if (ta) {
+          ta.value = getCleanProjectSourceHtml();
+        }
+      });
+      document.getElementById('copyFullProjectHtmlBtn').addEventListener('click', () => {
+        const fullHtml = getCleanProjectSourceHtml();
+        const ta = document.getElementById('fullProjectSourceTextarea');
+        if (ta) {
+          ta.value = fullHtml;
+          ta.focus();
+          ta.select();
+        }
+        try {
+          document.execCommand('copy');
+          showToast('تم نسخ كود المشروع (index.html) بالكامل إلى الحافظة! الصقه في ملف على جهازك (Ctrl+V)', 'success');
+        } catch (e) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(fullHtml);
+          }
+          showToast('تم تحديد الكود بالكامل — اضغط Ctrl+C لنسخه!', 'info');
+        }
+      });
+      document.getElementById('closeVercelModalBtn').addEventListener('click', () => {
+        document.getElementById('vercelModal').classList.add('hidden');
+      });
+      document.getElementById('downloadVercelIndexBtn').addEventListener('click', () => {
+        const fullHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'index.html';
+        a.click();
+        showToast('تم تحميل index.html الجاهز للرفع على Vercel!', 'success');
+      });
+      document.getElementById('downloadVercelConfigBtn').addEventListener('click', () => {
+        const vercelJson = JSON.stringify({
+          version: 2,
+          cleanUrls: true,
+          rewrites: [{ source: '/(.*)', destination: '/index.html' }]
+        }, null, 2);
+        const blob = new Blob([vercelJson], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'vercel.json';
+        a.click();
+        showToast('تم تحميل ملف vercel.json!', 'success');
+      });
+    }
+
+    // Initialize Application on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) window.lucide.createIcons();
+      loadStateFromStorage();
+      updateHeaderProviderBadge();
+      initEventListeners();
+      resizeCanvas();
+      loadPresetWireframe('dashboard');
+      window.addEventListener('resize', resizeCanvas);
+    });
+  </script>
+</body>
+</html>

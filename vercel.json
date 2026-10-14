@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "name": "live-sketch-to-ui-engine",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
