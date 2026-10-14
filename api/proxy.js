@@ -15,9 +15,10 @@ const ALLOWED_HOSTS = [
   'api.together.xyz',
   'api.deepinfra.com',
   'api.mistral.ai',
+  'api.figma.com',
 ];
 
-const FORWARD_HEADERS = ['authorization', 'content-type', 'accept', 'x-goog-api-key', 'http-referer', 'x-title'];
+const FORWARD_HEADERS = ['authorization', 'content-type', 'accept', 'x-goog-api-key', 'http-referer', 'x-title', 'x-figma-token'];
 
 const CORS = {
   'access-control-allow-origin': '*',

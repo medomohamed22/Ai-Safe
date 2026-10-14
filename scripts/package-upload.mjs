@@ -12,7 +12,7 @@ async function add(name) {
  if (/\.(png|jpe?g|webp|log)$/i.test(name)) return;
  zip.file(name, await fs.readFile(full)); included.push(name);
 }
-for (const name of ['src','api','tests','scripts','index.html','package.json','package-lock.json','vite.config.ts','tsconfig.json','.gitignore','README.md','TODO.md','VALIDATION.md','UI_DESIGN.md']) await add(name);
+for (const name of ['src','api','tests','scripts','index.html','package.json','package-lock.json','vite.config.ts','tsconfig.json','.gitignore','README.md','TODO.md','VALIDATION.md','UI_DESIGN.md','PRODUCTIVITY.md','server.mjs','supabase']) await add(name);
 const output = path.resolve(root, '../sketch2ui-github-ready.zip');
 const archive = await zip.generateAsync({type:'nodebuffer',compression:'DEFLATE'});
 await fs.writeFile(output,archive);

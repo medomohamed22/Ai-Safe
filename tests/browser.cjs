@@ -27,7 +27,7 @@ const fixture = `import {useState} from 'react'; export default function App(){c
   await page.reload();
   await frame.getByRole('button',{name:'Save',exact:true}).waitFor();
   const downloadEvent = page.waitForEvent('download');
-  await page.getByRole('button',{name:'Project ZIP',exact:true}).click();
+  await page.locator('.export-menu > summary').click();await page.getByRole('button',{name:'Project ZIP',exact:true}).click();
   const download = await downloadEvent;
   assert.equal(download.suggestedFilename(),'sketch2ui-project.zip');
   await download.saveAs('.qa/browser-export.zip');
