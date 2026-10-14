@@ -1,0 +1,6 @@
+const {chromium,chromePath}=require('./browser-runtime.cjs');const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({executablePath:chromePath,headless:true});try{
+ const page=await browser.newPage();await page.addInitScript(()=>{localStorage.setItem('s2ui.versions.v1',JSON.stringify(['export default function App(){return <h1>Responsive check</h1>}']));localStorage.setItem('s2ui.vindex.v1','0');});await page.goto(process.env.S2UI_TEST_URL||'http://127.0.0.1:5173');
+ for(const [width,height]of [[320,740],[390,844],[820,1180],[900,600],[1024,768],[1440,1000]]){await page.setViewportSize({width,height});await page.frameLocator('iframe[title="Live preview"]').getByRole('heading',{name:'Responsive check'}).waitFor({timeout:60000});const info=await page.evaluate(()=>({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,height:document.querySelector('iframe[title="Live preview"]').getBoundingClientRect().height}));assert.ok(info.scroll<=info.width+1,JSON.stringify({width,...info}));assert.ok(info.height>=160,JSON.stringify({width,...info}));}
+ console.log('PASS: six viewport sizes (320–1440px), no horizontal document overflow, usable preview area.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

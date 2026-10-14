@@ -1,5 +1,17 @@
 # Sketch2UI feature roadmap
 
+## UI/UX redesign
+
+- [x] Black/white visual system with persistent day/night/system modes.
+- [x] Structured workspace, refined composer and grouped tools.
+- [x] Responsive Sketch/Preview switching and usable mobile settings.
+- [x] Motion for controls, panels, menus, theme and dialog entrance/exit.
+- [x] Reduced motion, keyboard navigation and dialog focus behavior.
+- [x] Preserve preview state while switching theme or inspecting code.
+- [x] Final production regression and refreshed upload archive.
+
+## Functional features
+
 Implement in numbered order. A feature is complete only after its checks pass.
 Keep deployment to the existing GitHub/Vercel workflow; no hosting migration.
 

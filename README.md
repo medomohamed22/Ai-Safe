@@ -18,6 +18,13 @@ Draw a wireframe → get a live, interactive React + Tailwind UI in seconds.
 
 ## Workspace tools
 
+The workspace uses a monochrome day/night design. Use the moon/sun toggle to
+switch appearance or the adjacent device icon to follow the system. Narrow
+screens have Sketch/Preview workspace tabs. Keyboard navigation, reduced motion
+and theme persistence are supported; see `UI_DESIGN.md` for design references.
+Quick suggestions fill the composer for review; press Send to apply them. Theme
+and Code/Preview switching preserve the running generated interface state.
+
 - **Select element:** click preview elements to edit static text, colors, padding
   and corner radius in the actual JSX. Nested/dynamic text uses targeted AI edits.
   Repeated instances share a source template. Lock an element to reject changes

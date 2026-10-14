@@ -3,8 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✏️</text></svg>" />
-    <title>Sketch2UI — Live Sketch-to-UI Engine</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='black'/><path d='M10 9l13 5-6 3-3 6-4-14zM16 16l5 5' fill='none' stroke='white' stroke-width='1.5'/></svg>" />
+    <title>Sketch2UI — Ideas into interfaces</title>
+    <meta name="description" content="Sketch your next interface. Generate, refine, and export interactive frontends." />
+    <meta name="theme-color" content="#fafafa" />
+    <script>
+      try {
+        const pref = JSON.parse(localStorage.getItem('s2ui.theme.v1') || '"system"');
+        const dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.uiTheme = dark ? 'dark' : 'light';
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      } catch { document.documentElement.dataset.uiTheme = 'light'; }
+    </script>
   </head>
   <body>
     <div id="root"></div>

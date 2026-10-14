@@ -1,12 +1,29 @@
 # Validation and boundaries
 
+## UI/UX redesign verification
+
+The monochrome redesign was checked with the existing 12 Chrome workflows plus
+dedicated UI and responsive workflows (14 groups total) against the production
+build. TypeScript, source/contract checks and production build passed.
+
+UI checks cover saved day/night/system appearance, system preference updates,
+neutral drawing-tool highlights, reduced-motion behavior, dialog Tab containment,
+Escape dismissal and focus return, native canvas dark mode, mobile settings,
+keyboard model selection and keeping preview state through theme/code-tab changes.
+The final contrast/mobile-action refinements are covered by targeted UI/responsive
+checks against the rebuilt production bundle.
+
+Six viewports (320, 390, 820, 900, 1024 and 1440 px) were checked for document
+overflow and useful preview space. Day, night, mobile and modal screenshots were
+inspected after finite animations completed. No cloud deployment was performed.
+
 Implemented and tested locally on Windows with Node 24.21 and Chrome.
 Each numbered feature was implemented and checked before starting the next.
 The final pass also added hard JSX locks and corrected mobile toolbar overflow.
 
 ## Final result
 
-PASS: source/contract checks, TypeScript, production build, all 12 Chrome workflows against the production build, and independent exported-project builds.
+PASS: source/contract checks, TypeScript, production build, all 14 Chrome workflow groups, and independent exported-project builds.
 
 ## Checks
 

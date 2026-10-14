@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Excalidraw, convertToExcalidrawElements, exportToBlob } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
-import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Settings, Smartphone, Sparkles, Zap } from 'lucide-react';
+import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Settings, Smartphone, Sparkles, Zap, Layers, Palette, Image as ImageIcon, Cable, Columns2, PenTool, ChevronRight, Plus, ArrowUp, Command }  from 'lucide-react';
 
 import type { AppSettings } from './types';
 import { KEYS, load, loadSettings, save } from './lib/storage';
@@ -21,6 +21,8 @@ import { ReferencePanel, type ReferenceImage } from './components/ReferencePanel
 import { AlternativesPanel, type DesignAlternative } from './components/AlternativesPanel';
 import { ReviewPage } from './components/ReviewPage';
 import { assertLockedElements, lockPrompt } from './lib/visualEdit';
+import { ThemeToggle, useTheme } from './components/ThemeProvider';
+import { useDialogAccessibility } from './lib/useDialogAccessibility';
 
 const sigOf = (els: readonly any[]) =>
   els
@@ -36,7 +38,7 @@ const blobToDataUrl = (b: Blob) =>
     r.readAsDataURL(b);
   });
 
-const QUICK_PROMPTS = ['Dark mode', 'Make buttons rounded & bigger', 'Add a footer', 'More colorful', 'Add a settings modal'];
+const QUICK_PROMPTS = ['Improve spacing', 'Make it responsive', 'Add a footer', 'Simplify the layout', 'Add a settings modal'];
 const PRESET_ICONS = { dashboard: LayoutDashboard, landing: Globe, mobile: Smartphone } as const;
 
 interface RunOpts {
@@ -46,11 +48,13 @@ interface RunOpts {
 }
 
 export default function App() {
+  useDialogAccessibility();
   const [review] = useState(() => location.hash.startsWith('#review=') ? location.hash.slice(8) : null);
   return review ? <ReviewPage encoded={review} /> : <WorkspaceApp />;
 }
 
 function WorkspaceApp() {
+  const { theme } = useTheme();
   const initialProject = useMemo<ScreenProject>(() => load(KEYS.project, { activeId: 'home', links: [], screens: [{ id: 'home', name: 'Home', versions: load(KEYS.versions, []), vIndex: load(KEYS.vIndex, -1), scene: load(KEYS.scene, null) }] }), []);
   const initialScreen = initialProject.screens.find(s => s.id === initialProject.activeId) || initialProject.screens[0];
   const [project, setProject] = useState(initialProject);
@@ -79,6 +83,7 @@ function WorkspaceApp() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const promptRef = useRef(prompt); promptRef.current = prompt;
   const [backend, setBackend] = useState<BackendConfig>(() => load(KEYS.backend, DEFAULT_BACKEND));
   const [showBackend, setShowBackend] = useState(false);
   const backendRef = useRef(backend); backendRef.current = backend;
@@ -88,6 +93,7 @@ function WorkspaceApp() {
   useEffect(() => save(KEYS.project, liveProject), [liveProject]);
 
   const code = versions[vIndex] ?? '';
+  const [mobilePane, setMobilePane] = useState<'sketch' | 'preview'>(() => initialScreen.versions.length ? 'preview' : 'sketch');
 
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | undefined>(undefined);
@@ -120,6 +126,7 @@ function WorkspaceApp() {
   const hasModel = !!(activeProvider && settings.activeModelId);
 
   const pushVersion = (c: string) => {
+    setMobilePane('preview');
     setVersions((prev) => {
       const next = [...prev.slice(0, vIndexRef.current + 1), c].slice(-30);
       setVIndex(next.length - 1);
@@ -309,11 +316,12 @@ function WorkspaceApp() {
     setAlternatives({});
     setLocks({});
     setApiError(null);
+    setPrompt('');
   };
 
   const submitPrompt = () => {
     const text = prompt.trim();
-    if (!text && !apiRef.current?.getSceneElements().length) return;
+    if (!text && !apiRef.current?.getSceneElements().length && !referenceRef.current) return;
     runRef.current({ instruction: text });
     setPrompt('');
   };
@@ -322,8 +330,10 @@ function WorkspaceApp() {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (document.querySelector('[role="dialog"]')) return;
         e.preventDefault();
-        runRef.current({});
+        runRef.current({ instruction: promptRef.current.trim() || undefined });
+        setPrompt('');
       }
     };
     window.addEventListener('keydown', h);
@@ -333,105 +343,59 @@ function WorkspaceApp() {
   const modelLabel = settings.activeModelId ?? '';
 
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-slate-200">
-      {/* ---------------- Header ---------------- */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-900/60 px-3 py-2">
-        <div className="mr-2 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-500 shadow-lg shadow-indigo-500/30">
-            <Sparkles className="h-4 w-4 text-white" />
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-bold text-white">Sketch2UI</div>
-            <div className="text-[10px] text-slate-500">Live Sketch-to-UI Engine</div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
-          <span className="px-2 text-[11px] uppercase tracking-wide text-slate-500">Demo</span>
-          {(Object.keys(PRESETS) as PresetKey[]).map((k) => {
-            const Icon = PRESET_ICONS[k];
-            return (
-              <button
-                key={k}
-                onClick={() => loadPreset(k)}
-                disabled={!api}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-40"
-              >
-                <Icon className="h-3.5 w-3.5" /> {PRESETS[k].label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button onClick={() => setShowBackend(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Backend</button>
-          <button onClick={() => setShowScreens(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Screens ({project.screens.length})</button>
-          <button onClick={() => setShowBrand(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Brand</button>
-          <button onClick={() => setShowReference(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Reference{reference ? ' ✓' : ''}</button>
-          <button disabled={generating} onClick={generateAlternatives} className="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-40">3 designs</button>
-          {!!alternatives[project.activeId]?.length && <button onClick={() => setShowAlternatives(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Compare designs</button>}
-          <button
-            onClick={() => setSettings((s) => ({ ...s, autoSync: !s.autoSync }))}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
-              settings.autoSync ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 text-slate-400 hover:text-slate-200'
-            }`}
-            title={`Auto-generate ${settings.debounceMs / 1000}s after you stop drawing`}
-          >
-            <Zap className={`h-3.5 w-3.5 ${settings.autoSync ? 'fill-emerald-400' : ''}`} /> Live Sync {settings.autoSync ? 'ON' : 'OFF'}
-          </button>
-
-          <ModelPicker
-            settings={settings}
-            onSelect={(pid, mid) => setSettings((s) => ({ ...s, activeProviderId: pid, activeModelId: mid }))}
-            onOpenSettings={() => setShowSettings(true)}
-          />
-
-          <button
-            onClick={() => runRef.current({ fresh: true })}
-            disabled={generating}
-            title="Rebuild from scratch (ignore current code)"
-            className="rounded-lg border border-slate-700 p-2 text-slate-400 hover:text-white disabled:opacity-40"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => runRef.current({})}
-            disabled={generating}
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 hover:brightness-110 disabled:opacity-60"
-            title="Ctrl + Enter"
-          >
-            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {code ? 'Update UI' : 'Generate'}
-          </button>
-          <button onClick={() => setShowSettings(true)} className="rounded-lg border border-slate-700 p-2 text-slate-400 hover:text-white" title="Settings">
-            <Settings className="h-4 w-4" />
-          </button>
-        </div>
+    <div className="workspace-shell">
+      <header className="app-header">
+        <div className="brand-lockup"><span className="brand-mark"><PenTool size={19} strokeWidth={1.6} /></span><div><span className="brand-name">Sketch2UI<span className="brand-period">.</span></span><span className="brand-subtitle">IDEAS INTO INTERFACES</span></div></div>
+        <div className="workspace-breadcrumb"><span>Workspace</span><ChevronRight size={13} /><strong>{liveProject.screens.find(s => s.id === project.activeId)?.name || 'Home'}</strong></div>
+        <div className="header-spacer" />
+        <span className="save-indicator"><span />Local workspace</span>
+        <div className="model-slot desktop-only"><ModelPicker settings={settings} onSelect={(pid, mid) => setSettings(s => ({ ...s, activeProviderId: pid, activeModelId: mid }))} onOpenSettings={() => setShowSettings(true)} /></div>
+        <ThemeToggle />
+        <button onClick={() => setShowSettings(true)} className="ui-icon" aria-label="Settings" title="Settings"><Settings size={18} /></button>
+        <button onClick={() => generating ? stop() : runRef.current({ instruction: prompt.trim() || undefined })} className="ui-primary generate-button" aria-label={generating ? 'Stop generation' : code ? 'Update UI' : 'Generate'} title={generating ? 'Stop generation' : 'Generate interface (Ctrl + Enter)'}>{generating ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}<span>{generating ? 'Stop' : code ? 'Update UI' : 'Generate'}</span></button>
+        <button onClick={newProject} className="ui-button header-new" title="Start a new project"><Plus size={16} /><span>New project</span></button>
       </header>
 
-      {/* ---------------- Split workspace ---------------- */}
-      <main className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <section className="relative h-1/2 min-h-0 border-slate-800 md:h-auto md:w-1/2 md:border-r">
-          <div className="absolute inset-0">
+      <div className="workspace-toolbar" aria-label="Workspace tools">
+        <div className="tool-group">
+          <button onClick={newProject} className="ui-icon narrow-only" aria-label="New project" title="New project"><Plus size={16} /></button>
+          <button onClick={() => setShowScreens(true)} className="ui-tool"><Layers size={15} />Screens ({project.screens.length})</button>
+          <button onClick={() => setShowBrand(true)} className="ui-tool"><Palette size={15} />Brand</button>
+          <button onClick={() => setShowReference(true)} className="ui-tool"><ImageIcon size={15} />Reference{reference ? ' ✓' : ''}</button>
+          <span className="tool-divider" />
+          <button onClick={() => setShowBackend(true)} className="ui-tool"><Cable size={15} />Backend</button>
+        </div>
+        <div className="toolbar-spacer" />
+        <div className="tool-group">
+          <button disabled={generating} onClick={generateAlternatives} className="ui-tool" title="Explore three visual directions"><Columns2 size={15} />3 designs</button>
+          {!!alternatives[project.activeId]?.length && <button onClick={() => setShowAlternatives(true)} className="ui-tool">Compare designs</button>}
+          <span className="tool-divider" />
+          <button onClick={() => setSettings(s => ({ ...s, autoSync: !s.autoSync }))} className="ui-tool live-toggle" aria-pressed={settings.autoSync} title={"Auto-generate after " + settings.debounceMs / 1000 + " seconds"}><Zap size={14} />Live Sync {settings.autoSync ? 'ON' : 'OFF'}<span className="toggle-track"><span /></span></button>
+        </div>
+      </div>
+
+      <div className="mobile-workspace-switch">
+        <div className="segmented"><button aria-label="Show sketch workspace" aria-pressed={mobilePane === 'sketch'} onClick={() => setMobilePane('sketch')}>Sketch</button><button aria-label="Show preview workspace" aria-pressed={mobilePane === 'preview'} onClick={() => setMobilePane('preview')}>Preview</button></div>
+        <div className="mobile-model"><ModelPicker settings={settings} onSelect={(pid, mid) => setSettings(s => ({ ...s, activeProviderId: pid, activeModelId: mid }))} onOpenSettings={() => setShowSettings(true)} /></div>
+      </div>
+
+      <main className="workspace-grid">
+        <section className="workspace-panel sketch-panel" data-mobile-active={mobilePane === 'sketch'} aria-label="Drawing workspace">
+          <div className="panel-heading"><span className="panel-number">01</span><strong>Sketch</strong><span className="panel-caption">Start with a rough idea</span><button onClick={clearCanvas} className="ui-icon" aria-label="Clear sketch" title="Clear sketch"><Eraser size={16} /></button></div>
+          <div className="preset-strip"><span>Start with</span>{(Object.keys(PRESETS) as PresetKey[]).map(k => { const Icon = PRESET_ICONS[k]; return <button key={k} onClick={() => loadPreset(k)} disabled={!api} className="preset-pill"><Icon size={13} />{PRESETS[k].label}</button>; })}</div>
+          <div className="drawing-surface">
             <Excalidraw
               excalidrawAPI={(a) => setApi(a)}
               initialData={initialData}
               onChange={onChange}
-              theme="light"
+              theme={theme as 'light' | 'dark'}
               UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: false, toggleTheme: false } }}
             />
           </div>
-          <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-            <button onClick={clearCanvas} className="pointer-events-auto flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs text-slate-700 shadow ring-1 ring-slate-200 hover:bg-white">
-              <Eraser className="h-3.5 w-3.5" /> Clear sketch
-            </button>
-            <button onClick={newProject} className="pointer-events-auto flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs text-slate-700 shadow ring-1 ring-slate-200 hover:bg-white">
-              <FilePlus2 className="h-3.5 w-3.5" /> New project
-            </button>
-          </div>
+          <div className="panel-footnote"><span className="status-dot" />Your canvas, your starting point.<span className="desktop-only">Red notes become instructions.</span></div>
         </section>
 
-        <section className="h-1/2 min-h-0 md:h-auto md:w-1/2">
+        <section className="workspace-panel output-panel" data-mobile-active={mobilePane === 'preview'} aria-label="Preview workspace">
           <PreviewPane
             locks={locks[project.activeId] || []}
             onToggleLock={snippet => setLocks(prev => ({ ...prev, [project.activeId]: (prev[project.activeId] || []).includes(snippet) ? prev[project.activeId].filter(s => s !== snippet) : [...(prev[project.activeId] || []), snippet] }))}
@@ -458,43 +422,16 @@ function WorkspaceApp() {
         </section>
       </main>
 
-      {/* ---------------- Prompt bar ---------------- */}
-      <footer className="border-t border-slate-800 bg-slate-900/60 px-3 py-2">
-        <div className="mx-auto flex max-w-5xl flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <input
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submitPrompt();
-              }}
-              disabled={generating}
-              placeholder={code ? 'Refine the UI… e.g. “switch to dark mode and make the buttons pill-shaped”' : 'Optional: describe what you want (works with or without a sketch)…'}
-              className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-500 disabled:opacity-60"
-            />
-            <button
-              onClick={submitPrompt}
-              disabled={generating}
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-            >
-              <Send className="h-4 w-4" /> Send
-            </button>
+      <footer className="workspace-composer">
+        <div className="composer-shell">
+          <div className="prompt-row"><span className="composer-mark"><Sparkles size={18} strokeWidth={1.5} /></span>
+            <input aria-label="Describe your interface" value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submitPrompt(); }} disabled={generating} placeholder={code ? 'What would you like to change?' : 'Describe your idea, or let your sketch do the talking…'} />
+            <span className="composer-shortcut"><kbd>Ctrl</kbd><kbd>↵</kbd></span>
+            <button onClick={submitPrompt} disabled={generating} className="ui-primary send-button" aria-label="Send"><span>Send</span><ArrowUp size={17} /></button>
           </div>
-          {code && (
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK_PROMPTS.map((q) => (
-                <button
-                  key={q}
-                  disabled={generating}
-                  onClick={() => runRef.current({ instruction: q })}
-                  className="rounded-full border border-slate-700 px-2.5 py-1 text-[11px] text-slate-400 hover:border-indigo-500 hover:text-white disabled:opacity-40"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="composer-bottom"><div className="quick-prompts">{(code ? QUICK_PROMPTS : ['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']).map(q => <button key={q} disabled={generating} onClick={() => { setPrompt(q); document.querySelector<HTMLInputElement>('footer input')?.focus(); }} className="quick-prompt">{q}</button>)}</div><span className="composer-note">Make something worth making.</span></div>
         </div>
+        <div className="workspace-status"><span>{generating ? 'Bringing your idea to life…' : 'A little sketch. A lot of possibility.'}</span><div>{code ? <span>{versions.length} saved version{versions.length === 1 ? '' : 's'}</span> : <span>Ready when you are</span>}<span className="status-dot" /><span>Sketch → build → refine</span></div></div>
       </footer>
 
       {showSettings && <SettingsModal settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />}

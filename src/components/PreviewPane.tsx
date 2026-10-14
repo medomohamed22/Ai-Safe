@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   Check,
@@ -13,7 +14,7 @@ import {
   Smartphone,
   Square,
   Tablet,
-  Wand2,
+  Plus, Wand2, MousePointer2, Github, Share2, FlaskConical, FileCode2, Sparkles, ArrowUpRight,
 } from 'lucide-react';
 import { buildPreviewHtml } from '../lib/preview';
 import { VisualEditor } from './VisualEditor';
@@ -89,23 +90,25 @@ export function PreviewPane(p: Props) {
       const d = e.data;
       if (d?.source !== 's2ui-preview') return;
       if (d.type === 'error') setRuntimeError((prev) => prev ?? String(d.message));
-      if (d.type === 'ready') sendMode(editingRef.current && !p.generating);
+      if (d.type === 'ready') sendMode(editingRef.current && !p.generating && tab === 'preview');
       if (d.type === 'element-selected' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && d.id >= 0) {
         try { describeElement(p.code, d.id); setSelected(d.id); } catch { setSelected(null); }
       }
     };
     window.addEventListener('message', h);
     return () => window.removeEventListener('message', h);
-  }, [token, p.code, p.generating]);
+  }, [token, p.code, p.generating, tab]);
 
   useEffect(() => {
     if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
   }, [p.stream]);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(backendBootstrap(p.backend) + '\n' + p.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(backendBootstrap(p.backend) + '\n' + p.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { setExportError('Clipboard is unavailable. Download the JSX file instead.'); }
   };
 
   const download = (name: string, content: string, type: string) => {
@@ -129,166 +132,50 @@ export function PreviewPane(p: Props) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-950">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 px-3 py-2">
-        <div className="flex rounded-lg bg-slate-900 p-0.5">
-          <button onClick={() => setTab('preview')} className={`${btn} ${tab === 'preview' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
-            <MonitorPlay className="h-3.5 w-3.5" /> Preview
-          </button>
-          <button onClick={() => setTab('code')} className={`${btn} ${tab === 'code' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
-            <Code2 className="h-3.5 w-3.5" /> Code
-          </button>
-        </div>
-
-        {tab === 'preview' && (
-          <div className="flex rounded-lg bg-slate-900 p-0.5">
-            {(
-              [
-                ['desktop', Monitor],
-                ['tablet', Tablet],
-                ['mobile', Smartphone],
-              ] as const
-            ).map(([d, Icon]) => (
-              <button key={d} onClick={() => setDevice(d)} title={d} className={`${btn} ${device === d ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
-                <Icon className="h-3.5 w-3.5" />
-              </button>
-            ))}
-          </div>
-        )}
-        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className={`${btn} ${editing ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'} disabled:opacity-40`}>Select element</button>
-
-        <div className="ml-auto flex max-w-full flex-wrap items-center gap-1">
-          <button disabled={!p.code || p.generating} onClick={() => setShowShare(true)} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-40`}>Share / review</button>
-          <button disabled={!p.code || p.generating} onClick={() => setShowGitHub(true)} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-40`}>GitHub</button>
-          <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-40`}>Test UI</button>
-          <button disabled={!p.code || exporting || p.generating} onClick={exportProject} className={`${btn} text-indigo-300 hover:bg-slate-800 disabled:opacity-40`}>{exporting ? 'Exporting…' : 'Project ZIP'}</button>
-          {p.versionCount > 0 && (
-            <div className="mr-1 flex items-center gap-0.5 text-xs text-slate-400">
-              <button onClick={p.onPrev} disabled={p.versionIndex <= 0} className="rounded p-1 hover:bg-slate-800 disabled:opacity-30" title="Previous version">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="tabular-nums">
-                v{p.versionIndex + 1}/{p.versionCount}
-              </span>
-              <button onClick={p.onNext} disabled={p.versionIndex >= p.versionCount - 1} className="rounded p-1 hover:bg-slate-800 disabled:opacity-30" title="Next version">
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-          <button disabled={!p.code} onClick={copy} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-30`}>
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />} {copied ? 'Copied' : 'Copy'}
-          </button>
-          <button disabled={!p.code} onClick={() => download('App.jsx', backendBootstrap(p.backend) + '\n' + p.code, 'text/javascript')} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-30`} title="Download App.jsx">
-            <Download className="h-3.5 w-3.5" /> .jsx
-          </button>
-          <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-30`} title="Download standalone HTML">
-            <Download className="h-3.5 w-3.5" /> .html
-          </button>
-        </div>
+    <div className="preview-pane">
+      <div className="panel-heading preview-heading"><span className="panel-number">02</span><strong>Preview</strong><span className="panel-caption">{p.code ? 'Your idea, brought to life' : 'A blank page, full of possibility'}</span>
+        {p.versionCount > 0 && <div className="version-control"><button onClick={p.onPrev} disabled={p.versionIndex <= 0} className="ui-icon" title="Previous version" aria-label="Previous version"><ChevronLeft size={13} /></button><span>v{p.versionIndex + 1}<span className="version-total">/{p.versionCount}</span></span><button onClick={p.onNext} disabled={p.versionIndex >= p.versionCount - 1} className="ui-icon" title="Next version" aria-label="Next version"><ChevronRight size={13} /></button></div>}
       </div>
-
-      {editing && tab === 'preview' && (selected === null ? <p className="border-b border-slate-800 px-3 py-2 text-xs text-indigo-300">Click an element in the preview to edit it. Click “Select element” again to interact with the app.</p> : <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={`${token}:${selected}`} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />)}
-
-      {/* API error */}
-      {!!p.locks.length && <details className="border-b border-slate-800 px-3 py-2 text-xs text-amber-200"><summary>Locked elements ({p.locks.length}) — protected in saved JSX</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>Unlock</button></div>)}</details>}
-      {exportError && <p role="alert" className="px-3 py-2 text-xs text-red-300">Export failed: {exportError}</p>}
-      {p.apiError && (
-        <div className="flex items-start gap-2 border-b border-red-900/50 bg-red-950/40 px-3 py-2 text-xs text-red-200">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span className="flex-1 break-words">{p.apiError}</span>
-          <button onClick={p.onDismissError} className="text-red-300 hover:text-white">
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Body */}
-      {!!screenNavigation(p.project).length && <nav aria-label="Screen navigation" className="flex flex-wrap gap-2 border-b border-slate-700 px-3 py-2">{screenNavigation(p.project).map((link, i) => <button key={i} className="rounded border border-indigo-600 px-3 py-1 text-xs" onClick={() => p.onNavigate(link.id)}>{link.label}</button>)}</nav>}
-      {showTests && <TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />}
-      {showGitHub && <GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />}
-      {showShare && <SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />}
-      <div className="relative min-h-0 flex-1">
-        {tab === 'preview' ? (
-          p.code ? (
-            <div className="flex h-full justify-center overflow-auto bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]">
-              <iframe
-                ref={iframeRef}
-                title="Live preview"
-                srcDoc={html}
-                sandbox="allow-scripts allow-forms allow-modals allow-popups"
-                style={{ width: WIDTH[device] }}
-                className={`h-full bg-white transition-all duration-300 ${device !== 'desktop' ? 'my-3 rounded-xl border border-slate-700 shadow-2xl' : ''}`}
-              />
-            </div>
-          ) : (
-            <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />
-          )
-        ) : (
-          <pre className="h-full overflow-auto p-4 font-mono text-[12.5px] leading-relaxed text-slate-300">{p.code || '// No code yet'}</pre>
-        )}
-
-        {/* Runtime error banner */}
-        {runtimeError && !p.generating && tab === 'preview' && (
-          <div className="absolute inset-x-3 bottom-3 flex items-start gap-3 rounded-xl border border-amber-700/60 bg-slate-900/95 p-3 text-xs text-amber-100 shadow-2xl backdrop-blur">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold">The generated UI threw an error</div>
-              <div className="mt-0.5 line-clamp-3 break-words font-mono text-amber-200/80">{runtimeError}</div>
-            </div>
-            <button onClick={() => p.onFix(runtimeError)} className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 font-semibold text-slate-950 hover:bg-amber-400">
-              <Wand2 className="h-3.5 w-3.5" /> Fix with AI
-            </button>
-            <button onClick={() => setRuntimeError(null)} className="text-amber-300 hover:text-white">
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Streaming overlay */}
-        {p.generating && (
-          <div className="absolute inset-0 flex flex-col bg-slate-950/85 backdrop-blur-sm">
-            <div className="flex items-center gap-3 border-b border-slate-800 px-4 py-3">
-              <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
-              <div className="flex-1 text-sm text-slate-200">
-                Generating with <span className="font-semibold text-indigo-300">{p.modelLabel}</span>
-                <span className="ml-2 text-xs text-slate-500">{p.stream.length ? `${p.stream.length.toLocaleString()} chars` : 'reading your sketch…'}</span>
-              </div>
-              <button onClick={p.onStop} className="flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-red-500 hover:text-red-300">
-                <Square className="h-3 w-3" /> Stop
-              </button>
-            </div>
-            <pre ref={streamRef} className="flex-1 overflow-auto p-4 font-mono text-[12px] leading-relaxed text-emerald-300/90">
-              {p.stream.slice(-6000)}
-              <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-emerald-400 align-middle" />
-            </pre>
-          </div>
-        )}
+      <div className="preview-viewbar">
+        <div className="segmented" aria-label="Preview display"><button onClick={() => setTab('preview')} aria-pressed={tab === 'preview'}><MonitorPlay size={13} />Preview</button><button onClick={() => setTab('code')} aria-pressed={tab === 'code'}><Code2 size={13} />Code</button></div>
+        {tab === 'preview' && <div className="segmented device-switch" aria-label="Preview device">{([['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const).map(([d, Icon]) => <button key={d} onClick={() => setDevice(d)} title={d} aria-label={d} aria-pressed={device === d}><Icon size={13} /></button>)}</div>}
+        <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : device === 'desktop' ? 'Fit to workspace' : WIDTH[device]}</span>
       </div>
+      <div className="preview-actions" aria-label="Preview actions">
+        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select"><MousePointer2 size={13} /><span>Select element</span></button>
+        <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className="ui-icon" aria-label="Test UI" title="Test UI"><FlaskConical size={15} /></button>
+        <span className="actions-spacer" />
+        <button disabled={!p.code} onClick={copy} className="ui-icon" aria-label={copied ? 'Copied' : 'Copy'} title={copied ? 'Copied to clipboard' : 'Copy JSX'}>{copied ? <Check size={15} /> : <Copy size={15} />}</button>
+        <button disabled={!p.code} onClick={() => download('App.jsx', backendBootstrap(p.backend) + '\n' + p.code, 'text/javascript')} className="ui-icon file-button" aria-label=".jsx" title="Download App.jsx"><span>JSX</span></button>
+        <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} className="ui-icon file-button" aria-label=".html" title="Download standalone HTML"><span>HTML</span></button>
+        <span className="tool-divider" />
+        <button disabled={!p.code || p.generating} onClick={() => setShowShare(true)} className="ui-icon" aria-label="Share / review" title="Share / review"><Share2 size={15} /></button>
+        <button disabled={!p.code || p.generating} onClick={() => setShowGitHub(true)} className="ui-icon" aria-label="GitHub" title="Export to GitHub"><Github size={15} /></button>
+        <button disabled={!p.code || exporting || p.generating} onClick={exportProject} className="ui-button export-project" aria-label={exporting ? 'Exporting…' : 'Project ZIP'} title="Download a complete project">{exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}<span>Project ZIP</span></button>
+      </div>
+      {editing && tab === 'preview' && (selected === null ? <p className="selection-hint"><MousePointer2 size={13} />Select anything in the preview. Edit its look, or ask AI to refine it.</p> : <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />)}
+      {!!p.locks.length && <details className="locks-list"><summary>Locked elements ({p.locks.length}) — protected in saved JSX</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>Unlock</button></div>)}</details>}
+      {exportError && <p role="alert" className="mx-3 my-2 text-xs">{exportError}</p>}
+      {p.apiError && <div role="alert" className="preview-error"><AlertTriangle size={15} /><span>{p.apiError}</span><button onClick={p.onDismissError} aria-label="Dismiss error">✕</button></div>}
+      {!!screenNavigation(p.project).length && <nav aria-label="Screen navigation" className="screen-navigation">{screenNavigation(p.project).map((link, i) => <button key={i} className="ui-button" onClick={() => p.onNavigate(link.id)}>{link.label}<ArrowUpRight size={12} /></button>)}</nav>}
+      {showTests && createPortal(<TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />, document.body)}
+      {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}
+      {showShare && createPortal(<SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />, document.body)}
+      <div className="preview-stage">
+        <div className="preview-tab-content" hidden={tab !== 'preview'}>{p.code ? <div className="preview-document" style={{ width: WIDTH[device] }} data-device={device}><iframe ref={iframeRef} title="Live preview" srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>React / JSX</span></div><pre>{p.code || '// Your code will appear here'}</pre></div>
+        {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>Something needs a quick fix</strong><p>{runtimeError}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />Fix with AI</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label="Dismiss runtime error">✕</button></div>}
+        {p.generating && <div className="generation-overlay"><div className="generation-heading"><span className="generation-icon"><Sparkles size={20} /></span><div><strong>Bringing your idea to life</strong><p>Generating with {p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11} />Stop</button></div><div className="generation-progress"><span /></div><pre ref={streamRef} className="generation-code">{p.stream.slice(-6000) || 'Reading your sketch and shaping the interface…'}<span className="generation-cursor" /></pre><span className="generation-caption">{p.stream.length ? p.stream.length.toLocaleString() + ' characters generated' : 'Good things start with a rough idea.'}</span></div>}
+      </div>
+      <div className="panel-footnote preview-footnote"><span className="status-dot" />{tab === 'preview' ? 'Interactive preview' : 'Your generated source'}<span>{p.code ? 'Ready to refine' : 'Waiting for your first idea'}</span></div>
     </div>
   );
 }
 
 function EmptyState({ hasModel, onOpenSettings }: { hasModel: boolean; onOpenSettings: () => void }) {
-  return (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-md text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-2xl shadow-lg shadow-indigo-500/30">✏️</div>
-        <h3 className="text-lg font-semibold text-white">Your live UI will appear here</h3>
-        <ol className="mt-4 space-y-2 text-left text-sm text-slate-400">
-          <li className={hasModel ? 'text-slate-600 line-through' : ''}>
-            1.{' '}
-            <button onClick={onOpenSettings} className="text-indigo-300 underline-offset-2 hover:underline">
-              Open Settings
-            </button>{' '}
-            → add a provider (OpenRouter / Meta / Gemini), paste your key, fetch models.
-          </li>
-          <li>2. Sketch boxes & labels on the canvas — or click a demo preset above.</li>
-          <li>3. Press Generate (Ctrl + Enter), or turn on Live Sync.</li>
-          <li>4. Iterate: type “make it dark mode”, or draw on top of the sketch.</li>
-        </ol>
-        <p className="mt-4 text-xs text-slate-600">Tip: write red notes with arrows on the sketch — the model treats them as instructions.</p>
-      </div>
-    </div>
-  );
+  return <div className="empty-state"><div className="empty-state-inner">
+    <div className="empty-visual" aria-hidden="true"><div className="empty-wireframe"><div className="mini-window-bar"><i /><i /><i /></div><div className="wireframe-content"><span /><span /><div><i /><i /></div><b /></div></div><span className="empty-connector">↗</span><div className="empty-output"><span>{'</>'}</span><div><i /><i /><i /></div><b>Made real<span /></b></div></div>
+    <p className="empty-eyebrow">A SPACE FOR YOUR NEXT IDEA</p><h2>Draw an idea.<br /><em>Make it real.</em></h2><p className="empty-description">Turn rough sketches into thoughtful interfaces.<br />Start on the canvas. We'll meet you on the other side.</p>
+    <div className="empty-steps"><span><b>1</b>Sketch</span><i /><span><b>2</b>Generate</span><i /><span><b>3</b>Refine</span></div>
+    {!hasModel ? <button onClick={onOpenSettings} className="ui-button empty-setup" aria-label="Open Settings"><Plus size={13} />Connect your first model<ArrowUpRight size={13} /></button> : <p className="model-ready"><Check size={13} />Your model is connected. You're ready to create.</p>}
+  </div></div>;
 }
