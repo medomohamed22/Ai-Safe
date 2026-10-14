@@ -18,7 +18,24 @@ OUTPUT RULES (STRICT)
 - Use realistic, specific mock data (real-sounding names, prices, dates, statuses) — never "lorem ipsum".
 - Modern, premium aesthetic: generous spacing, clear typographic hierarchy, rounded corners, soft shadows, subtle gradients, smooth transitions. Responsive.
 - The root element must fill the viewport (min-h-screen).
-- Only import lucide-react icons that really exist (e.g. Search, Bell, User, Users, Settings, Home, ChevronRight, ChevronDown, Plus, Check, X, Menu, BarChart3, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Mail, Star, Heart, Calendar, Filter, LogOut, Sparkles, ArrowRight).`;
+- Only import lucide-react icons that really exist (e.g. Search, Bell, User, Users, Settings, Home, ChevronRight, ChevronDown, Plus, Check, X, Menu, BarChart3, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Mail, Star, Heart, Calendar, Filter, LogOut, Sparkles, ArrowRight).
+
+FUNCTIONAL BEHAVIOR (REQUIRED)
+- Every visible action must have meaningful behavior appropriate to the sketch: navigation changes the displayed view, search/filter/sort update results, pagination follows the filtered results, and add/edit/delete actions update the underlying data and any derived totals or charts. Implement only features relevant to the requested UI.
+- Use controlled form inputs, field validation, accessible error messages, submit/cancel flows, and confirmation for destructive actions. Prevent duplicate submissions; display pending, success, empty and failure states with retry where appropriate. Keep keyboard interaction and mobile layouts usable.
+- Do not substitute alerts, console logs, empty callbacks, dead links or decorative buttons for a working feature. If an action needs an unavailable external service, show an honest unavailable/demo state instead of claiming it succeeded.
+
+BACKEND INTEGRATION CONTRACT (REQUIRED)
+- Keep the output as ONE runnable JSX file. Within that file, separate configuration, seed data, data access/service functions, reusable UI components and the App component. UI event handlers call the service layer; never scatter fetch calls or endpoint strings through components.
+- Define an explicit configuration near the top with demo mode enabled by default and a configurable API base URL. Provide async demo and HTTP service adapters with the SAME method signatures and return shapes for the domain operations the UI actually uses. Switching adapters must not require rewriting the UI.
+- Document the integration contract in concise code comments: assumed endpoint paths and HTTP methods, request fields, response shapes, stable IDs, and list pagination/filter conventions where needed. If the user supplies a backend contract, follow its exact routes and schema. Otherwise label the contract as proposed; do not claim compatibility with an unknown backend.
+- Demo mode must run immediately without a backend or network requests. Keep mutable demo records outside render in the service layer, with stable IDs and consistent CRUD behavior during the preview session. React state reflects service results; never silently fall back to demo data after a real API failure.
+- The HTTP adapter uses fetch with the configured base URL, checks response.ok, handles empty/204 responses, normalizes response data and surfaces useful errors. Handle loading and stale async responses so older requests cannot overwrite newer results. Only show success after the operation succeeds.
+- Keep API secrets, database credentials, privileged operations and server-side authorization out of the generated frontend. Authentication/payment/external delivery must be visibly simulated in demo mode, with their real integration boundary documented; do not implement fake production security.
+- The preview runs in an iframe with an opaque origin. Do not rely on localStorage, sessionStorage, cookies, parent-window access, process.env or import.meta.env to make the demo work. Use in-memory demo state. Real HTTP mode needs an explicit absolute API base URL and appropriate backend CORS/auth configuration; document this beside configuration.
+
+FINAL SELF-CHECK
+- Before returning code, trace each visible control through its handler, service call and resulting UI state. Check validation, cancel/delete, empty results and API failures. Preserve the integration contract when updating or fixing existing code. Return the complete file only; never claim that generated code has been tested against a real backend.`;
 
 export function buildUserPrompt(o: {
   hasImage: boolean;
@@ -37,7 +54,7 @@ ${o.fixError}
 ${o.currentCode}
 \`\`\`
 
-Fix the bug while keeping the design and behavior identical. Return the full corrected file.`;
+Fix the bug while keeping the design, working behavior and existing backend integration contract identical. Keep the demo runnable in the sandboxed preview. Return the full corrected file.`;
   }
 
   if (o.currentCode) {
@@ -49,6 +66,7 @@ ${o.currentCode}
 
 ${o.hasImage ? 'The attached image is the LATEST version of the wireframe sketch (it may contain new, moved or removed elements, or new annotations).\n' : ''}Update the existing code instead of starting over: keep everything that still applies (style, data, behavior) and apply:
 ${o.hasImage ? '1. Any differences between the sketch and the current UI.\n' : ''}${instr ? `${o.hasImage ? '2' : '1'}. This instruction from the user: "${instr}"\n` : ''}
+Preserve existing service method signatures and backend contracts unless the requested change requires an update. Ensure every added control works in demo mode and uses the service layer for backend operations.
 Return the full updated file.`;
   }
 

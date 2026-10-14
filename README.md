@@ -5,7 +5,7 @@ Draw a wireframe → get a live, interactive React + Tailwind UI in seconds.
 - **Canvas:** Excalidraw (MIT)
 - **Brain:** any vision LLM — Meta Llama API, OpenRouter (incl. Llama 4), Google Gemini, or any OpenAI-compatible API
 - **Renderer:** sandboxed iframe (Babel + import maps + Tailwind CDN) — supports `react`, `lucide-react`, `recharts`
-- **100% client-side:** API keys, models, sketch and code history are stored in `localStorage` only
+- **Local workspace:** provider settings, sketches and code history stay in your browser. GitHub tokens and backend tester tokens are kept in memory only.
 
 ## Features (MVP)
 
@@ -16,7 +16,57 @@ Draw a wireframe → get a live, interactive React + Tailwind UI in seconds.
 5. Live Sync (debounced auto-generate), streaming output, version history, “Fix with AI” for runtime errors
 6. Multi-provider settings: add API keys, fetch the model list, search by model name, filter to vision models
 
+## Workspace tools
+
+- **Select element:** click preview elements to edit static text, colors, padding
+  and corner radius in the actual JSX. Nested/dynamic text uses targeted AI edits.
+  Repeated instances share a source template. Lock an element to reject changes
+  to its JSX; unlock from the element editor or the locked-elements list.
+- **Project ZIP:** runnable React/Vite/Tailwind project, backend runtime and contract.
+  Multiple screens are exported into separate source modules with shared navigation.
+  JSX/HTML downloads export the current screen, including the backend runtime.
+- **Backend:** import OpenAPI 3 JSON (local schema refs supported), configure
+  endpoints/response paths/field mapping, and test requests. Demo CRUD stays in
+  memory; HTTP mode requires your backend and its CORS/auth setup. YAML and remote
+  schema refs are not supported. Regenerate existing UI to adopt a new contract.
+- **Test UI:** JSON scenarios with `exists`, `click`, `fill` and `expectText` steps,
+  CSS selectors and string `value` for fill/text assertions. Tests use a fresh demo
+  iframe, share state in scenario order and block app fetch/XHR. The default test
+  checks only that a page renders; add assertions for your actual user flows.
+- **Screens:** separate sketches and histories; add labelled links between screens.
+  Generate each screen independently; screen detection from a multi-frame drawing
+  is not automatic. Rename/delete and switch screens from this panel.
+- **Brand:** saved logo/palette/font/radius/direction applied to future model requests.
+- **Reference:** independent style image, sent separately from the layout sketch.
+- **GitHub:** review exported files and create a new branch/PR using a session token.
+  Requires an initialized repository and Contents/Pull requests write permissions.
+  Unrelated files are retained; merge/review and deployment remain your GitHub/Vercel
+  workflow. This exports changes; it is not continuous two-way repository sync.
+- **3 designs:** three sequential calls to the selected model with the same input.
+  Choose one to add to history; compare alternatives saved per screen. Stop cancels
+  the remaining batch. This uses up to three generation requests.
+- **Share / review:** compressed snapshot link for a deployed copy of this editor.
+  Reviewers select elements and return comments as a JSON file; import them against
+  the matching source snapshot and explicitly apply feedback with AI. No cloud
+  comment sync or authentication; anyone with the link can view its source.
+  Encoded links are limited to 60 KB, and some messaging services impose smaller
+  URL limits. Localhost links work on the same computer only.
+
+## Generation requirements
+
+The generation instructions in `src/lib/prompts.ts` require working controls,
+validated forms and loading/error/empty states. Generated JSX should include an
+in-memory demo adapter and an HTTP adapter behind the same service interface,
+with API configuration and a proposed endpoint/data contract documented in code.
+Demo mode is the default so the sandboxed preview works before a backend exists.
+When connecting a real backend, supply its contract in the generation request,
+configure its absolute base URL and authentication/CORS, and verify the generated
+integration against that backend. These are generation requirements, not a
+guarantee that every model output works or matches an unspecified backend.
+
 ## Run locally
+
+Use Node.js 22.18+ within Node 22, or Node 24.11+ (tested with Node 24.21), and npm.
 
 ```bash
 npm install
@@ -24,6 +74,21 @@ npm run dev
 ```
 
 Open http://localhost:5173 → ⚙️ Settings → add a provider → paste your key → **Fetch models** → pick a vision model.
+
+## Verify changes
+
+```bash
+npm test
+npm run typecheck
+npm run build
+npm run dev
+```
+
+In another terminal run `npm run test:browser`. Tests use installed Chrome on
+Windows, or Playwright's Chromium (`npx playwright install chromium`). Override
+`CHROME_PATH` and `S2UI_TEST_URL` if needed. Browser tests use isolated synthetic
+projects, mocked providers/GitHub/backends and do not publish real repositories.
+See `TODO.md` and `VALIDATION.md` for per-feature results and verification limits.
 
 ## Deploy to Vercel
 

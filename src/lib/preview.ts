@@ -1,6 +1,10 @@
 // Builds a fully isolated HTML document that compiles & runs AI-generated React code
 // inside a sandboxed iframe (no allow-same-origin → cannot read the app's localStorage/API keys).
 
+import { instrumentPreview } from './visualEdit';
+import { backendBootstrap, DEFAULT_BACKEND, type BackendConfig } from './backend';
+import { installTestRunner } from './interactionTests';
+
 const IMPORT_MAP: Record<string, string> = {
   react: 'https://esm.sh/react@18.3.1',
   'react/jsx-runtime': 'https://esm.sh/react@18.3.1/jsx-runtime',
@@ -13,7 +17,11 @@ const IMPORT_MAP: Record<string, string> = {
 const safeJson = (v: unknown) =>
   JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
-export function buildPreviewHtml(code: string): string {
+export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean }, backend: BackendConfig = DEFAULT_BACKEND): string {
+  let source = code;
+  if (editor) {
+    try { source = instrumentPreview(code); } catch { /* Existing runtime error reporting handles invalid JSX. */ }
+  }
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -40,9 +48,34 @@ export function buildPreviewHtml(code: string): string {
   };
   window.addEventListener('error', function (e) { window.__report(e.error || e.message); });
   window.addEventListener('unhandledrejection', function (e) { window.__report(e.reason); });
-  window.__SRC__ = ${safeJson(code)};
+  window.__SRC__ = ${safeJson(source)};
   window.__KNOWN__ = ${safeJson(Object.keys(IMPORT_MAP))};
+  ${backendBootstrap(backend)}
+  ${editor?.tests ? `(${installTestRunner.toString()})(${safeJson(editor.token)});` : ''}
 </script>
+${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important; outline-offset: 3px; }</style>
+<script>
+  (function () {
+    var token = ${safeJson(editor.token)};
+    var editing = false;
+    window.addEventListener('message', function (e) {
+      if (e.source !== parent || !e.data || e.data.token !== token || e.data.type !== 'edit-mode') return;
+      editing = !!e.data.enabled;
+      if (!editing) document.querySelectorAll('[data-s2ui-selected]').forEach(function (el) { el.removeAttribute('data-s2ui-selected'); });
+    });
+    function intercept(e) {
+      if (!editing) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.type !== 'click') return;
+      var el = e.target.closest && e.target.closest('[data-s2ui-id]');
+      if (!el) return;
+      document.querySelectorAll('[data-s2ui-selected]').forEach(function (item) { item.removeAttribute('data-s2ui-selected'); });
+      el.setAttribute('data-s2ui-selected', '');
+      parent.postMessage({ source: 's2ui-preview', type: 'element-selected', token: token, id: Number(el.getAttribute('data-s2ui-id')) }, '*');
+    }
+    ['click', 'dblclick', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'submit', 'keydown', 'input', 'change'].forEach(function (name) { window.addEventListener(name, intercept, true); });
+  })();
+</script>` : ''}
 <script type="module">
 import React from 'react';
 import { createRoot } from 'react-dom/client';

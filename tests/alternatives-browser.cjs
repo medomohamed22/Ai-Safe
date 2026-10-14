@@ -1,0 +1,11 @@
+const {chromium,chromePath}=require('./browser-runtime.cjs');const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({executablePath:chromePath,headless:true});try{
+ const page=await browser.newPage();const requests=[];
+ await page.addInitScript(()=>{if(!localStorage.getItem('s2ui.versions.v1')){localStorage.setItem('s2ui.versions.v1',JSON.stringify(['export default function App(){return <h1>Original</h1>}']));localStorage.setItem('s2ui.vindex.v1','0');}localStorage.setItem('s2ui.settings.v1',JSON.stringify({providers:[{id:'p',type:'openai',name:'Test',apiKey:'test',baseUrl:'https://provider.example.test/v1',useProxy:false,models:[{id:'test',name:'Test',vision:true}]}],activeProviderId:'p',activeModelId:'test',temperature:0.2,autoSync:false,debounceMs:2000}));});
+ await page.route('https://provider.example.test/**',route=>{requests.push(route.request().postDataJSON());const name=['Formal','Minimal','Bold'][requests.length-1];return route.fulfill({contentType:'application/json',body:JSON.stringify({choices:[{message:{content:`export default function App(){return <h1>${name}</h1>}`}}]})});});
+ await page.goto(process.env.S2UI_TEST_URL || 'http://127.0.0.1:5173');await page.getByRole('button',{name:'3 designs',exact:true}).click();await page.getByRole('button',{name:'Use Bold',exact:true}).waitFor({state:'visible',timeout:60000});await page.getByRole('button',{name:'Use Bold',exact:true}).click();
+ assert.equal(requests.length,3);for(const req of requests)assert.match(typeof req.messages[1].content==='string'?req.messages[1].content:req.messages[1].content[0].text,/Original/);
+ await page.frameLocator('iframe[title="Live preview"]').getByRole('heading',{name:'Bold',exact:true}).waitFor();const versions=await page.evaluate(()=>JSON.parse(localStorage.getItem('s2ui.project.v1')).screens[0].versions);assert.equal(versions.length,2);assert.match(versions[1],/Bold/);
+ await page.reload();await page.getByRole('button',{name:'Compare designs',exact:true}).click();assert.equal(await page.getByRole('button',{name:/^Use (Formal|Minimal|Bold)$/}).count(),3);
+ console.log('PASS: exactly three sequential requests share original code, choice adds one history version, alternatives persist for comparison. Provider mocked.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

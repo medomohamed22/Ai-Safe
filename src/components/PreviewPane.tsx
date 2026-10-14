@@ -16,8 +16,22 @@ import {
   Wand2,
 } from 'lucide-react';
 import { buildPreviewHtml } from '../lib/preview';
+import { VisualEditor } from './VisualEditor';
+import { describeElement } from '../lib/visualEdit';
+import { projectFiles, projectZip } from '../lib/projectExport';
+import type { BackendConfig } from '../lib/backend';
+import { backendBootstrap } from '../lib/backend';
+import { TestsPanel } from './TestsPanel';
+import { screenNavigation, type ScreenProject } from '../lib/screens';
+import { GitHubPanel } from './GitHubPanel';
+import { SharePanel } from './SharePanel';
 
 interface Props {
+  locks: string[];
+  onToggleLock: (snippet: string) => void;
+  project: ScreenProject;
+  onNavigate: (id: string) => void;
+  backend: BackendConfig;
   code: string;
   generating: boolean;
   stream: string;
@@ -32,6 +46,8 @@ interface Props {
   onFix: (error: string) => void;
   onDismissError: () => void;
   onOpenSettings: () => void;
+  onCodeChange: (code: string) => void;
+  onElementRequest: (instruction: string) => void;
 }
 
 type Device = 'desktop' | 'tablet' | 'mobile';
@@ -42,13 +58,28 @@ export function PreviewPane(p: Props) {
   const [device, setDevice] = useState<Device>('desktop');
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const [showTests, setShowTests] = useState(false);
+  const [showGitHub, setShowGitHub] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const exportFiles = useMemo(() => projectFiles(p.code, p.backend, p.project), [p.code, p.backend, p.project]);
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const streamRef = useRef<HTMLPreElement>(null);
 
-  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code) : ''), [p.code]);
+  const token = useMemo(() => crypto.randomUUID(), [p.code]);
+  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token }, p.backend) : ''), [p.code, token, p.backend]);
+  const sendMode = (enabled: boolean) => iframeRef.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled }, '*');
+
+  useEffect(() => { sendMode(editing && !p.generating && tab === 'preview'); }, [editing, p.generating, tab, token]);
 
   useEffect(() => {
     setRuntimeError(null);
+    setSelected(null);
     if (p.code) setTab('preview');
   }, [p.code]);
 
@@ -58,17 +89,21 @@ export function PreviewPane(p: Props) {
       const d = e.data;
       if (d?.source !== 's2ui-preview') return;
       if (d.type === 'error') setRuntimeError((prev) => prev ?? String(d.message));
+      if (d.type === 'ready') sendMode(editingRef.current && !p.generating);
+      if (d.type === 'element-selected' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && d.id >= 0) {
+        try { describeElement(p.code, d.id); setSelected(d.id); } catch { setSelected(null); }
+      }
     };
     window.addEventListener('message', h);
     return () => window.removeEventListener('message', h);
-  }, []);
+  }, [token, p.code, p.generating]);
 
   useEffect(() => {
     if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
   }, [p.stream]);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(p.code);
+    await navigator.clipboard.writeText(backendBootstrap(p.backend) + '\n' + p.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -82,6 +117,16 @@ export function PreviewPane(p: Props) {
   };
 
   const btn = 'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition';
+  const exportProject = async () => {
+    setExporting(true); setExportError('');
+    try {
+      const blob = await projectZip(p.code, p.backend, p.project);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'sketch2ui-project.zip'; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setExportError((e as Error).message); }
+    finally { setExporting(false); }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-950">
@@ -111,8 +156,13 @@ export function PreviewPane(p: Props) {
             ))}
           </div>
         )}
+        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className={`${btn} ${editing ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'} disabled:opacity-40`}>Select element</button>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex max-w-full flex-wrap items-center gap-1">
+          <button disabled={!p.code || p.generating} onClick={() => setShowShare(true)} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-40`}>Share / review</button>
+          <button disabled={!p.code || p.generating} onClick={() => setShowGitHub(true)} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-40`}>GitHub</button>
+          <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-40`}>Test UI</button>
+          <button disabled={!p.code || exporting || p.generating} onClick={exportProject} className={`${btn} text-indigo-300 hover:bg-slate-800 disabled:opacity-40`}>{exporting ? 'Exporting…' : 'Project ZIP'}</button>
           {p.versionCount > 0 && (
             <div className="mr-1 flex items-center gap-0.5 text-xs text-slate-400">
               <button onClick={p.onPrev} disabled={p.versionIndex <= 0} className="rounded p-1 hover:bg-slate-800 disabled:opacity-30" title="Previous version">
@@ -129,16 +179,20 @@ export function PreviewPane(p: Props) {
           <button disabled={!p.code} onClick={copy} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-30`}>
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />} {copied ? 'Copied' : 'Copy'}
           </button>
-          <button disabled={!p.code} onClick={() => download('App.jsx', p.code, 'text/javascript')} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-30`} title="Download App.jsx">
+          <button disabled={!p.code} onClick={() => download('App.jsx', backendBootstrap(p.backend) + '\n' + p.code, 'text/javascript')} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-30`} title="Download App.jsx">
             <Download className="h-3.5 w-3.5" /> .jsx
           </button>
-          <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code), 'text/html')} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-30`} title="Download standalone HTML">
+          <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} className={`${btn} text-slate-300 hover:bg-slate-800 disabled:opacity-30`} title="Download standalone HTML">
             <Download className="h-3.5 w-3.5" /> .html
           </button>
         </div>
       </div>
 
+      {editing && tab === 'preview' && (selected === null ? <p className="border-b border-slate-800 px-3 py-2 text-xs text-indigo-300">Click an element in the preview to edit it. Click “Select element” again to interact with the app.</p> : <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={`${token}:${selected}`} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />)}
+
       {/* API error */}
+      {!!p.locks.length && <details className="border-b border-slate-800 px-3 py-2 text-xs text-amber-200"><summary>Locked elements ({p.locks.length}) — protected in saved JSX</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>Unlock</button></div>)}</details>}
+      {exportError && <p role="alert" className="px-3 py-2 text-xs text-red-300">Export failed: {exportError}</p>}
       {p.apiError && (
         <div className="flex items-start gap-2 border-b border-red-900/50 bg-red-950/40 px-3 py-2 text-xs text-red-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -150,6 +204,10 @@ export function PreviewPane(p: Props) {
       )}
 
       {/* Body */}
+      {!!screenNavigation(p.project).length && <nav aria-label="Screen navigation" className="flex flex-wrap gap-2 border-b border-slate-700 px-3 py-2">{screenNavigation(p.project).map((link, i) => <button key={i} className="rounded border border-indigo-600 px-3 py-1 text-xs" onClick={() => p.onNavigate(link.id)}>{link.label}</button>)}</nav>}
+      {showTests && <TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />}
+      {showGitHub && <GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />}
+      {showShare && <SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />}
       <div className="relative min-h-0 flex-1">
         {tab === 'preview' ? (
           p.code ? (

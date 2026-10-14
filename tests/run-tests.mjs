@@ -1,0 +1,5 @@
+import {spawnSync} from 'node:child_process';
+for(const file of ['visual-edit.test.mjs','backend.test.mjs','provider-images.test.mjs','export.test.mjs','screens.test.mjs','review.test.mjs','github.test.mjs']) {
+ const result=spawnSync(process.execPath,['--import','./tests/register.mjs',`tests/${file}`],{stdio:'inherit'});if(result.status!==0)process.exit(result.status||1);
+}
+console.log('All source/contract checks passed.');

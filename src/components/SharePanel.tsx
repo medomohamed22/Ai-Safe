@@ -1,0 +1,26 @@
+import { useEffect, useMemo, useState } from 'react';
+import { encodeReview, parseComments, reviewBundle, reviewId, type ReviewComment } from '../lib/review';
+import { describeElement } from '../lib/visualEdit';
+import { screenCode, type ScreenProject } from '../lib/screens';
+import type { BackendConfig } from '../lib/backend';
+export function SharePanel({ project, backend, onNavigate, onRequest, onClose }: { project: ScreenProject; backend: BackendConfig; onNavigate: (id: string) => void; onRequest: (instruction: string) => void; onClose: () => void }) {
+  const signature = JSON.stringify(reviewBundle(project, backend));
+  const bundle = useMemo(() => JSON.parse(signature) as ReturnType<typeof reviewBundle>, [signature]);
+  const [baseUrl, setBaseUrl] = useState(location.origin + location.pathname);
+  const [link, setLink] = useState(''); const [id, setId] = useState(''); const [importedId, setImportedId] = useState('');
+  const [comments, setComments] = useState<ReviewComment[]>([]); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  useEffect(() => { let alive = true; setLink(''); setId(''); reviewId(bundle).then(value => { if (alive) setId(value); }); return () => { alive = false; }; }, [bundle]);
+  const input = 'w-full rounded border border-slate-600 bg-slate-950 p-2';
+  return <div role="dialog" aria-label="Share and review" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><section className="max-h-[90vh] w-full max-w-2xl space-y-3 overflow-auto rounded-xl bg-slate-900 p-5">
+    <div className="flex justify-between"><h2 className="font-bold">Share and review</h2><button onClick={onClose}>Close</button></div>
+    <p className="text-sm text-slate-400">The link contains a compressed snapshot of generated screen code. Anyone with the link can view it. Provider settings, API keys and sketches are excluded. Review uses demo API and blocks app fetch/XHR calls. Comments are exchanged as JSON files.</p>
+    <label className="block">Public Sketch2UI address<input aria-label="Review site address" className={input} value={baseUrl} onChange={e => { setBaseUrl(e.target.value); setLink(''); }} /></label>
+    {/localhost|127\.0\.0\.1/.test(baseUrl) && <p className="text-xs text-amber-200">A local URL works only on this machine. Use your deployed Sketch2UI address for other reviewers.</p>}
+    <button disabled={busy || !id} onClick={async () => { setBusy(true); setError(''); try { const url = new URL(baseUrl); if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Use a valid public http(s) address without credentials.'); url.search = ''; url.hash = `review=${await encodeReview(bundle)}`; setLink(url.toString()); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }} className="rounded bg-indigo-600 px-4 py-2 disabled:opacity-40">{busy ? 'Preparing…' : 'Create review link'}</button>
+    {link && <><textarea aria-label="Review link" readOnly className={`${input} h-24 text-xs`} value={link} /><div className="flex gap-4"><button onClick={async () => { try { await navigator.clipboard.writeText(link); } catch { setError('Copy the link from the text field.'); } }}>Copy link</button><a href={link} target="_blank" rel="noreferrer" className="text-indigo-300">Open review</a></div></>}
+    <label className="block">Import reviewer comments<input aria-label="Import reviewer comments" type="file" accept="application/json,.json" onChange={async e => { try { const file = e.target.files?.[0]; if (!file || !id) return; if (file.size > 1000000) throw new Error('Maximum comments file size is 1 MB.'); setComments(parseComments(await file.text(), id)); setImportedId(id); setError(''); } catch (err) { setError((err as Error).message); } }} /></label>
+    {comments.length > 0 && importedId !== id && <p className="text-amber-200">Source changed since this feedback snapshot. Restore its matching version before applying feedback.</p>}
+    <ul className="space-y-2">{comments.map(comment => <li key={comment.id} className="rounded border border-slate-700 p-3"><strong>{comment.author} · {project.screens.find(s => s.id === comment.screenId)?.name || 'Missing screen'} · #{comment.elementId}</strong><p className="my-2 whitespace-pre-wrap text-sm">{comment.text}</p>{comment.screenId !== project.activeId ? <button onClick={() => onNavigate(comment.screenId)} className="text-indigo-300">Open target screen</button> : <button disabled={importedId !== id} className="rounded border border-indigo-500 px-3 py-1 disabled:opacity-40" onClick={() => { try { const screen = project.screens.find(s => s.id === comment.screenId)!; const element = describeElement(screenCode(screen), comment.elementId); onRequest(`Apply the following reviewer feedback to this selected JSX element. Preserve unrelated UI and behavior.\nSelected source:\n${element.snippet}\nFeedback: ${comment.text}`); onClose(); } catch (e) { setError((e as Error).message); } }}>Apply feedback with AI</button>}</li>)}</ul>
+    {error && <p role="alert" className="text-red-300">{error}</p>}
+  </section></div>;
+}

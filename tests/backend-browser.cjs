@@ -1,0 +1,26 @@
+const {chromium,chromePath}=require('./browser-runtime.cjs');
+const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({executablePath:chromePath,headless:true});try{
+ const page=await browser.newPage();
+ await page.addInitScript(()=>{localStorage.setItem('s2ui.versions.v1',JSON.stringify(["import {useState} from 'react';export default function App(){const [data,setData]=useState('');return <main><button onClick={async()=>setData(JSON.stringify(await globalThis.__S2UI_API__.request('list')))}>Load API data</button><output>{data}</output></main>}"]));localStorage.setItem('s2ui.vindex.v1','0');});
+ await page.route('https://backend.example.test/**',route=>route.fulfill({status:200,headers:{'access-control-allow-origin':'*','content-type':'application/json'},body:JSON.stringify({data:[{id:1,full_name:'Ada'}]})}));
+ await page.goto(process.env.S2UI_TEST_URL || 'http://127.0.0.1:5173');
+ await page.getByRole('button',{name:'Backend',exact:true}).click();
+ const spec={openapi:'3.0.0',servers:[{url:'https://backend.example.test/v1'}],paths:{'/items':{get:{operationId:'list'}}}};
+ await page.getByLabel('OpenAPI JSON').setInputFiles({name:'api.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(spec))});
+ await page.getByRole('button',{name:'Test GET (demo)',exact:true}).click();
+ await page.getByRole('status').filter({hasText:'"response": []'}).waitFor();
+ await page.getByLabel('Response path').fill('data');
+ await page.getByLabel('Field mapping').fill('{"name":"full_name"}');
+ await page.getByLabel('Response path').click();
+ await page.getByLabel('API mode').selectOption('http');
+ await page.getByLabel('Test bearer token').fill('session-only-test-token');
+ await page.getByRole('button',{name:'Test GET (http)',exact:true}).click();
+ await page.getByRole('status').filter({hasText:'"name": "Ada"'}).waitFor();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('s2ui.backend.v1').includes('session-only-test-token')),false);
+ await page.getByRole('button',{name:'Close',exact:true}).click();
+ const preview=page.frameLocator('iframe[title="Live preview"]');await preview.getByRole('button',{name:'Load API data',exact:true}).waitFor({timeout:60000});await preview.getByRole('button',{name:'Load API data',exact:true}).click();await preview.locator('output').filter({hasText:'"name":"Ada"'}).waitFor();
+ await page.getByRole('button',{name:'Backend',exact:true}).click();
+ assert.equal(await page.getByLabel('Test bearer token').inputValue(),'');
+ console.log('PASS: browser OpenAPI import, demo request, HTTP request with mocked backend, field mapping, token excluded from saved configuration and cleared on close.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

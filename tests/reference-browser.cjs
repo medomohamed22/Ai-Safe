@@ -1,0 +1,11 @@
+const {chromium,chromePath}=require('./browser-runtime.cjs');const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({executablePath:chromePath,headless:true});try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});let request;
+ await page.addInitScript(()=>localStorage.setItem('s2ui.settings.v1',JSON.stringify({providers:[{id:'p',type:'openai',name:'Test',apiKey:'local-test',baseUrl:'https://provider.example.test/v1',useProxy:false,models:[{id:'test',name:'Test',vision:true}]}],activeProviderId:'p',activeModelId:'test',temperature:0.2,autoSync:false,debounceMs:2000})));
+ await page.route('https://provider.example.test/**',route=>{request=route.request().postDataJSON();return route.fulfill({contentType:'application/json',body:JSON.stringify({choices:[{message:{content:'```jsx\nexport default function App(){return <h1>Reference result</h1>}\n```'}}]})});});
+ await page.goto(process.env.S2UI_TEST_URL || 'http://127.0.0.1:5173');await page.getByRole('button',{name:'Reference',exact:true}).click();await page.getByLabel('Reference image',{exact:true}).setInputFiles('tests/visual-editor.png');await page.getByAltText('Design style reference').waitFor();await page.getByLabel('Reference instruction').fill('Borrow spacing and colors');await page.getByRole('button',{name:'Close',exact:true}).click();
+ await page.getByRole('button',{name:'Dashboard',exact:true}).click();await page.frameLocator('iframe[title="Live preview"]').getByRole('heading',{name:'Reference result'}).waitFor({timeout:60000});
+ const content=request.messages[1].content;assert.equal(content.filter(x=>x.type==='image_url').length,2);assert.match(content[0].text,/Image 1 is the wireframe/);assert.match(content[0].text,/Borrow spacing and colors/);
+ await page.reload();await page.getByRole('button',{name:'Reference ✓',exact:true}).click();assert.equal(await page.getByLabel('Reference instruction').inputValue(),'Borrow spacing and colors');
+ console.log('PASS: separate reference upload, image preprocessing/persistence, and two correctly labelled images in the generation request. Model response mocked.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

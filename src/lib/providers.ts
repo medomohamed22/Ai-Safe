@@ -147,6 +147,7 @@ export interface GenerateArgs {
   system: string;
   userText: string;
   imageDataUrl?: string | null;
+  imageDataUrls?: string[];
   temperature: number;
   signal: AbortSignal;
   onToken: (fullTextSoFar: string) => void;
@@ -218,11 +219,12 @@ async function readResponse(res: Response, onToken: (t: string) => void): Promis
 export async function generate(a: GenerateArgs): Promise<string> {
   const p = a.provider;
   const base = trimSlash(p.baseUrl);
+  const images = a.imageDataUrls ?? (a.imageDataUrl ? [a.imageDataUrl] : []);
 
   if (p.type === 'gemini') {
     const parts: any[] = [{ text: a.userText }];
-    if (a.imageDataUrl) {
-      const [meta, data] = a.imageDataUrl.split(',');
+    for (const image of images) {
+      const [meta, data] = image.split(',');
       const mimeType = meta.match(/data:(.*?);/)?.[1] || 'image/png';
       parts.push({ inlineData: { mimeType, data } });
     }
@@ -242,14 +244,14 @@ export async function generate(a: GenerateArgs): Promise<string> {
 
   // OpenAI-compatible: OpenRouter, Meta Llama API (compat), OpenAI, Groq, ...
   const content: any[] = [{ type: 'text', text: a.userText }];
-  if (a.imageDataUrl) content.push({ type: 'image_url', image_url: { url: a.imageDataUrl } });
+  for (const image of images) content.push({ type: 'image_url', image_url: { url: image } });
   const body: Record<string, unknown> = {
     model: a.model,
     stream: true,
     temperature: a.temperature,
     messages: [
       { role: 'system', content: a.system },
-      { role: 'user', content: a.imageDataUrl ? content : a.userText },
+      { role: 'user', content: images.length ? content : a.userText },
     ],
   };
   if (p.type !== 'meta') body.max_tokens = 12000;

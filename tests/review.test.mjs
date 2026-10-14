@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';
+import {reviewBundle,reviewId,encodeReview,decodeReview,parseComments} from '../src/lib/review.ts';
+const project={activeId:'a',screens:[{id:'a',name:'Home',versions:['export default function App(){return <h1>Hello</h1>}'],vIndex:0,scene:null}],links:[]};
+const bundle=reviewBundle(project,{mode:'http',baseUrl:'https://private.example.test',endpoints:[]});assert.equal(bundle.backend.baseUrl,'');assert.equal(bundle.backend.mode,'demo');const decoded=await decodeReview(await encodeReview(bundle));assert.deepEqual(decoded,bundle);const id=await reviewId(bundle);assert.deepEqual(parseComments(JSON.stringify({reviewId:id,comments:[]}),id),[]);assert.throws(()=>parseComments(JSON.stringify({reviewId:'wrong',comments:[]}),id),/different source/);await assert.rejects(()=>decodeReview('bad%link'),/Invalid/);console.log('PASS: compressed review roundtrip, backend URL excluded, snapshot matching and malformed link rejection.');

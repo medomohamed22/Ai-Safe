@@ -5,6 +5,13 @@ export const KEYS = {
   scene: 's2ui.scene.v1',
   versions: 's2ui.versions.v1',
   vIndex: 's2ui.vindex.v1',
+  backend: 's2ui.backend.v1',
+  project: 's2ui.project.v1',
+  brand: 's2ui.brand.v1',
+  reference: 's2ui.reference.v1',
+  alternatives: 's2ui.alternatives.v1',
+  locks: 's2ui.locks.v1',
+  tests: 's2ui.tests.v1',
 };
 
 export function load<T>(key: string, fallback: T): T {
@@ -38,5 +45,5 @@ export function loadSettings(): AppSettings {
 }
 
 export function clearAll() {
-  Object.values(KEYS).forEach((k) => localStorage.removeItem(k));
+  Object.keys(localStorage).filter(key => key.startsWith('s2ui.')).forEach(key => localStorage.removeItem(key));
 }

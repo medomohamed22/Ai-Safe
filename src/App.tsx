@@ -11,6 +11,16 @@ import { PRESETS, type PresetKey } from './lib/presets';
 import { ModelPicker } from './components/ModelPicker';
 import { SettingsModal } from './components/SettingsModal';
 import { PreviewPane } from './components/PreviewPane';
+import { BackendPanel } from './components/BackendPanel';
+import { backendPrompt, DEFAULT_BACKEND, type BackendConfig } from './lib/backend';
+import { ScreensPanel } from './components/ScreensPanel';
+import type { ScreenProject } from './lib/screens';
+import { BrandPanel } from './components/BrandPanel';
+import { brandPrompt, DEFAULT_BRAND, type Brand } from './lib/brand';
+import { ReferencePanel, type ReferenceImage } from './components/ReferencePanel';
+import { AlternativesPanel, type DesignAlternative } from './components/AlternativesPanel';
+import { ReviewPage } from './components/ReviewPage';
+import { assertLockedElements, lockPrompt } from './lib/visualEdit';
 
 const sigOf = (els: readonly any[]) =>
   els
@@ -36,15 +46,46 @@ interface RunOpts {
 }
 
 export default function App() {
+  const [review] = useState(() => location.hash.startsWith('#review=') ? location.hash.slice(8) : null);
+  return review ? <ReviewPage encoded={review} /> : <WorkspaceApp />;
+}
+
+function WorkspaceApp() {
+  const initialProject = useMemo<ScreenProject>(() => load(KEYS.project, { activeId: 'home', links: [], screens: [{ id: 'home', name: 'Home', versions: load(KEYS.versions, []), vIndex: load(KEYS.vIndex, -1), scene: load(KEYS.scene, null) }] }), []);
+  const initialScreen = initialProject.screens.find(s => s.id === initialProject.activeId) || initialProject.screens[0];
+  const [project, setProject] = useState(initialProject);
+  const [screenScene, setScreenScene] = useState<any>(initialScreen.scene);
+  const [showScreens, setShowScreens] = useState(false);
+  const [brand, setBrand] = useState<Brand>(() => load(KEYS.brand, DEFAULT_BRAND));
+  const [showBrand, setShowBrand] = useState(false);
+  const [reference, setReference] = useState<ReferenceImage | null>(() => load(KEYS.reference, null));
+  const [showReference, setShowReference] = useState(false);
+  const [alternatives, setAlternatives] = useState<Record<string, DesignAlternative[]>>(() => load(KEYS.alternatives, {}));
+  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [locks, setLocks] = useState<Record<string, string[]>>(() => load(KEYS.locks, {}));
+  const locksRef = useRef(locks); locksRef.current = locks;
+  useEffect(() => save(KEYS.locks, locks), [locks]);
+  useEffect(() => save(KEYS.alternatives, alternatives), [alternatives]);
+  const referenceRef = useRef(reference); referenceRef.current = reference;
+  useEffect(() => save(KEYS.reference, reference), [reference]);
+  const brandRef = useRef(brand); brandRef.current = brand;
+  useEffect(() => save(KEYS.brand, brand), [brand]);
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
-  const [versions, setVersions] = useState<string[]>(() => load(KEYS.versions, []));
-  const [vIndex, setVIndex] = useState<number>(() => Math.min(load(KEYS.vIndex, -1), load<string[]>(KEYS.versions, []).length - 1));
+  const [versions, setVersions] = useState<string[]>(initialScreen.versions);
+  const [vIndex, setVIndex] = useState<number>(() => Math.min(initialScreen.vIndex, initialScreen.versions.length - 1));
   const [generating, setGenerating] = useState(false);
   const [stream, setStream] = useState('');
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [backend, setBackend] = useState<BackendConfig>(() => load(KEYS.backend, DEFAULT_BACKEND));
+  const [showBackend, setShowBackend] = useState(false);
+  const backendRef = useRef(backend); backendRef.current = backend;
+  useEffect(() => save(KEYS.backend, backend), [backend]);
+  const liveProject = useMemo(() => ({ ...project, screens: project.screens.map(s => s.id === project.activeId ? { ...s, versions, vIndex, scene: screenScene } : s) }), [project, versions, vIndex, screenScene]);
+  const projectRef = useRef(liveProject); projectRef.current = liveProject;
+  useEffect(() => save(KEYS.project, liveProject), [liveProject]);
 
   const code = versions[vIndex] ?? '';
 
@@ -59,7 +100,7 @@ export default function App() {
   apiRef.current = api;
 
   const initialData = useMemo(() => {
-    const s = load<any>(KEYS.scene, null);
+    const s = initialScreen.scene;
     return {
       elements: s?.elements ?? [],
       files: s?.files ?? undefined,
@@ -106,6 +147,7 @@ export default function App() {
 
   // ------------------------------------------------------------------ generation
   const run = async (opts: RunOpts = {}) => {
+    const screenId = projectRef.current.activeId;
     const s = settingsRef.current;
     const provider = s.providers.find((p) => p.id === s.activeProviderId);
     if (!provider || !s.activeModelId) {
@@ -115,8 +157,10 @@ export default function App() {
     }
     window.clearTimeout(debounceRef.current);
     const image = opts.fixError ? null : await exportSketch();
+    if (projectRef.current.activeId !== screenId) return;
     const current = opts.fresh ? '' : codeRef.current;
-    if (!image && !opts.instruction?.trim() && !opts.fixError) {
+    const styleReference = opts.fixError ? null : referenceRef.current;
+    if (!image && !styleReference && !opts.instruction?.trim() && !opts.fixError) {
       setApiError('Draw something on the canvas (or pick a demo preset) or type an instruction.');
       return;
     }
@@ -132,15 +176,17 @@ export default function App() {
       const full = await generate({
         provider,
         model: s.activeModelId,
-        system: SYSTEM_PROMPT,
-        userText: buildUserPrompt({ hasImage: !!image, currentCode: current, instruction: opts.instruction, fixError: opts.fixError }),
-        imageDataUrl: image,
+        system: SYSTEM_PROMPT + brandPrompt(brandRef.current) + lockPrompt(locksRef.current[screenId] || []),
+        userText: buildUserPrompt({ hasImage: !!image, currentCode: current, instruction: opts.instruction || (styleReference && !image ? 'Create an interface based on the attached style reference.' : undefined), fixError: opts.fixError }) + backendPrompt(backendRef.current) + (styleReference ? `\nIMAGE ROLES: ${image ? 'Image 1 is the wireframe and controls layout. Image 2' : 'Image 1'} is a visual style reference. ${styleReference.instruction}\nDo not render designer annotations as content. Saved brand identity takes precedence over conflicting reference colors.\n` : ''),
+        imageDataUrls: [image, styleReference?.dataUrl].filter((value): value is string => !!value),
         temperature: s.temperature,
         signal: ctrl.signal,
         onToken: (t) => setStream(t),
       });
       const c = extractCode(full);
+      if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
       if (!c || c.length < 30) throw new Error('The model did not return any code. Try a stronger vision model.');
+      assertLockedElements(c, locksRef.current[screenId] || []);
       pushVersion(c);
     } catch (e: any) {
       if (ctrl.signal.aborted) return;
@@ -162,10 +208,58 @@ export default function App() {
   };
 
   // ------------------------------------------------------------------ canvas
+  const generateAlternatives = async () => {
+    const s = settingsRef.current; const provider = s.providers.find(p => p.id === s.activeProviderId);
+    if (!provider || !s.activeModelId) { setShowSettings(true); return; }
+    const screenId = projectRef.current.activeId;
+    const current = codeRef.current; const ref = referenceRef.current;
+    abortRef.current?.abort(); window.clearTimeout(debounceRef.current);
+    const ctrl = new AbortController(); abortRef.current = ctrl;
+    setGenerating(true); setStream(''); setApiError(null); setShowAlternatives(true);
+    setAlternatives(prev => ({ ...prev, [screenId]: [] }));
+    try {
+      const image = await exportSketch();
+      if (!image && !current && !ref && !prompt.trim()) throw new Error('Draw a sketch, add a reference, or describe the interface first.');
+      const basePrompt = buildUserPrompt({ hasImage: !!image, currentCode: current, instruction: prompt.trim() || 'Create the interface shown in the reference.' }) + backendPrompt(backendRef.current) + (ref ? `\n${image ? 'Image 1 is the sketch controlling layout. Image 2' : 'Image 1'} is a style reference: ${ref.instruction}` : '');
+      const system = SYSTEM_PROMPT + brandPrompt(brandRef.current) + lockPrompt(locksRef.current[screenId] || []);
+      for (const [name, direction] of [['Formal', 'Professional, restrained, clear business hierarchy.'], ['Minimal', 'Minimal, spacious, clean and focused.'], ['Bold', 'Expressive typography and strong visual hierarchy.']] as const) {
+        if (ctrl.signal.aborted || projectRef.current.activeId !== screenId) break;
+        setStream(`Generating ${name}…\n`);
+        const result = await generate({ provider, model: s.activeModelId, system, userText: `${basePrompt}\nDESIGN VARIANT: ${name}. ${direction} Keep the same content, functional behavior, backend contract and saved brand identity.`, imageDataUrls: [image, ref?.dataUrl].filter((v): v is string => !!v), temperature: s.temperature, signal: ctrl.signal, onToken: text => setStream(`${name}\n${text}`) });
+        if (ctrl.signal.aborted || projectRef.current.activeId !== screenId) break;
+        const code = extractCode(result); if (code.length < 30) throw new Error(`${name}: model did not return code.`);
+        assertLockedElements(code, locksRef.current[screenId] || []);
+        setAlternatives(prev => ({ ...prev, [screenId]: [...(prev[screenId] || []), { name, code }] }));
+      }
+    } catch (e) { if (!ctrl.signal.aborted) setApiError((e as Error).message); }
+    finally { if (abortRef.current === ctrl) { abortRef.current = null; setGenerating(false); } }
+  };
+
+  const snapshotProject = () => {
+    const a = apiRef.current;
+    const scene = a ? { elements: a.getSceneElements(), files: a.getFiles() } : screenScene;
+    return { ...liveProject, screens: liveProject.screens.map(s => s.id === project.activeId ? { ...s, scene } : s) };
+  };
+  const selectScreen = (id: string, nextProject = snapshotProject()) => {
+    const screen = nextProject.screens.find(s => s.id === id);
+    if (!screen) return;
+    stop(); window.clearTimeout(debounceRef.current); window.clearTimeout(saveSceneRef.current);
+    setProject({ ...nextProject, activeId: id }); setVersions(screen.versions); setVIndex(screen.vIndex); setScreenScene(screen.scene);
+    setApiError(null); setStream(''); setPrompt('');
+    sigRef.current = sigOf(screen.scene?.elements || []);
+    apiRef.current?.resetScene();
+    if (screen.scene?.files) apiRef.current?.addFiles(Object.values(screen.scene.files));
+    apiRef.current?.updateScene({ elements: screen.scene?.elements || [] });
+  };
+  const addScreen = (name: string) => {
+    const screen = { id: crypto.randomUUID(), name, versions: [], vIndex: -1, scene: null };
+    const snapshot = snapshotProject(); selectScreen(screen.id, { ...snapshot, screens: [...snapshot.screens, screen] });
+  };
   const persistScene = (elements: readonly any[], files: any) => {
     window.clearTimeout(saveSceneRef.current);
     saveSceneRef.current = window.setTimeout(() => {
       save(KEYS.scene, { elements: elements.filter((e) => !e.isDeleted), files });
+      setScreenScene({ elements: elements.filter((e) => !e.isDeleted), files });
     }, 500);
   };
 
@@ -202,6 +296,7 @@ export default function App() {
     a.updateScene({ elements: [] });
     sigRef.current = '';
     save(KEYS.scene, { elements: [], files: {} });
+    setScreenScene({ elements: [], files: {} });
   };
 
   const newProject = () => {
@@ -210,6 +305,9 @@ export default function App() {
     clearCanvas();
     setVersions([]);
     setVIndex(-1);
+    setProject({ activeId: 'home', links: [], screens: [{ id: 'home', name: 'Home', versions: [], vIndex: -1, scene: null }] });
+    setAlternatives({});
+    setLocks({});
     setApiError(null);
   };
 
@@ -266,6 +364,12 @@ export default function App() {
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button onClick={() => setShowBackend(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Backend</button>
+          <button onClick={() => setShowScreens(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Screens ({project.screens.length})</button>
+          <button onClick={() => setShowBrand(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Brand</button>
+          <button onClick={() => setShowReference(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Reference{reference ? ' ✓' : ''}</button>
+          <button disabled={generating} onClick={generateAlternatives} className="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-40">3 designs</button>
+          {!!alternatives[project.activeId]?.length && <button onClick={() => setShowAlternatives(true)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs">Compare designs</button>}
           <button
             onClick={() => setSettings((s) => ({ ...s, autoSync: !s.autoSync }))}
             className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
@@ -329,6 +433,11 @@ export default function App() {
 
         <section className="h-1/2 min-h-0 md:h-auto md:w-1/2">
           <PreviewPane
+            locks={locks[project.activeId] || []}
+            onToggleLock={snippet => setLocks(prev => ({ ...prev, [project.activeId]: (prev[project.activeId] || []).includes(snippet) ? prev[project.activeId].filter(s => s !== snippet) : [...(prev[project.activeId] || []), snippet] }))}
+            project={liveProject}
+            onNavigate={selectScreen}
+            backend={backend}
             code={code}
             generating={generating}
             stream={stream}
@@ -343,6 +452,8 @@ export default function App() {
             onFix={(err) => runRef.current({ fixError: err })}
             onDismissError={() => setApiError(null)}
             onOpenSettings={() => setShowSettings(true)}
+            onCodeChange={code => { assertLockedElements(code, locksRef.current[project.activeId] || []); pushVersion(code); }}
+            onElementRequest={(instruction) => runRef.current({ instruction })}
           />
         </section>
       </main>
@@ -387,6 +498,11 @@ export default function App() {
       </footer>
 
       {showSettings && <SettingsModal settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />}
+      {showBackend && <BackendPanel config={backend} onChange={setBackend} onClose={() => setShowBackend(false)} />}
+      {showBrand && <BrandPanel brand={brand} onChange={setBrand} onClose={() => setShowBrand(false)} />}
+      {showReference && <ReferencePanel reference={reference} onChange={setReference} onClose={() => setShowReference(false)} />}
+      {showAlternatives && <AlternativesPanel error={apiError} onStop={stop} alternatives={alternatives[project.activeId] || []} backend={backend} busy={generating} onClose={() => setShowAlternatives(false)} onChoose={code => { pushVersion(code); setShowAlternatives(false); }} />}
+      {showScreens && <ScreensPanel project={liveProject} onClose={() => setShowScreens(false)} onSelect={(id) => { selectScreen(id); setShowScreens(false); }} onAdd={addScreen} onRename={(id, name) => setProject(prev => ({ ...prev, screens: prev.screens.map(s => s.id === id ? { ...s, name } : s) }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} onDelete={(id) => { const snapshot = snapshotProject(); const next = { ...snapshot, screens: snapshot.screens.filter(s => s.id !== id), links: snapshot.links.filter(l => l.from !== id && l.to !== id) }; if (id === project.activeId) selectScreen(next.screens[0].id, next); else setProject(next); }} />}
     </div>
   );
 }
