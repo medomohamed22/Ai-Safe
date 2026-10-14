@@ -3,11 +3,17 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 // Same handler that Vercel runs as an Edge Function, reused locally in `npm run dev`.
 import proxyHandler from './api/proxy.js';
+import projectBundleHandler from './api/project-bundle.js';
+import screenshotHandler from './api/screenshot.js';
+import qualityHandler from './api/quality.js';
 
 function devApiProxy(): Plugin {
   return {
     name: 'dev-api-proxy',
     configureServer(server) {
+      server.middlewares.use('/api/quality', qualityHandler);
+      server.middlewares.use('/api/screenshot', screenshotHandler);
+      server.middlewares.use('/api/project-bundle', projectBundleHandler);
       server.middlewares.use('/api/proxy', async (req, res) => {
         try {
           const chunks: Buffer[] = [];

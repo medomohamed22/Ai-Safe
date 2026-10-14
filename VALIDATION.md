@@ -77,3 +77,64 @@ The implementation uses GitHub's documented [tree creation](https://docs.github.
 and [Pull Request creation](https://docs.github.com/en/rest/pulls/pulls#create-a-pull-request)
 with a session token. Review happens before writes; changed base commits invalidate
 the review, and unrelated repository files are retained through `base_tree`.
+
+
+## Studio redesign verification — 2026-10-14
+
+- `npm run typecheck`: passed.
+- `npm test`: all seven source/contract groups passed.
+- `npm run build`: passed; existing large-bundle warning remains.
+- `S2UI_TEST_URL=http://127.0.0.1:5175 npm run test:browser`: all 15
+  browser workflow groups passed against the production build in Chrome.
+- New checks include persisted pointer/keyboard split resizing, pane focus,
+  sidebar collapse, grouped exports, contextual inspector, mobile draft and
+  running-preview preservation, tools sheet focus/Escape/return, and applying
+  source edits from a phone-sized viewport.
+- Responsive checks cover 320, 390, 820, 900, 1024 and 1440 pixels, with no
+  horizontal page overflow and preview height at least 160px. A 390x500 viewport
+  also verifies the instructions action remains reachable.
+- Visual inspection covered desktop day/night, phone sketch/preview/instructions,
+  and the phone tools sheet. Screenshot fixtures are excluded from the upload ZIP.
+- External provider, GitHub and backend responses remain mocked in these tests.
+  No physical phone, live model quality, live API, GitHub write or Vercel deploy
+  was verified as part of this layout change.
+
+
+## Ten productivity features — 2026-10-14
+
+Implemented in proposal order. Each feature's targeted checks passed before work
+started on the next feature; see the completed productivity section in TODO.md.
+
+- `npm run typecheck`: passed.
+- `npm test`: all 12 source/contract groups passed, including actual Vite bundle
+  compilation, a chart bundle using the matching Recharts version, unresolved
+  symbols, unsupported Node imports and obfuscated import.meta macro rejection.
+- `npm run build`: passed with the existing large-chunk warning. The resulting
+  main JS is approximately 2.15 MB raw / 661 KB gzip; no performance budget was measured.
+- Production app/services: `npm run serve` on localhost:5175. Original 15 browser
+  workflows and nine productivity workflows passed as a complete run. Two extra
+  browser groups then passed for all ten tabs on phone/tablet, authenticated remote
+  service routing, and independent shared-component/asset review links (26 total).
+- After final ZIP-root/backup validation fixes, imported project, workspace/cloud
+  and automatic quality/repair browser groups were rerun and passed on production.
+- Desktop day/night and phone screenshots were inspected. UI checks cover all ten
+  productivity sections at 320, 390 and 820px; existing layout checks cover six
+  sizes from 320 to 1440px. No physical phone was tested.
+- Real operations: React interactions, fixed-config production JS bundling,
+  imported JSX/TSX/CSS compilation, screenshot capture in sandboxed Chrome,
+  pixel-difference calculation, WebM decoding/seeking, local IndexedDB persistence,
+  workspace switching and shared component updates across two screens.
+- Mocked operations: model generation/quality, GitHub, Figma REST/asset downloads,
+  and Supabase auth/RPC/conflicts. No real provider charge, repository write,
+  private Figma access, Supabase schema/RLS execution or Vercel deployment occurred.
+- Supabase preparation matches the user's choice to connect it later. The schema,
+  owner-only policies, optimistic save RPC and setup instructions are supplied;
+  real account/cloud verification remains pending that connection.
+- Browser capture requires installed Chrome/Chromium. It works in local dev and
+  the supplied production service. Vercel users must connect a browser-capable
+  service for capture; ordinary frontend hosting does not supply that binary.
+- Full WCAG compliance, CSS build output, generated TypeScript types, arbitrary
+  frameworks/packages, video/audio timing and live backend behavior are not
+  certified by the available checks. See PRODUCTIVITY.md for per-feature bounds.
+
+Final workspace regression also passed: opening the already-active project keeps its latest browser snapshot instead of restoring an older IndexedDB snapshot.

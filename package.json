@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "node tests/run-tests.mjs",
     "test:browser": "node tests/run-browser.cjs",
-    "package:upload": "node scripts/package-upload.mjs"
+    "package:upload": "node scripts/package-upload.mjs",
+    "serve": "node server.mjs"
   },
   "dependencies": {
     "@babel/generator": "^8.0.6",
@@ -20,7 +21,8 @@
     "jszip": "^3.10.2",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "recharts": "2.15.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
@@ -29,6 +31,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.0",
+    "esbuild": "0.25.12",
     "playwright": "^1.64.0",
     "tailwindcss": "^4.1.0",
     "typescript": "~5.8.0",

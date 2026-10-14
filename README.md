@@ -20,9 +20,12 @@ Draw a wireframe → get a live, interactive React + Tailwind UI in seconds.
 
 The workspace uses a monochrome day/night design. Use the moon/sun toggle to
 switch appearance or the adjacent device icon to follow the system. Narrow
-screens have Sketch/Preview workspace tabs. Keyboard navigation, reduced motion
+screens have bottom navigation for Sketch, Preview and Instructions, plus a
+workspace-tools bottom sheet. Desktop supports a collapsible sidebar, a saved
+resizable split and focus views. Keyboard navigation, reduced motion
 and theme persistence are supported; see `UI_DESIGN.md` for design references.
-Quick suggestions fill the composer for review; press Send to apply them. Theme
+Quick suggestions fill the composer for review; use Generate/Update interface to
+apply them. ZIP, GitHub, JSX, HTML and copy actions are in the Export menu. Theme
 and Code/Preview switching preserve the running generated interface state.
 
 - **Select element:** click preview elements to edit static text, colors, padding
@@ -58,6 +61,16 @@ and Code/Preview switching preserve the running generated interface state.
   comment sync or authentication; anyone with the link can view its source.
   Encoded links are limited to 60 KB, and some messaging services impose smaller
   URL limits. Localhost links work on the same computer only.
+
+## Productivity studio
+
+The sidebar now opens ten additional tools: automatic quality checks and bounded
+repair, approved plans, shared source components, reference-image comparison,
+request budgets, existing React-project import, before/after change review, Figma
+structure/assets, video interaction references and independent saved projects.
+Supabase is prepared for connection later; browser captures need a Chrome service.
+See [PRODUCTIVITY.md](PRODUCTIVITY.md) for exact capabilities, limits, service
+setup, Supabase SQL and verification boundaries.
 
 ## Generation requirements
 

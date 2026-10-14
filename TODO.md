@@ -73,3 +73,32 @@ and explicit targeted feedback request. Local link tested; public use requires
 deploying this updated editor. No cloud comment sync; encoded limit is 60 KB.
 
 Final pass passed: source locks, cancellation, separate sketches and mobile layout verified. All 12 Chrome workflows passed against the production build on port 5175; source checks, TypeScript and build passed. Real external integrations remain unverified as documented above.
+
+
+## Studio layout refresh
+- [x] Collapsible workspace sidebar and screen shortcuts.
+- [x] Resizable 40/60 split and focus views with state preserved.
+- [x] Grouped exports and contextual element properties.
+- [x] Phone bottom navigation, instructions view and tools bottom sheet.
+- [x] Day/night styling and reduced-motion support retained.
+- [x] Source/build checks and focused interaction tests.
+
+
+## Productivity features — implement sequentially, test before next feature
+- [x] 1. Automatic quality checks, acceptance scenarios and bounded repair. Chrome quality repair and fixed-config Vite compilation tests passed.
+- [x] 2. Editable generation plans and tracked acceptance requirements. Browser approval, edits, generation payload and persistence passed.
+- [x] 3. Reusable source component library. Source materialization and real two-screen shared update/interaction/reload passed.
+- [x] 4. Visual reference comparison and measured refinement. Real Chrome capture and decreased pixel difference verified; AI mocked. Production capture requires Chrome service.
+- [x] 5. Request usage, budgets and duplicate protection. Concurrent duplicate, actual token telemetry, cost estimates and pre-network limit tests passed.
+- [x] 6. Import and develop an existing React/Vite project. Multi-file JSX/TSX/CSS bundling, ZIP/raw-file edit, React interaction, secret/path exclusion passed. Bounded supported packages only.
+- [x] 7. Before/after visual and source review before adoption. Pending generation, source diff, stale-review rejection and explicit acceptance/rejection passed.
+- [x] 8. Figma import with structure/assets. Mocked REST nodes/auto-layout/fonts/image fills, local asset resolution, generation payload and token handling passed; live Figma not connected.
+- [x] 9. Video reference extraction and interaction generation. Real WebM decode, six timed frames, edited notes/spec, correct model images and working generated menu passed.
+- [x] 10. Multi-project cloud workspace prepared for Supabase (user connects later). IndexedDB save/switch/restore and mocked authenticated upload/conflict/session tests passed. SQL/RLS live verification pending user connection.
+
+
+Productivity final verification: all ten implementation checkpoints passed before
+advancing. TypeScript, 12 source/contract groups, production build and 26 browser
+workflow/integration groups passed. Supabase is prepared for later user connection;
+external providers/GitHub/Figma/Supabase were mocked. Browser capture uses the local
+Chrome service and needs a browser-capable production runner. See PRODUCTIVITY.md.
