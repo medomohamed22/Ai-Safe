@@ -26,8 +26,10 @@ export function load<T>(key: string, fallback: T): T {
 export function save(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('s2ui-storage-change', {detail:key}));
   } catch (e) {
     console.warn('localStorage save failed', key, e);
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('s2ui-storage-error', {detail:key}));
   }
 }
 

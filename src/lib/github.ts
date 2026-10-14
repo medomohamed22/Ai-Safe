@@ -1,7 +1,7 @@
 export interface GitReview { repo: string; baseBranch: string; baseSha: string; treeSha: string; changes: { path: string; content: string; previousSha?: string }[] }
 const API = 'https://api.github.com';
 export async function githubRequest(token: string, route: string, method = 'GET', body?: unknown, fetcher: typeof fetch = fetch) {
-  const response = await fetcher(API + route, { method, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2026-03-10', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const response = await fetcher(API + route, { method, headers: { Accept: 'application/vnd.github+json', ...(token.trim() ? {Authorization: `Bearer ${token}`} : {}), 'X-GitHub-Api-Version': '2026-03-10', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const result = await response.json();
   if (!response.ok) throw new Error(`GitHub ${response.status}: ${result.message || 'Request failed'}`);
   return result;

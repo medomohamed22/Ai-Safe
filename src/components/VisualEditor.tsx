@@ -19,13 +19,13 @@ export function VisualEditor({ code, id, disabled, locks, onToggleLock, onApply,
       onApply(applyElementEdit(code, id, patch));
     } catch (e) { setError(String((e as Error).message)); }
   };
-  return <section aria-label="Element editor" className="min-h-0 max-h-40 overflow-auto sm:max-h-72 border-b border-[var(--ui-border)] bg-[var(--ui-surface)] p-3 text-xs">
-    <div className="mb-2 flex items-center justify-between"><strong>Edit &lt;{info.tag}&gt;</strong><button onClick={onClose} aria-label="Close element editor">✕</button></div>
+  return <section aria-label="Element editor" className="element-inspector">
+    <div className="inspector-heading"><strong>Edit &lt;{info.tag}&gt;</strong><button onClick={onClose} aria-label="Close element editor">✕</button></div>
     <p className="mb-2 text-[var(--ui-muted)]">Repeated items share the same source: changes apply to every instance.</p>
     <fieldset disabled={disabled} className="space-y-2 disabled:opacity-50">
       <button className="rounded border border-[var(--ui-border)] px-3 py-1 text-[var(--ui-text)]" onClick={() => { onToggleLock(info.snippet); setError(''); }}>{locks.includes(info.snippet) ? 'Unlock element' : 'Lock element'}</button>
       {info.editableText ? <label className="block">Text<input aria-label="Element text" className={input} value={text} onChange={(e) => setText(e.target.value)} /></label> : <p className="text-[var(--ui-text)]">Nested or dynamic text is protected. Use the AI instruction below.</p>}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2">
         <label>Text color<input aria-label="Text color" type="color" value={edit.color ?? '#000000'} onChange={(e) => setEdit({ ...edit, color: e.target.value })} className="block h-8 w-full" /></label>
         <label>Background<input aria-label="Background color" type="color" value={edit.backgroundColor ?? '#ffffff'} onChange={(e) => setEdit({ ...edit, backgroundColor: e.target.value })} className="block h-8 w-full" /></label>
         <label>Padding (px)<input aria-label="Padding" type="number" min="0" max="200" placeholder="Unchanged" className={input} value={edit.padding ?? ''} onChange={(e) => setEdit({ ...edit, padding: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>

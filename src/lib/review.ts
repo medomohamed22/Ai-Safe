@@ -1,12 +1,16 @@
+import { materializeLibrary } from './componentLibrary';
+import { materializeAssets } from './designAssets';
+import { instrumentPreview } from './visualEdit';
 import { screenCode, type ScreenProject } from './screens';
 import type { BackendConfig } from './backend';
-export interface ReviewBundle { version: 1; activeId: string; screens: { id: string; name: string; code: string }[]; backend: BackendConfig }
+export interface ReviewBundle { version: 1; preInstrumented?: boolean; activeId: string; screens: { id: string; name: string; code: string }[]; backend: BackendConfig }
 export interface ReviewComment { id: string; screenId: string; elementId: number; text: string; author: string; createdAt: string }
 export function reviewBundle(project: ScreenProject, backend: BackendConfig): ReviewBundle {
-  return { version: 1, activeId: project.activeId, screens: project.screens.map(s => ({ id: s.id, name: s.name, code: screenCode(s) })), backend: { mode: 'demo', baseUrl: '', endpoints: backend.endpoints.map(e => ({ id: e.id, method: e.method, path: e.path, dataPath: e.dataPath, fields: e.fields })) } };
+  const preInstrumented = project.screens.some(s => /@sketch2ui\/library|s2ui-asset:/.test(screenCode(s)));
+  return { version: 1, ...(preInstrumented ? {preInstrumented:true} : {}), activeId: project.activeId, screens: project.screens.map(s => ({ id: s.id, name: s.name, code: preInstrumented ? materializeAssets(materializeLibrary(instrumentPreview(screenCode(s)))) : screenCode(s) })), backend: { mode: 'demo', baseUrl: '', endpoints: backend.endpoints.map(e => ({ id: e.id, method: e.method, path: e.path, dataPath: e.dataPath, fields: e.fields })) } };
 }
 export async function reviewId(bundle: ReviewBundle) {
-  const data = new TextEncoder().encode(JSON.stringify({ screens: bundle.screens, backend: bundle.backend }));
+  const data = new TextEncoder().encode(JSON.stringify({ screens: bundle.screens, backend: bundle.backend, preInstrumented: bundle.preInstrumented }));
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), n => n.toString(16).padStart(2, '0')).join('');
 }
 export async function encodeReview(bundle: ReviewBundle) {

@@ -1,0 +1,40 @@
+.productivity-overlay { position:fixed; inset:0; z-index:70; background:var(--ui-bg); overflow:auto; padding:24px; }
+.productivity-shell { max-width:1100px; margin:0 auto; color:var(--ui-text); }
+.productivity-shell>header { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:12px 0 24px; border-bottom:1px solid var(--ui-border); }
+.productivity-shell h2 { font-size:24px; margin-top:8px; }
+.productivity-page { padding:24px 0; }
+.productivity-tabs { display:flex; flex-wrap:wrap; gap:8px; padding:18px 0 0; }
+.productivity-tabs>button[aria-pressed='true'] { background:var(--ui-contrast); color:var(--ui-on-contrast); }
+.studio-shell .save-indicator { max-width:180px; overflow:hidden; }
+.service-connection { padding:18px 0; border-top:1px solid var(--ui-border); font-size:12px; }
+.service-connection>p { color:var(--ui-muted); font-size:12px; margin:14px 0; line-height:1.8; }
+.service-connection label { display:block; margin:12px 0; }
+.service-connection input { display:block; width:100%; border:1px solid var(--ui-border); background:var(--ui-surface); padding:10px; border-radius:8px; margin-top:5px; }
+.source-editor { min-height:280px !important; font-family:Consolas,monospace; }
+.figma-preview { max-height:380px; max-width:100%; margin:15px auto; border:1px solid var(--ui-border); border-radius:10px; }
+.productivity-page h3 { font-size:20px; font-weight:600; margin-bottom:12px; }
+.productivity-page>p { font-size:13px; line-height:1.8; max-width:800px; color:var(--ui-muted); margin-bottom:18px; }
+.productivity-page label { display:block; font-size:12px; line-height:1.8; margin:12px 0; }
+.productivity-page :is(textarea,input:not([type=checkbox]),select) { display:block; border:1px solid var(--ui-border); background:var(--ui-surface); color:var(--ui-text); padding:12px; border-radius:9px; width:100%; }
+.productivity-page textarea { min-height:110px; font-size:13px; }
+.productivity-page .check-option { display:flex; align-items:center; gap:10px; }
+.productivity-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:16px 0; }
+.productivity-actions>button { min-height:40px; padding:8px 15px; font-size:12px; }
+.productivity-page ul { display:grid; gap:8px; }
+.productivity-page li { padding:12px 15px; border:1px solid var(--ui-border); border-radius:9px; font-size:12px; background:var(--ui-surface); }
+.productivity-page li>span { display:block; margin-top:4px; color:var(--ui-muted); overflow-wrap:anywhere; }
+.quality-frame-scroll { margin-top:20px; overflow:auto; max-width:100%; border:1px solid var(--ui-border); border-radius:12px; }
+.quality-frame-scroll iframe { display:block; border:0; background:white; color-scheme:light; }
+.comparison-images { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin:18px 0; }
+.comparison-images figure { border:1px solid var(--ui-border); border-radius:10px; overflow:hidden; background:var(--ui-surface); }
+.comparison-images figcaption { padding:10px; font-size:12px; }
+.comparison-images img { width:100%; max-height:450px; object-fit:contain; background:white; }
+.productivity-report { font:12px/1.7 Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; padding:15px; border:1px solid var(--ui-border); border-radius:10px; max-height:450px; overflow:auto; }
+.comparison-previews { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; }
+.comparison-previews figure { border:1px solid var(--ui-border); border-radius:10px; overflow:hidden; }
+.comparison-previews figcaption { font-size:12px; padding:10px; }
+.comparison-previews iframe { width:100%; height:400px; border:0; background:white; color-scheme:light; }
+.diff-add { background:var(--ui-selected); font-weight:650; }
+.diff-remove { color:var(--ui-muted); text-decoration:line-through; }
+@media(max-width:600px){.comparison-previews{grid-template-columns:1fr;}}
+@media(max-width:900px) { .productivity-overlay { padding:14px; } .productivity-shell h2 { font-size:21px; } .productivity-page textarea,.productivity-page input { font-size:16px; } }

@@ -1,9 +1,11 @@
+import { materializeAssets } from './designAssets';
+import { materializeLibrary } from './componentLibrary';
 import JSZip from 'jszip';
 import { backendBootstrap, DEFAULT_BACKEND, type BackendConfig } from './backend';
 import { screenFiles, type ScreenProject } from './screens';
 
 export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACKEND, project?: ScreenProject): Record<string, string> {
-  return {
+  const files: Record<string, string> = {
     'package.json': JSON.stringify({ name: 'sketch2ui-export', private: true, version: '1.0.0', type: 'module',
       scripts: { dev: 'vite', build: 'vite build', preview: 'vite preview' },
       dependencies: { react: '18.3.1', 'react-dom': '18.3.1', 'lucide-react': '0.468.0', recharts: '2.15.0' },
@@ -23,6 +25,8 @@ export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACK
     'vercel.json': JSON.stringify({ framework: 'vite', buildCommand: 'npm run build', outputDirectory: 'dist', rewrites: [{ source: '/((?!api/).*)', destination: '/index.html' }] }, null, 2),
     'README.md': '# Sketch2UI exported project\n\nRun `npm install`, then `npm run dev`. Build with `npm run build`. Commit the generated package-lock.json after installation.\n\nUpload these contents to GitHub; import in Vercel as Vite with build `npm run build`, output `dist`.\n\n## Backend handoff\n\nApp.jsx preserves the generated source and its service adapters. Review its proposed contract, API base URL and backend authentication/CORS before real API use. Demo data is not a production database. No backend or API secrets are included in this export.\n\nReview generated dependencies and external image URLs before production use.\n',
   };
+  for (const name of Object.keys(files)) if (name.endsWith('.jsx')) files[name] = materializeAssets(materializeLibrary(files[name]));
+  return files;
 }
 
 export async function projectZip(code: string, backend: BackendConfig = DEFAULT_BACKEND, project?: ScreenProject) {

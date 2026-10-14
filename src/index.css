@@ -1,2 +1,4 @@
 @import 'tailwindcss';
 @import './ui.css';
+@import './studio.css';
+@import './productivity.css';

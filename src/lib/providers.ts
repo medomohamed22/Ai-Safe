@@ -1,3 +1,4 @@
+import { reserveRequest } from './usage';
 import type { ModelInfo, ProviderConfig, ProviderType } from '../types';
 
 export const PROVIDER_PRESETS: Record<
@@ -151,6 +152,7 @@ export interface GenerateArgs {
   temperature: number;
   signal: AbortSignal;
   onToken: (fullTextSoFar: string) => void;
+  onUsage?: (usage: {input:number;output:number}) => void;
 }
 
 function textFromContent(c: any): string {
@@ -176,11 +178,13 @@ function deltaFrom(j: any): string {
   return '';
 }
 
-async function readResponse(res: Response, onToken: (t: string) => void): Promise<string> {
+async function readResponse(res: Response, onToken: (t: string) => void, onUsage?: GenerateArgs['onUsage']): Promise<string> {
+  const report = (j: any) => { const input = j?.usage?.prompt_tokens ?? j?.usageMetadata?.promptTokenCount; const output = j?.usage?.completion_tokens ?? j?.usageMetadata?.candidatesTokenCount; if (Number.isFinite(input) && Number.isFinite(output) && input >= 0 && output >= 0) onUsage?.({ input, output }); };
   const ct = res.headers.get('content-type') || '';
   if (!res.body || !ct.includes('event-stream')) {
     // Provider ignored streaming → plain JSON
     const j = await res.json();
+    if (Array.isArray(j)) j.forEach(report); else report(j);
     const full = Array.isArray(j) ? j.map(deltaFrom).join('') : deltaFrom(j);
     onToken(full);
     return full;
@@ -206,6 +210,7 @@ async function readResponse(res: Response, onToken: (t: string) => void): Promis
       } catch {
         continue;
       }
+      report(j);
       const d = deltaFrom(j);
       if (d) {
         full += d;
@@ -216,7 +221,7 @@ async function readResponse(res: Response, onToken: (t: string) => void): Promis
   return full;
 }
 
-export async function generate(a: GenerateArgs): Promise<string> {
+async function generateRaw(a: GenerateArgs): Promise<string> {
   const p = a.provider;
   const base = trimSlash(p.baseUrl);
   const images = a.imageDataUrls ?? (a.imageDataUrl ? [a.imageDataUrl] : []);
@@ -239,7 +244,7 @@ export async function generate(a: GenerateArgs): Promise<string> {
       }),
     });
     await ensureOk(res);
-    return readResponse(res, a.onToken);
+    return readResponse(res, a.onToken, a.onUsage);
   }
 
   // OpenAI-compatible: OpenRouter, Meta Llama API (compat), OpenAI, Groq, ...
@@ -263,5 +268,17 @@ export async function generate(a: GenerateArgs): Promise<string> {
     body: JSON.stringify(body),
   });
   await ensureOk(res);
-  return readResponse(res, a.onToken);
+  return readResponse(res, a.onToken, a.onUsage);
+}
+
+
+export async function generate(a: GenerateArgs): Promise<string> {
+ if (a.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+ const finish = reserveRequest(a.model, a.provider.id || a.provider.type, a.temperature + '\n' + a.system + '\n' + a.userText, a.imageDataUrls ?? (a.imageDataUrl ? [a.imageDataUrl] : []));
+ let output = ''; let actual: {input:number;output:number} | undefined;
+ try {
+  const result = await generateRaw({ ...a, onToken: text => { output = text; a.onToken(text); }, onUsage: u => { actual = u; a.onUsage?.(u); } });
+  if (a.signal.aborted) throw new DOMException('Aborted','AbortError');
+  finish('done', result, actual); return result;
+ } catch(e) { finish(a.signal.aborted ? 'cancelled' : 'failed', output, actual); throw e; }
 }

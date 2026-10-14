@@ -1,8 +1,11 @@
 // Builds a fully isolated HTML document that compiles & runs AI-generated React code
 // inside a sandboxed iframe (no allow-same-origin → cannot read the app's localStorage/API keys).
 
+import { materializeAssets } from './designAssets';
+import { materializeLibrary } from './componentLibrary';
 import { instrumentPreview } from './visualEdit';
 import { backendBootstrap, DEFAULT_BACKEND, type BackendConfig } from './backend';
+import { auditDocument } from './quality';
 import { installTestRunner } from './interactionTests';
 
 const IMPORT_MAP: Record<string, string> = {
@@ -17,11 +20,12 @@ const IMPORT_MAP: Record<string, string> = {
 const safeJson = (v: unknown) =>
   JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
-export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean }, backend: BackendConfig = DEFAULT_BACKEND): string {
+export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean; preserveInstrumentation?: boolean }, backend: BackendConfig = DEFAULT_BACKEND): string {
   let source = code;
-  if (editor) {
+  if (editor && !editor.preserveInstrumentation) {
     try { source = instrumentPreview(code); } catch { /* Existing runtime error reporting handles invalid JSX. */ }
   }
+  try { source = materializeAssets(materializeLibrary(source)); } catch (e) { source = `export default function App(){ throw new Error(${JSON.stringify((e as Error).message)}) }`; }
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -51,7 +55,7 @@ export function buildPreviewHtml(code: string, editor?: { token: string; tests?:
   window.__SRC__ = ${safeJson(source)};
   window.__KNOWN__ = ${safeJson(Object.keys(IMPORT_MAP))};
   ${backendBootstrap(backend)}
-  ${editor?.tests ? `(${installTestRunner.toString()})(${safeJson(editor.token)});` : ''}
+  ${editor?.tests ? `(${installTestRunner.toString()})(${safeJson(editor.token)}, (${auditDocument.toString()}));` : ''}
 </script>
 ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important; outline-offset: 3px; }</style>
 <script>

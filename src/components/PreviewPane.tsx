@@ -16,6 +16,8 @@ import {
   Tablet,
   Plus, Wand2, MousePointer2, Github, Share2, FlaskConical, FileCode2, Sparkles, ArrowUpRight,
 } from 'lucide-react';
+import { materializeAssets } from '../lib/designAssets';
+import { materializeLibrary } from '../lib/componentLibrary';
 import { buildPreviewHtml } from '../lib/preview';
 import { VisualEditor } from './VisualEditor';
 import { describeElement } from '../lib/visualEdit';
@@ -55,6 +57,8 @@ type Device = 'desktop' | 'tablet' | 'mobile';
 const WIDTH: Record<Device, string> = { desktop: '100%', tablet: '820px', mobile: '390px' };
 
 export function PreviewPane(p: Props) {
+  const [libraryRevision, setLibraryRevision] = useState(0);
+  useEffect(() => { const update = () => setLibraryRevision(v => v + 1); window.addEventListener('s2ui-library-change', update); return () => window.removeEventListener('s2ui-library-change', update); }, []);
   const [tab, setTab] = useState<'preview' | 'code'>('preview');
   const [device, setDevice] = useState<Device>('desktop');
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -66,14 +70,15 @@ export function PreviewPane(p: Props) {
   const [showTests, setShowTests] = useState(false);
   const [showGitHub, setShowGitHub] = useState(false);
   const [showShare, setShowShare] = useState(false);
-  const exportFiles = useMemo(() => projectFiles(p.code, p.backend, p.project), [p.code, p.backend, p.project]);
+  const exportMenuRef = useRef<HTMLDetailsElement>(null);
+  const exportFiles = useMemo(() => { try { return projectFiles(p.code, p.backend, p.project); } catch { return {}; } }, [p.code, p.backend, p.project, libraryRevision]);
   const editingRef = useRef(editing);
   editingRef.current = editing;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const streamRef = useRef<HTMLPreElement>(null);
 
   const token = useMemo(() => crypto.randomUUID(), [p.code]);
-  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token }, p.backend) : ''), [p.code, token, p.backend]);
+  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token }, p.backend) : ''), [p.code, token, p.backend, libraryRevision]);
   const sendMode = (enabled: boolean) => iframeRef.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled }, '*');
 
   useEffect(() => { sendMode(editing && !p.generating && tab === 'preview'); }, [editing, p.generating, tab, token]);
@@ -105,7 +110,7 @@ export function PreviewPane(p: Props) {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(backendBootstrap(p.backend) + '\n' + p.code);
+      await navigator.clipboard.writeText(backendBootstrap(p.backend) + '\n' + materializeAssets(materializeLibrary(p.code)));
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch { setExportError('Clipboard is unavailable. Download the JSX file instead.'); }
@@ -132,7 +137,7 @@ export function PreviewPane(p: Props) {
   };
 
   return (
-    <div className="preview-pane">
+    <div className="preview-pane" onClick={e => { if (exportMenuRef.current?.open && !exportMenuRef.current.contains(e.target as Node)) exportMenuRef.current.removeAttribute('open'); }}>
       <div className="panel-heading preview-heading"><span className="panel-number">02</span><strong>Preview</strong><span className="panel-caption">{p.code ? 'Your idea, brought to life' : 'A blank page, full of possibility'}</span>
         {p.versionCount > 0 && <div className="version-control"><button onClick={p.onPrev} disabled={p.versionIndex <= 0} className="ui-icon" title="Previous version" aria-label="Previous version"><ChevronLeft size={13} /></button><span>v{p.versionIndex + 1}<span className="version-total">/{p.versionCount}</span></span><button onClick={p.onNext} disabled={p.versionIndex >= p.versionCount - 1} className="ui-icon" title="Next version" aria-label="Next version"><ChevronRight size={13} /></button></div>}
       </div>
@@ -145,15 +150,21 @@ export function PreviewPane(p: Props) {
         <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select"><MousePointer2 size={13} /><span>Select element</span></button>
         <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className="ui-icon" aria-label="Test UI" title="Test UI"><FlaskConical size={15} /></button>
         <span className="actions-spacer" />
-        <button disabled={!p.code} onClick={copy} className="ui-icon" aria-label={copied ? 'Copied' : 'Copy'} title={copied ? 'Copied to clipboard' : 'Copy JSX'}>{copied ? <Check size={15} /> : <Copy size={15} />}</button>
-        <button disabled={!p.code} onClick={() => download('App.jsx', backendBootstrap(p.backend) + '\n' + p.code, 'text/javascript')} className="ui-icon file-button" aria-label=".jsx" title="Download App.jsx"><span>JSX</span></button>
-        <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} className="ui-icon file-button" aria-label=".html" title="Download standalone HTML"><span>HTML</span></button>
-        <span className="tool-divider" />
-        <button disabled={!p.code || p.generating} onClick={() => setShowShare(true)} className="ui-icon" aria-label="Share / review" title="Share / review"><Share2 size={15} /></button>
-        <button disabled={!p.code || p.generating} onClick={() => setShowGitHub(true)} className="ui-icon" aria-label="GitHub" title="Export to GitHub"><Github size={15} /></button>
-        <button disabled={!p.code || exporting || p.generating} onClick={exportProject} className="ui-button export-project" aria-label={exporting ? 'Exporting…' : 'Project ZIP'} title="Download a complete project">{exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}<span>Project ZIP</span></button>
+        <button disabled={!p.code || p.generating || !Object.keys(exportFiles).length} onClick={() => setShowShare(true)} className="ui-button" aria-label="Share / review" title="Share / review"><Share2 size={15} /><span>Share</span></button>
+        <details ref={exportMenuRef} className="export-menu" onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); exportMenuRef.current?.removeAttribute('open'); exportMenuRef.current?.querySelector('summary')?.focus(); } }}>
+          <summary className="ui-button" aria-label="Export options"><Download size={15} /><span>Export</span><ChevronRight size={12} /></summary>
+          <div className="export-dropdown" aria-label="Export options" onClick={e => { if ((e.target as HTMLElement).closest('button:not(:disabled)')) exportMenuRef.current?.removeAttribute('open'); }}>
+            <span className="studio-eyebrow">TAKE YOUR WORK WITH YOU</span>
+            <button disabled={!p.code || exporting || p.generating} onClick={exportProject} aria-label={exporting ? 'Exporting…' : 'Project ZIP'}><Download size={16} /><span>Project ZIP<small>Complete React + Vite project</small></span></button>
+            <button disabled={!p.code || p.generating} onClick={() => setShowGitHub(true)} aria-label="GitHub"><Github size={16} /><span>GitHub<small>Review changes & create a PR</small></span></button>
+            <hr />
+            <button disabled={!p.code} onClick={copy} aria-label={copied ? 'Copied' : 'Copy'}>{copied ? <Check size={16} /> : <Copy size={16} />}<span>{copied ? 'Copied' : 'Copy JSX'}</span></button>
+            <button disabled={!p.code} onClick={() => download('App.jsx', backendBootstrap(p.backend) + '\n' + materializeAssets(materializeLibrary(p.code)), 'text/javascript')} aria-label=".jsx"><FileCode2 size={16} /><span>Download JSX</span></button>
+            <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} aria-label=".html"><Code2 size={16} /><span>Standalone HTML</span></button>
+          </div>
+        </details>
       </div>
-      {editing && tab === 'preview' && (selected === null ? <p className="selection-hint"><MousePointer2 size={13} />Select anything in the preview. Edit its look, or ask AI to refine it.</p> : <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />)}
+      {editing && tab === 'preview' && selected === null && <p className="selection-hint"><MousePointer2 size={13} />Select anything in the preview to edit its properties.</p>}
       {!!p.locks.length && <details className="locks-list"><summary>Locked elements ({p.locks.length}) — protected in saved JSX</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>Unlock</button></div>)}</details>}
       {exportError && <p role="alert" className="mx-3 my-2 text-xs">{exportError}</p>}
       {p.apiError && <div role="alert" className="preview-error"><AlertTriangle size={15} /><span>{p.apiError}</span><button onClick={p.onDismissError} aria-label="Dismiss error">✕</button></div>}
@@ -161,10 +172,12 @@ export function PreviewPane(p: Props) {
       {showTests && createPortal(<TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />, document.body)}
       {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}
       {showShare && createPortal(<SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />, document.body)}
-      <div className="preview-stage">
+      <div className="preview-workarea"><div className="preview-stage">
         <div className="preview-tab-content" hidden={tab !== 'preview'}>{p.code ? <div className="preview-document" style={{ width: WIDTH[device] }} data-device={device}><iframe ref={iframeRef} title="Live preview" srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>React / JSX</span></div><pre>{p.code || '// Your code will appear here'}</pre></div>
         {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>Something needs a quick fix</strong><p>{runtimeError}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />Fix with AI</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label="Dismiss runtime error">✕</button></div>}
         {p.generating && <div className="generation-overlay"><div className="generation-heading"><span className="generation-icon"><Sparkles size={20} /></span><div><strong>Bringing your idea to life</strong><p>Generating with {p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11} />Stop</button></div><div className="generation-progress"><span /></div><pre ref={streamRef} className="generation-code">{p.stream.slice(-6000) || 'Reading your sketch and shaping the interface…'}<span className="generation-cursor" /></pre><span className="generation-caption">{p.stream.length ? p.stream.length.toLocaleString() + ' characters generated' : 'Good things start with a rough idea.'}</span></div>}
+      </div>
+      {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />}
       </div>
       <div className="panel-footnote preview-footnote"><span className="status-dot" />{tab === 'preview' ? 'Interactive preview' : 'Your generated source'}<span>{p.code ? 'Ready to refine' : 'Waiting for your first idea'}</span></div>
     </div>

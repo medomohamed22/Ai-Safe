@@ -20,7 +20,7 @@ export function parseScenarios(text: string): Scenario[] {
 }
 
 // Runs only inside a separate preview iframe; uses the actual rendered React DOM.
-export function installTestRunner(token: string) {
+export function installTestRunner(token: string, audit?: () => ScenarioResult[]) {
   let running = false;
   const blocked = () => { throw new Error('External network is disabled during demo interaction tests.'); };
   window.fetch = async () => blocked();
@@ -31,7 +31,7 @@ export function installTestRunner(token: string) {
   document.addEventListener('submit', e => e.preventDefault(), true);
   document.addEventListener('click', e => { if ((e.target as Element).closest('a[href]')) e.preventDefault(); }, true);
   window.addEventListener('message', async e => {
-    if (e.source !== parent || e.data?.token !== token || e.data.type !== 'run-tests' || running) return;
+    if (e.source !== parent || e.data?.token !== token || !['run-tests', 'quality-check'].includes(e.data.type) || running) return;
     running = true;
     const results: ScenarioResult[] = [];
     for (const scenario of e.data.scenarios as Scenario[]) {
@@ -63,7 +63,8 @@ export function installTestRunner(token: string) {
         results.push({ name: scenario.name, passed: true, detail: `${stepNumber} steps passed` });
       } catch (error) { results.push({ name: scenario.name, passed: false, detail: `Step ${stepNumber}: ${(error as Error).message}` }); }
     }
-    parent.postMessage({ source: 's2ui-tests', token, results }, '*');
+    if (e.data.type === 'quality-check') results.push(...(audit?.() || []));
+    parent.postMessage({ source: e.data.type === 'quality-check' ? 's2ui-quality' : 's2ui-tests', token, results }, '*');
     running = false;
   });
 }

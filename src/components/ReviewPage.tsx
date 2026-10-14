@@ -13,7 +13,7 @@ export function ReviewPage({ encoded }: { encoded: string }) {
   useEffect(() => { if (id) save(`s2ui.review.${id}`, comments); }, [id, comments]);
   const screen = bundle?.screens.find(s => s.id === active) || bundle?.screens[0];
   const token = useMemo(() => crypto.randomUUID(), [screen?.id]);
-  const html = useMemo(() => screen && bundle ? buildPreviewHtml(screen.code, { token, tests: true }, bundle.backend) : '', [screen, bundle, token]);
+  const html = useMemo(() => screen && bundle ? buildPreviewHtml(screen.code, { token, tests: true, preserveInstrumentation: bundle.preInstrumented }, bundle.backend) : '', [screen, bundle, token]);
   const sendMode = () => frame.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled: commenting }, '*');
   useEffect(() => { sendMode(); }, [token, commenting]);
   useEffect(() => {
