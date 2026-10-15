@@ -138,3 +138,23 @@ started on the next feature; see the completed productivity section in TODO.md.
   certified by the available checks. See PRODUCTIVITY.md for per-feature bounds.
 
 Final workspace regression also passed: opening the already-active project keeps its latest browser snapshot instead of restoring an older IndexedDB snapshot.
+
+
+## Stitch-inspired home and studio — 2026-10-15
+- TypeScript and production Vite build passed; the pre-existing large-chunk warning remains.
+- All 12 source/contract groups passed.
+- All 26 existing browser groups and the new home/canvas group passed against the local production server (27 total).
+- After final framing/open-state changes, home/canvas, responsive and studio groups passed again. Phone send-arrow visibility is asserted after the visual review fix.
+- New coverage: home at 320/390/820/1440, day/night appearance, Settings from home, editable prompt starters, actual Web/App instruction, exactly one generation request, focus changes preserving React state, project search, active-project state preservation, new-project isolation, reopening saved source without generation, missing-provider brief retention, reference-first flow.
+- Screenshots inspected: tests/stitch-home-dark.png, stitch-home-light.png, stitch-home-mobile.png, stitch-editor-dark.png, stitch-editor-mobile.png. Screenshots contain synthetic test projects/provider labels, not production model output.
+- External provider responses were mocked. Existing Figma/GitHub/Supabase test boundaries still apply. No Google authentication, real provider billing, live Supabase setup, GitHub write or Vercel deployment was performed.
+
+
+## Arabic/English localization — 2026-10-15
+- `npm run typecheck` and final production build passed. Existing large-chunk warning remains.
+- `npm test`: 12 previous source/contract groups plus the new i18n group passed (13 groups). The i18n test checks 835 owned UI/diagnostic messages, 652 static translation call sites, placeholder integrity, English default, locale persistence, RTL and storage-failure fallback. A source scan rejects newly introduced untranslated static UI text, while retaining technical filenames.
+- All 26 existing browser groups and Stitch home passed. The new bilingual browser group passed after fixing the 320px Arabic header overflow (28 browser groups overall). Final targeted reruns cover home, bilingual UI and upload/backend/Figma workflows against the final production build.
+- Arabic tested at 320/390/820/1440, including all ten Productivity tabs. Settings, brand, reference, backend, screens, export, visual inspector and independent review UI are translated. Brand direction still stores canonical `ltr`/`rtl` option values.
+- Language switches preserve home/editor drafts, generated source and the running preview counter. Existing user content is unchanged. English returns correctly, and Arabic selection survives reload. Excalidraw's Arabic locale uses document language `ar-SA`.
+- Screenshots inspected: `tests/language-home-ar.png`, `language-home-ar-mobile.png`, `language-settings-ar.png`, `language-projects-ar.png`, `language-editor-ar-mobile.png`.
+- Provider/model names, user-authored data, code/JSON, filenames and external provider diagnostics remain technical/source content; UI localization does not rewrite them. No external service write, credential setup, live model call or Vercel deployment was performed.

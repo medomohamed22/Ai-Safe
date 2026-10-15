@@ -102,3 +102,22 @@ advancing. TypeScript, 12 source/contract groups, production build and 26 browse
 workflow/integration groups passed. Supabase is prepared for later user connection;
 external providers/GitHub/Figma/Supabase were mocked. Browser capture uses the local
 Chrome service and needs a browser-capable production runner. See PRODUCTIVITY.md.
+
+
+## Stitch-inspired design — 2026-10-15
+- [x] Research official Google Stitch descriptions and inspect supplied UI references.
+- [x] Add prompt-first home, Web/App intent and editable design starters.
+- [x] Connect project search/open/create to real local workspace persistence.
+- [x] Add monochrome canvas styling, floating tool rail and bottom composer.
+- [x] Preserve existing drawing, generated UI, tools, themes and responsive navigation.
+- [x] Add browser coverage for home generation, isolation and active-project state preservation.
+- [x] Final production regression and upload ZIP verification.
+
+
+## Full Arabic/English UI — 2026-10-15
+- [x] Add persistent EN/AR switch with English first-visit default.
+- [x] Translate home, editor, all tools/settings/export/review and owned diagnostics.
+- [x] Add RTL layout, Arabic drawing locale and localized file controls.
+- [x] Preserve source, API values, user content, drafts and running previews on switching.
+- [x] Add static message/interpolation coverage and bilingual browser regression.
+- [x] Verify final production build and update upload ZIP.

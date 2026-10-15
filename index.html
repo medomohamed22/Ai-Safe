@@ -9,6 +9,11 @@
     <meta name="theme-color" content="#fafafa" />
     <script>
       try {
+        const language = localStorage.getItem('s2ui.language.v1') === 'ar' ? 'ar' : 'en';
+        document.documentElement.lang = language;
+        document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+      } catch { document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr'; }
+      try {
         const pref = JSON.parse(localStorage.getItem('s2ui.theme.v1') || '"system"');
         const dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.dataset.uiTheme = dark ? 'dark' : 'light';

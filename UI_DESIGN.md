@@ -80,3 +80,28 @@ workflows are rechecked against the production build.
 `tests/studio-browser.cjs` verifies split persistence, pointer/keyboard resizing,
 focus views, sidebar persistence, export menu dismissal, contextual source edits,
 phone navigation and draft/preview preservation, and mobile tools accessibility.
+
+
+## Stitch-inspired redesign — 2026-10-15
+Reference: the two supplied screenshots and Google's official descriptions:
+- https://stitch.withgoogle.com/
+- https://blog.google/innovation-and-ai/models-and-research/google-labs/stitch-ai-ui-design/
+- https://blog.google/innovation-and-ai/models-and-research/google-labs/stitch-updates/
+
+The public root now opens a prompt-first home with Web/App intent, four editable prompt starters, local project search and project reopening. `#studio` opens the editor directly. Browser back/forward changes between home and studio; review links retain their separate route.
+
+The studio uses a charcoal/monochrome dot grid, rounded floating tools card, vertical focus/reference/brand/productivity rail, framed live preview and centered rounded instruction composer. Drawing, generated React, history, visual edits, export/review and all Productivity tools remain available. Phone layouts retain the existing bottom navigation and tools sheet. Day/night/system settings and reduced motion still apply. Starter illustrations are CSS, not external assets or static images of generated projects.
+
+Starting from a home prompt first saves the current project, creates an independent IndexedDB workspace, then generates once after the drawing API is ready. Web/App selection is included in the actual generation instruction. Without a configured model the brief stays in the editor and Settings opens. Blank and reference-first projects use the same isolated project flow. Opening the active project preserves the running preview rather than reloading an older snapshot.
+
+Scope: inspired layout and workflow, with Sketch2UI branding. This does not add Stitch's infinite multi-artboard pan/zoom, voice agent, live collaboration or Google service integrations. The drawing canvas retains Excalidraw's own pan/zoom. Projects are local unless the user separately configures the existing Supabase connection. No deployment was performed.
+
+
+## Arabic localization — 2026-10-15
+- English first-visit default; global EN/AR control in home, editor and review headers.
+- Saved preference in `s2ui.language.v1`, outside workspace backups. `index.html` applies direction before app paint.
+- Arabic UI, titles, accessible names, placeholders, dialogs, local diagnostic messages and standard empty states. Provider/model names, filenames, code, JSON keys and user-authored content retain their original values.
+- Mirrored project sidebar and tool rail, logical spacing, readable Arabic type, responsive language controls, Excalidraw `ar-SA` locale. Excalidraw may set the document language tag to `ar-SA`; both `ar` and `ar-SA` are valid Arabic tags.
+- Technical inputs remain LTR; ordinary Arabic fields use RTL. Brand direction options preserve canonical `ltr`/`rtl` values independently of their translated labels.
+- Localized file picker buttons avoid the browser's English native button caption. File names remain unchanged.
+- Switching does not remount the live preview, clear editor drafts, rerun generation or change exported source.

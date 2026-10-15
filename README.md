@@ -138,3 +138,13 @@ It only forwards to the hosts in its `ALLOWED_HOSTS` list. Edit that list if you
 | Meta Llama API | `Llama-4-Maverick-17B-128E-Instruct-FP8` |
 | OpenRouter | `meta-llama/llama-4-maverick`, `google/gemini-2.5-flash` |
 | Gemini | `gemini-2.5-flash` / `gemini-2.5-pro` |
+
+
+### Design home and canvas studio
+The root URL opens the new Stitch-inspired design home. Start from a description, choose Web/App, edit a prompt starter, attach a reference, or open a saved local project. The `#studio` deep link opens the editor directly. The studio keeps the existing sketch/preview split and phone navigation alongside the new floating controls. See `UI_DESIGN.md` for the design rationale and scope.
+
+
+### English and Arabic
+Use the **EN / AR** buttons in the home, studio or review header. English is the default on a first visit; the selected language is saved on the device. Arabic uses a right-to-left layout and the drawing library's Arabic locale. Interface translation does not rewrite project source, imported files, names supplied by users, API identifiers or generated preview content. Code, JSON, URLs and credentials retain left-to-right input where appropriate.
+
+Arabic UI messages are maintained in `src/lib/ar.json`. `src/lib/i18n.ts` handles interpolation, UI diagnostics and locale persistence; `LanguageToggle.tsx` subscribes React without remounting the editor. `npm test` checks translation coverage and placeholder integrity. `npm run test:browser` includes the English/Arabic regression flow.
