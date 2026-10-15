@@ -1,3 +1,5 @@
+import { tr, screenLabel } from './lib/i18n';
+import {useLanguage} from './components/LanguageToggle';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Excalidraw, convertToExcalidrawElements, exportToBlob } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
@@ -27,6 +29,8 @@ import { ThemeToggle, useTheme } from './components/ThemeProvider';
 import { useWorkspaceAutosave } from './lib/useWorkspaceAutosave';
 import { ProductivityPanel } from './components/ProductivityPanel';
 import { StudioSidebar } from './components/StudioSidebar';
+import { DesignHome } from './components/DesignHome';
+import { saveCurrentWorkspace, newWorkspace, openWorkspace, type WorkspaceRecord } from './lib/workspaces';
 import { createPortal } from 'react-dom';
 import { Menu, X, Maximize2, MonitorPlay, MessageSquare, PanelLeftOpen } from 'lucide-react';
 import { useDialogAccessibility } from './lib/useDialogAccessibility';
@@ -55,12 +59,20 @@ interface RunOpts {
 }
 
 export default function App() {
+  useLanguage();
   useDialogAccessibility();
   const [review] = useState(() => location.hash.startsWith('#review=') ? location.hash.slice(8) : null);
   return review ? <ReviewPage encoded={review} /> : <WorkspaceApp />;
 }
 
 function WorkspaceApp() {
+  const language=useLanguage();
+  const [home, setHome] = useState(() => location.hash !== '#studio');
+  const [starting, setStarting] = useState(false);
+  const [draft] = useState<{text:string;reference:boolean}|null>(() => { try { return JSON.parse(sessionStorage.getItem('s2ui.start-draft') || 'null'); } catch { return null; } });
+  const enteredDraft = useRef(false);
+  const enterStudio = () => { location.hash = 'studio'; setHome(false); };
+  useEffect(() => { const change = () => setHome(location.hash !== '#studio'); window.addEventListener('hashchange',change); return () => window.removeEventListener('hashchange',change); }, []);
   const workspaceSaveStatus = useWorkspaceAutosave();
   const { theme } = useTheme();
   const initialProject = useMemo<ScreenProject>(() => load(KEYS.project, { activeId: 'home', links: [], screens: [{ id: 'home', name: 'Home', versions: load(KEYS.versions, []), vIndex: load(KEYS.vIndex, -1), scene: load(KEYS.scene, null) }] }), []);
@@ -97,7 +109,7 @@ function WorkspaceApp() {
   const [stream, setStream] = useState('');
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(draft?.text || '');
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [backend, setBackend] = useState<BackendConfig>(() => load(KEYS.backend, DEFAULT_BACKEND));
   const [showBackend, setShowBackend] = useState(false);
@@ -245,6 +257,36 @@ function WorkspaceApp() {
   };
   const runRef = useRef(run);
   runRef.current = run;
+  useEffect(() => {
+    if (!api || home || !draft || enteredDraft.current) return;
+    enteredDraft.current = true;
+    sessionStorage.removeItem('s2ui.start-draft');
+    if (draft.reference) { setShowReference(true); return; }
+    if (draft.text) {
+      setFocusPane('preview'); setMobilePane('preview');
+      runRef.current({instruction:draft.text});
+      if (hasModel) setPrompt('');
+    }
+  }, [api, home]);
+  const startDesign = async (text:string, mode:'web'|'app', reference=false) => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      await saveCurrentWorkspace();
+      const record = await newWorkspace(text.trim().slice(0,60) || 'Untitled design');
+      sessionStorage.setItem('s2ui.start-draft',JSON.stringify({text:text.trim() ? `${text.trim()}\nTarget platform: ${mode === 'app' ? 'mobile app, responsive on desktop too' : 'responsive website, desktop and mobile'}.` : '',reference}));
+      location.hash = 'studio';
+      await openWorkspace(record,false);
+    } finally { setStarting(false); }
+  };
+  const openDesign = async (record:WorkspaceRecord) => {
+    if (starting) return;
+    setStarting(true);
+    // Reopening the active workspace keeps the live editor; another workspace reloads.
+    try { await saveCurrentWorkspace(); enterStudio(); await openWorkspace(record); }
+    catch (e) { location.hash='home'; setHome(true); throw e; }
+    finally { setStarting(false); }
+  };
 
   const stop = () => {
     abortRef.current?.abort();
@@ -346,7 +388,7 @@ function WorkspaceApp() {
   };
 
   const newProject = () => {
-    if (!confirm('Start a new project? This clears the canvas and the code history.')) return;
+    if (!confirm(tr("Start a new project? This clears the canvas and the code history."))) return;
     stop();
     clearCanvas();
     setVersions([]);
@@ -368,6 +410,7 @@ function WorkspaceApp() {
   // Ctrl/Cmd + Enter → generate
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
+      if (home) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         if (document.querySelector('[role="dialog"]')) return;
         e.preventDefault();
@@ -377,41 +420,53 @@ function WorkspaceApp() {
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, []);
+  }, [home]);
 
   const modelLabel = settings.activeModelId ?? '';
 
-  return (
-    <div className="workspace-shell studio-shell" data-mobile-pane={mobilePane}>
+  return (<>
+    {home && <DesignHome busy={starting} onStart={startDesign} onContinue={enterStudio} onOpen={openDesign}
+      model={<ModelPicker settings={settings} onSelect={(pid,mid)=>setSettings(s=>({...s,activeProviderId:pid,activeModelId:mid}))} onOpenSettings={()=>setShowSettings(true)}/>}
+      actions={<><ThemeToggle/><button className="ui-icon" aria-label={tr("Settings")} onClick={()=>setShowSettings(true)}><Settings size={18}/></button></>}/>}
+    <div className="workspace-shell studio-shell canvas-studio" style={home ? {display:'none'} : undefined} data-mobile-pane={mobilePane}>
       <header className="app-header">
-        <button className="ui-icon mobile-tools-button" onClick={() => setToolsOpen(true)} aria-label="Open workspace tools"><Menu size={19} /></button>
-        <div className="brand-lockup"><span className="brand-mark"><PenTool size={19} strokeWidth={1.6} /></span><div><span className="brand-name">Sketch2UI<span className="brand-period">.</span></span><span className="brand-subtitle">IDEAS INTO INTERFACES</span></div></div>
-        <div className="workspace-breadcrumb"><span>Workspace</span><ChevronRight size={13} /><strong>{liveProject.screens.find(s => s.id === project.activeId)?.name || 'Home'}</strong></div>
+        <button className="ui-icon mobile-tools-button" onClick={() => setToolsOpen(true)} aria-label={tr("Open workspace tools")}><Menu size={19} /></button>
+        <button className="brand-lockup" aria-label={tr("Back to projects")} onClick={()=>{stop();location.hash='home';setHome(true);}}><span className="brand-mark"><PenTool size={19} strokeWidth={1.6} /></span><div><span className="brand-name">{tr("Sketch2UI")}<span className="brand-period">.</span></span><span className="brand-subtitle">{tr("DESIGN STUDIO")}</span></div></button>
+        <div className="workspace-breadcrumb"><span>{tr("Workspace")}</span><ChevronRight size={13} /><strong>{screenLabel(liveProject.screens.find(s => s.id === project.activeId) || {id:'home',name:'Home'})}</strong></div>
         <div className="header-spacer" />
-        <span className="save-indicator" title={workspaceSaveStatus}><span />{workspaceSaveStatus}</span>
+        <span className="save-indicator" title={tr(workspaceSaveStatus)}><span />{tr(workspaceSaveStatus)}</span>
         <div className="model-slot desktop-only"><ModelPicker settings={settings} onSelect={(pid, mid) => setSettings(s => ({ ...s, activeProviderId: pid, activeModelId: mid }))} onOpenSettings={() => setShowSettings(true)} /></div>
         <ThemeToggle />
-        <button onClick={() => setShowSettings(true)} className="ui-icon" aria-label="Settings" title="Settings"><Settings size={18} /></button>
-        <button onClick={newProject} className="ui-button header-new" aria-label="New project" title="Start a new project"><Plus size={16} /><span>New project</span></button>
+        <button onClick={() => setShowSettings(true)} className="ui-icon" aria-label={tr("Settings")} title={tr("Settings")}><Settings size={18} /></button>
+        <button onClick={newProject} className="ui-button header-new" aria-label={tr("New project")} title={tr("Start a new project")}><Plus size={16} /><span>{tr("New project")}</span></button>
       </header>
 
       <div className="studio-body" data-sidebar-collapsed={sidebarCollapsed}>
-        <aside className="studio-sidebar" aria-label="Workspace tools">{sidebar}</aside>
+        <aside className="studio-sidebar" aria-label={tr("Workspace tools")}>{sidebar}</aside>
         <div className="studio-content">
           <div className="studio-contextbar">
-            <div><span className="studio-eyebrow">DESIGN STUDIO</span><strong>{liveProject.screens.find(s => s.id === project.activeId)?.name || 'Home'}</strong><span className="context-hint">Sketch it. Build it. Make it yours.</span></div>
-            <div className="segmented desktop-layout" aria-label="Workspace layout">
-              <button onClick={() => setFocusPane('both')} aria-pressed={focusPane === 'both'} aria-label="Split workspace"><Columns2 size={15} /><span>Split</span></button>
-              <button onClick={() => setFocusPane('sketch')} aria-pressed={focusPane === 'sketch'} aria-label="Expand sketch"><PenTool size={15} /><span>Sketch</span></button>
-              <button onClick={() => setFocusPane('preview')} aria-pressed={focusPane === 'preview'} aria-label="Expand preview"><MonitorPlay size={15} /><span>Preview</span></button>
+            <div><span className="studio-eyebrow">{tr("DESIGN STUDIO")}</span><strong>{screenLabel(liveProject.screens.find(s => s.id === project.activeId) || {id:'home',name:'Home'})}</strong><span className="context-hint">{tr("Sketch it. Build it. Make it yours.")}</span></div>
+            <div className="segmented desktop-layout" aria-label={tr("Workspace layout")}>
+              <button onClick={() => setFocusPane('both')} aria-pressed={focusPane === 'both'} aria-label={tr("Split workspace")}><Columns2 size={15} /><span>{tr("Split")}</span></button>
+              <button onClick={() => setFocusPane('sketch')} aria-pressed={focusPane === 'sketch'} aria-label={tr("Expand sketch")}><PenTool size={15} /><span>{tr("Sketch")}</span></button>
+              <button onClick={() => setFocusPane('preview')} aria-pressed={focusPane === 'preview'} aria-label={tr("Expand preview")}><MonitorPlay size={15} /><span>{tr("Preview")}</span></button>
             </div>
           </div>
+          <nav className="canvas-toolrail" aria-label={tr("Canvas tools")}>
+            <button className="ui-icon" aria-label={tr("Focus interactive preview")} title={tr("Interactive preview")} aria-pressed={focusPane==='preview'} onClick={()=>setFocusPane('preview')}><MonitorPlay size={19}/></button>
+            <button className="ui-icon" aria-label={tr("Focus drawing canvas")} title={tr("Drawing canvas")} aria-pressed={focusPane==='sketch'} onClick={()=>setFocusPane('sketch')}><PenTool size={19}/></button>
+            <button className="ui-icon" aria-label={tr("Show both canvases")} title={tr("Split canvas")} aria-pressed={focusPane==='both'} onClick={()=>setFocusPane('both')}><Columns2 size={19}/></button>
+            <span/><button className="ui-icon" aria-label={tr("Canvas reference")} title={tr("Reference image")} onClick={()=>setShowReference(true)}><ImageIcon size={19}/></button>
+            <button className="ui-icon" aria-label={tr("Canvas brand")} title={tr("Brand")} onClick={()=>setShowBrand(true)}><Palette size={19}/></button>
+            <button className="ui-icon" aria-label={tr("Canvas productivity")} title={tr("Productivity tools")} onClick={()=>setShowProductivity(true)}><Sparkles size={19}/></button>
+          </nav>
       <main ref={gridRef} className="workspace-grid" data-focus={focusPane} style={{ '--studio-split': `${split}%` } as React.CSSProperties}>
-        <section className="workspace-panel sketch-panel" data-mobile-active={mobilePane === 'sketch'} aria-label="Drawing workspace">
-          <div className="panel-heading"><span className="panel-number">01</span><strong>Sketch</strong><span className="panel-caption">Start with a rough idea</span><button onClick={clearCanvas} className="ui-icon" aria-label="Clear sketch" title="Clear sketch"><Eraser size={16} /></button></div>
-          <div className="preset-strip"><span>Start with</span>{(Object.keys(PRESETS) as PresetKey[]).map(k => { const Icon = PRESET_ICONS[k]; return <button key={k} onClick={() => loadPreset(k)} disabled={!api} className="preset-pill"><Icon size={13} />{PRESETS[k].label}</button>; })}</div>
+        <section className="workspace-panel sketch-panel" data-mobile-active={mobilePane === 'sketch'} aria-label={tr("Drawing workspace")}>
+          <div className="panel-heading"><span className="panel-number">01</span><strong>{tr("Sketch")}</strong><span className="panel-caption">{tr("Start with a rough idea")}</span><button onClick={clearCanvas} className="ui-icon" aria-label={tr("Clear sketch")} title={tr("Clear sketch")}><Eraser size={16} /></button></div>
+          <div className="preset-strip"><span>{tr("Start with")}</span>{(Object.keys(PRESETS) as PresetKey[]).map(k => { const Icon = PRESET_ICONS[k]; return <button key={k} onClick={() => loadPreset(k)} disabled={!api} className="preset-pill"><Icon size={13} />{tr(PRESETS[k].label)}</button>; })}</div>
           <div className="drawing-surface">
             <Excalidraw
+              langCode={language==='ar'?'ar-SA':'en'}
               excalidrawAPI={(a) => setApi(a)}
               initialData={initialData}
               onChange={onChange}
@@ -419,15 +474,15 @@ function WorkspaceApp() {
               UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: false, toggleTheme: false } }}
             />
           </div>
-          <div className="panel-footnote"><span className="status-dot" />Your canvas, your starting point.<span className="desktop-only">Red notes become instructions.</span></div>
+          <div className="panel-footnote"><span className="status-dot" />{tr("Your canvas, your starting point.")}<span className="desktop-only">{tr("Red notes become instructions.")}</span></div>
         </section>
 
-        <div className="studio-divider" role="separator" aria-label="Resize drawing and preview" aria-orientation="vertical" aria-valuemin={30} aria-valuemax={65} aria-valuenow={Math.round(split)} tabIndex={0}
-          onKeyDown={e => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) { e.preventDefault(); setSplit(v => e.key === 'Home' ? 30 : e.key === 'End' ? 65 : Math.max(30, Math.min(65, v + (e.key === 'ArrowLeft' ? -2 : 2)))); } }}
+        <div className="studio-divider" role="separator" aria-label={tr("Resize drawing and preview")} aria-orientation="vertical" aria-valuemin={30} aria-valuemax={65} aria-valuenow={Math.round(split)} tabIndex={0}
+          onKeyDown={e => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) { e.preventDefault(); setSplit(v => e.key === 'Home' ? 30 : e.key === 'End' ? 65 : Math.max(30, Math.min(65, v + (e.key === 'ArrowLeft' ? (language === 'ar' ? 2 : -2) : (language === 'ar' ? -2 : 2))))); } }}
           onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); }}
-          onPointerMove={e => { if (!e.currentTarget.hasPointerCapture(e.pointerId)) return; const box = gridRef.current?.getBoundingClientRect(); if (box) setSplit(Math.max(30, Math.min(65, (e.clientX - box.left) / box.width * 100))); }}
+          onPointerMove={e => { if (!e.currentTarget.hasPointerCapture(e.pointerId)) return; const box = gridRef.current?.getBoundingClientRect(); if (box) setSplit(Math.max(30, Math.min(65, (language === 'ar' ? box.right - e.clientX : e.clientX - box.left) / box.width * 100))); }}
           onPointerUp={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}><span /></div>
-        <section className="workspace-panel output-panel" data-mobile-active={mobilePane === 'preview'} aria-label="Preview workspace">
+        <section className="workspace-panel output-panel" data-mobile-active={mobilePane === 'preview'} aria-label={tr("Preview workspace")}>
           <PreviewPane
             locks={locks[project.activeId] || []}
             onToggleLock={snippet => setLocks(prev => ({ ...prev, [project.activeId]: (prev[project.activeId] || []).includes(snippet) ? prev[project.activeId].filter(s => s !== snippet) : [...(prev[project.activeId] || []), snippet] }))}
@@ -455,39 +510,40 @@ function WorkspaceApp() {
       </main>
 
       <footer className="workspace-composer" data-mobile-active={mobilePane === 'instructions'}>
-        <div className="mobile-instructions-heading"><span className="studio-eyebrow">YOUR CREATIVE PARTNER</span><h2>What shall we make?</h2><p>Describe a new interface or refine the current screen.</p></div>
+        <div className="mobile-instructions-heading"><span className="studio-eyebrow">{tr("YOUR CREATIVE PARTNER")}</span><h2>{tr("What shall we make?")}</h2><p>{tr("Describe a new interface or refine the current screen.")}</p></div>
         <div className="composer-model"><ModelPicker settings={settings} onSelect={(pid, mid) => setSettings(s => ({ ...s, activeProviderId: pid, activeModelId: mid }))} onOpenSettings={() => setShowSettings(true)} /></div>
         <div className="composer-shell">
           <div className="prompt-row"><span className="composer-mark"><Sparkles size={18} strokeWidth={1.5} /></span>
-            <input aria-label="Describe your interface" value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submitPrompt(); }} disabled={generating} placeholder={code ? 'What would you like to change?' : 'Describe your idea, or let your sketch do the talking…'} />
-            <span className="composer-shortcut"><kbd>Ctrl</kbd><kbd>↵</kbd></span>
-            <button onClick={() => { if (generating) stop(); else { runRef.current({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary send-button" aria-label={generating ? 'Stop generation' : 'Send'} title={generating ? 'Stop generation' : 'Generate interface (Ctrl + Enter)'}>{generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}<span>{generating ? 'Stop' : code ? 'Update interface' : 'Generate interface'}</span><ArrowUp size={16} /></button>
+            <input aria-label={tr("Describe your interface")} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submitPrompt(); }} disabled={generating} placeholder={code ? tr("What would you like to change?") : tr("Describe your idea, or let your sketch do the talking…")} />
+            <span className="composer-shortcut"><kbd>{tr("Ctrl")}</kbd><kbd>↵</kbd></span>
+            <button onClick={() => { if (generating) stop(); else { runRef.current({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary send-button" aria-label={generating ? tr("Stop generation") : tr("Send")} title={generating ? tr("Stop generation") : tr("Generate interface (Ctrl + Enter)")}>{generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}<span>{generating ? tr("Stop") : code ? tr("Update interface") : tr("Generate interface")}</span><ArrowUp size={16} /></button>
           </div>
-          <div className="composer-bottom"><div className="quick-prompts">{(code ? QUICK_PROMPTS : ['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']).map(q => <button key={q} disabled={generating} onClick={() => { setPrompt(q); document.querySelector<HTMLInputElement>('footer input')?.focus(); }} className="quick-prompt">{q}</button>)}</div><span className="composer-note">Make something worth making.</span></div>
+          <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><div className="quick-prompts">{(code ? QUICK_PROMPTS : ['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']).map(q => <button key={q} disabled={generating} onClick={() => { setPrompt(tr(q)); document.querySelector<HTMLInputElement>('footer input')?.focus(); }} className="quick-prompt">{tr(q)}</button>)}</div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
         </div>
-        <div className="workspace-status"><span>{generating ? 'Bringing your idea to life…' : 'A little sketch. A lot of possibility.'}</span><div>{code ? <span>{versions.length} saved version{versions.length === 1 ? '' : 's'}</span> : <span>Ready when you are</span>}<span className="status-dot" /><span>Sketch → build → refine</span></div></div>
+        <div className="workspace-status"><span>{generating ? tr("Bringing your idea to life…") : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
       </footer>
 
         </div>
       </div>
-      <nav className="mobile-studio-nav" aria-label="Workspace navigation">
-        <button aria-label="Show sketch workspace" aria-pressed={mobilePane === 'sketch'} onClick={() => setMobilePane('sketch')}><PenTool size={20} /><span>Sketch</span></button>
-        <button aria-label="Show preview workspace" aria-pressed={mobilePane === 'preview'} onClick={() => setMobilePane('preview')}><MonitorPlay size={20} /><span>Preview</span></button>
-        <button aria-label="Show instructions workspace" aria-pressed={mobilePane === 'instructions'} onClick={() => setMobilePane('instructions')}><MessageSquare size={20} /><span>Instructions</span>{generating && <i />}</button>
+      <nav className="mobile-studio-nav" aria-label={tr("Workspace navigation")}>
+        <button aria-label={tr("Show sketch workspace")} aria-pressed={mobilePane === 'sketch'} onClick={() => setMobilePane('sketch')}><PenTool size={20} /><span>{tr("Sketch")}</span></button>
+        <button aria-label={tr("Show preview workspace")} aria-pressed={mobilePane === 'preview'} onClick={() => setMobilePane('preview')}><MonitorPlay size={20} /><span>{tr("Preview")}</span></button>
+        <button aria-label={tr("Show instructions workspace")} aria-pressed={mobilePane === 'instructions'} onClick={() => setMobilePane('instructions')}><MessageSquare size={20} /><span>{tr("Instructions")}</span>{generating && <i />}</button>
       </nav>
-      {toolsOpen && createPortal(<div role="dialog" aria-modal="true" aria-label="Workspace tools" className="studio-tools-overlay items-center"><section className="studio-tools-sheet"><div className="sheet-heading"><strong>Workspace tools</strong><button className="ui-icon" data-dialog-close onClick={() => setToolsOpen(false)} aria-label="Close workspace tools"><X size={20} /></button></div>{sidebar}</section></div>, document.body)}
+      {toolsOpen && createPortal(<div role="dialog" aria-modal="true" aria-label={tr("Workspace tools")} className="studio-tools-overlay items-center"><section className="studio-tools-sheet"><div className="sheet-heading"><strong>{tr("Workspace tools")}</strong><button className="ui-icon" data-dialog-close onClick={() => setToolsOpen(false)} aria-label={tr("Close workspace tools")}><X size={20} /></button></div>{sidebar}</section></div>, document.body)}
       {showProductivity && <ProductivityPanel reviewEnabled={reviewEnabled} onReviewEnabled={setReviewEnabled} review={pendingChange} onRejectReview={() => setPendingChange(null)} onAcceptReview={(next,base) => { if (codeRef.current !== base || pendingChange && pendingChange.scope !== project.activeId) throw new Error('Source or screen changed. Reject this stale review and regenerate.'); assertLockedElements(next,locksRef.current[project.activeId]||[]); pushVersion(next); setPendingChange(null); }} getSketch={exportSketch} model={settings.activeModelId || ''} reference={reference?.dataUrl} scope={project.activeId} autoQuality={autoQuality} onAutoQuality={setAutoQuality} code={code} backend={backend} onClose={() => { productivityAbort.current?.abort(); setShowProductivity(false); }} onAdopt={next => { assertLockedElements(next, locksRef.current[project.activeId] || []); pushVersion(next); }} ask={async (userText, system, images) => {
         const s = settingsRef.current; const provider = s.providers.find(p => p.id === s.activeProviderId);
         if (!provider || !s.activeModelId) throw new Error('Connect a provider and model in Settings first.');
         productivityAbort.current?.abort(); const ctrl = new AbortController(); productivityAbort.current = ctrl;
         return generate({ provider, model: s.activeModelId, system: system || SYSTEM_PROMPT + libraryPrompt() + backendPrompt(backendRef.current) + brandPrompt(brandRef.current) + lockPrompt(locksRef.current[project.activeId] || []), userText, imageDataUrls: images, temperature: s.temperature, signal: ctrl.signal, onToken: () => {} });
       }} />}
-      {showSettings && <SettingsModal settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />}
       {showBackend && <BackendPanel config={backend} onChange={setBackend} onClose={() => setShowBackend(false)} />}
       {showBrand && <BrandPanel brand={brand} onChange={setBrand} onClose={() => setShowBrand(false)} />}
       {showReference && <ReferencePanel reference={reference} onChange={setReference} onClose={() => setShowReference(false)} />}
       {showAlternatives && <AlternativesPanel error={apiError} onStop={stop} alternatives={alternatives[project.activeId] || []} backend={backend} busy={generating} onClose={() => setShowAlternatives(false)} onChoose={code => { pushVersion(code); setShowAlternatives(false); }} />}
       {showScreens && <ScreensPanel project={liveProject} onClose={() => setShowScreens(false)} onSelect={(id) => { selectScreen(id); setShowScreens(false); }} onAdd={addScreen} onRename={(id, name) => setProject(prev => ({ ...prev, screens: prev.screens.map(s => s.id === id ? { ...s, name } : s) }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} onDelete={(id) => { const snapshot = snapshotProject(); const next = { ...snapshot, screens: snapshot.screens.filter(s => s.id !== id), links: snapshot.links.filter(l => l.from !== id && l.to !== id) }; if (id === project.activeId) selectScreen(next.screens[0].id, next); else setProject(next); }} />}
     </div>
+    {showSettings && <SettingsModal settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />}
+    </>
   );
 }

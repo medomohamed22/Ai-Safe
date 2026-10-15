@@ -1,3 +1,5 @@
+import { tr } from '../lib/i18n';
+import { LanguageToggle } from './LanguageToggle';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 
@@ -25,10 +27,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export const useTheme = () => useContext(ThemeContext);
 export function ThemeToggle() {
   const { theme, preference, setPreference } = useTheme();
-  return <div className="theme-switch" aria-label="Appearance">
-    <button className="ui-icon theme-button" aria-label={theme === 'dark' ? 'Switch to day mode' : 'Switch to night mode'} title={theme === 'dark' ? 'Day mode' : 'Night mode'} onClick={() => setPreference(theme === 'dark' ? 'light' : 'dark')}>
+  return <><LanguageToggle/><div className="theme-switch" aria-label={tr("Appearance")}>
+    <button className="ui-icon theme-button" aria-label={theme === 'dark' ? tr("Switch to day mode") : tr("Switch to night mode")} title={theme === 'dark' ? tr("Day mode") : tr("Night mode")} onClick={() => setPreference(theme === 'dark' ? 'light' : 'dark')}>
       {theme === 'dark' ? <Sun key="sun" size={17} /> : <Moon key="moon" size={17} />}
     </button>
-    <button className="ui-icon system-theme" aria-label="Use system theme" aria-pressed={preference === 'system'} title="Follow device appearance" onClick={() => setPreference('system')}><Monitor size={14} /></button>
-  </div>;
+    <button className="ui-icon system-theme" aria-label={tr("Use system theme")} aria-pressed={preference === 'system'} title={tr("Follow device appearance")} onClick={() => setPreference('system')}><Monitor size={14} /></button>
+  </div></>;
 }

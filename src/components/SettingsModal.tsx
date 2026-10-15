@@ -1,3 +1,4 @@
+import { tr } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Download, ExternalLink, Eye, EyeOff, Loader2, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import type { AppSettings, ProviderConfig, ProviderType } from '../types';
@@ -29,17 +30,17 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
   };
 
   return (
-    <div role="dialog" aria-label="Settings" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+    <div role="dialog" aria-label={tr("Settings")} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={onClose}>
       <div
         className="settings-panel flex h-[min(720px,92vh)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-surface)] text-[var(--ui-text)] shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--ui-border)] px-5 py-3">
           <div>
-            <h2 className="text-lg font-semibold text-[var(--ui-text)]">Settings</h2>
-            <p className="text-xs text-[var(--ui-muted)]">Everything is stored locally in your browser (localStorage). Keys are only sent to the provider you call.</p>
+            <h2 className="text-lg font-semibold text-[var(--ui-text)]">{tr("Settings")}</h2>
+            <p className="text-xs text-[var(--ui-muted)]">{tr("Everything is stored locally in your browser (localStorage). Keys are only sent to the provider you call.")}</p>
           </div>
-          <button data-dialog-close aria-label="Close settings" onClick={onClose} className="rounded-lg p-2 text-[var(--ui-muted)] hover:bg-[var(--ui-hover)] hover:text-[var(--ui-text)]">
+          <button data-dialog-close aria-label={tr("Close settings")} onClick={onClose} className="rounded-lg p-2 text-[var(--ui-muted)] hover:bg-[var(--ui-hover)] hover:text-[var(--ui-text)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -48,9 +49,9 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
           {/* Left column: providers + general */}
           <aside className="flex w-full shrink-0 flex-col gap-4 overflow-y-auto border-b border-[var(--ui-border)] p-4 md:w-72 md:border-r md:border-b-0">
             <div>
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Providers</div>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--ui-muted)]">{tr("Providers")}</div>
               <div className="space-y-1">
-                {settings.providers.length === 0 && <div className="rounded-lg border border-dashed border-[var(--ui-border)] p-3 text-xs text-[var(--ui-muted)]">Add a provider to get started.</div>}
+                {settings.providers.length === 0 && <div className="rounded-lg border border-dashed border-[var(--ui-border)] p-3 text-xs text-[var(--ui-muted)]">{tr("Add a provider to get started.")}</div>}
                 {settings.providers.map((p) => (
                   <button
                     key={p.id}
@@ -59,7 +60,7 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
                   >
                     <span className={`h-2 w-2 rounded-full ${p.apiKey ? 'bg-[var(--ui-selected)]' : 'bg-[var(--ui-selected)]'}`} />
                     <span className="flex-1 truncate">{p.name}</span>
-                    {p.id === settings.activeProviderId && <span className="rounded bg-[var(--ui-selected)] px-1.5 text-[10px] text-[var(--ui-text)]">active</span>}
+                    {p.id === settings.activeProviderId && <span className="rounded bg-[var(--ui-selected)] px-1.5 text-[10px] text-[var(--ui-text)]">{tr("active")}</span>}
                     <span className="text-[11px] text-[var(--ui-muted)]">{p.models.length || ''}</span>
                   </button>
                 ))}
@@ -71,16 +72,16 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
                     onClick={() => add(t)}
                     className="flex items-center gap-1 rounded-lg border border-[var(--ui-border)] px-2 py-1.5 text-xs text-[var(--ui-text)] hover:border-[var(--ui-border)] hover:text-[var(--ui-text)]"
                   >
-                    <Plus className="h-3 w-3" /> {PROVIDER_PRESETS[t].label}
+                    <Plus className="h-3 w-3" /> {tr(PROVIDER_PRESETS[t].label)}
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="border-t border-[var(--ui-border)] pt-4">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--ui-muted)]">Generation</div>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--ui-muted)]">{tr("Generation")}</div>
               <label className="flex items-center justify-between gap-2 py-1 text-sm">
-                <span>Live Sync (auto-generate)</span>
+                <span>{tr("Live Sync (auto-generate)")}</span>
                 <input
                   type="checkbox"
                   checked={settings.autoSync}
@@ -90,7 +91,7 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
               </label>
               <label className="block py-1 text-sm">
                 <div className="flex justify-between">
-                  <span>Debounce</span>
+                  <span>{tr("Debounce")}</span>
                   <span className="text-[var(--ui-muted)]">{(settings.debounceMs / 1000).toFixed(1)}s</span>
                 </div>
                 <input
@@ -105,7 +106,7 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
               </label>
               <label className="block py-1 text-sm">
                 <div className="flex justify-between">
-                  <span>Temperature</span>
+                  <span>{tr("Temperature")}</span>
                   <span className="text-[var(--ui-muted)]">{settings.temperature.toFixed(2)}</span>
                 </div>
                 <input
@@ -123,15 +124,14 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
             <div className="mt-auto border-t border-[var(--ui-border)] pt-4">
               <button
                 onClick={() => {
-                  if (confirm('Delete ALL local data (providers, keys, sketch, code history)?')) {
+                  if (confirm(tr("Delete ALL local data (providers, keys, sketch, code history)?"))) {
                     clearAll();
                     location.reload();
                   }
                 }}
                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--ui-border)]/60 px-3 py-2 text-xs text-[var(--ui-text)] hover:bg-[var(--ui-selected)]"
               >
-                <Trash2 className="h-3.5 w-3.5" /> Clear all local data
-              </button>
+                <Trash2 className="h-3.5 w-3.5" />{tr(" Clear all local data")}</button>
             </div>
           </aside>
 
@@ -141,8 +141,8 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
               <ProviderEditor key={sel.id} provider={sel} settings={settings} setSettings={setSettings} onDeleted={() => setSelId(null)} />
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-[var(--ui-muted)]">
-                <p className="text-sm">Add a provider (OpenRouter, Meta Llama API, Gemini or any OpenAI-compatible API)</p>
-                <p className="text-xs">then paste your API key and click “Fetch models”.</p>
+                <p className="text-sm">{tr("Add a provider (OpenRouter, Meta Llama API, Gemini or any OpenAI-compatible API)")}</p>
+                <p className="text-xs">{tr("then paste your API key and click “Fetch models”.")}</p>
               </div>
             )}
           </section>
@@ -177,7 +177,7 @@ function ProviderEditor({
   const selectModel = (modelId: string) => setSettings((s) => ({ ...s, activeProviderId: p.id, activeModelId: modelId }));
 
   const remove = () => {
-    if (!confirm(`Remove provider "${p.name}"?`)) return;
+    if (!confirm(tr("Remove provider \"{0}\"?", [p.name]))) return;
     setSettings((s) => {
       const wasActive = s.activeProviderId === p.id;
       return {
@@ -228,25 +228,21 @@ function ProviderEditor({
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--ui-text)]">{preset.label}</div>
-          <p className="mt-1 max-w-xl text-xs text-[var(--ui-muted)]">{preset.hint}</p>
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--ui-text)]">{tr(preset.label)}</div>
+          <p className="mt-1 max-w-xl text-xs text-[var(--ui-muted)]">{tr(preset.hint)}</p>
         </div>
         <button onClick={remove} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--ui-text)] hover:bg-[var(--ui-selected)]">
-          <Trash2 className="h-3.5 w-3.5" /> Remove
-        </button>
+          <Trash2 className="h-3.5 w-3.5" />{tr(" Remove")}</button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block space-y-1">
-          <span className="text-xs text-[var(--ui-muted)]">Display name</span>
+          <span className="text-xs text-[var(--ui-muted)]">{tr("Display name")}</span>
           <input className={inputCls} value={p.name} onChange={(e) => update({ name: e.target.value })} />
         </label>
         <label className="block space-y-1">
-          <span className="flex items-center justify-between text-xs text-[var(--ui-muted)]">
-            API key
-            {preset.keyUrl && (
-              <a href={preset.keyUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[var(--ui-text)] hover:underline">
-                Get a key <ExternalLink className="h-3 w-3" />
+          <span className="flex items-center justify-between text-xs text-[var(--ui-muted)]">{tr("API key")}{preset.keyUrl && (
+              <a href={preset.keyUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[var(--ui-text)] hover:underline">{tr("Get a key ")}<ExternalLink className="h-3 w-3" />
               </a>
             )}
           </span>
@@ -255,27 +251,24 @@ function ProviderEditor({
               className={inputCls + ' pr-10 font-mono'}
               type={showKey ? 'text' : 'password'}
               value={p.apiKey}
-              placeholder={p.type === 'openrouter' ? 'sk-or-…' : p.type === 'gemini' ? 'AIza…' : 'sk-… / LLM|…'}
+              placeholder={p.type === 'openrouter' ? tr("sk-or-…") : p.type === 'gemini' ? tr("AIza…") : tr("sk-… / LLM|…")}
               onChange={(e) => update({ apiKey: e.target.value.trim() })}
               autoComplete="off"
               spellCheck={false}
             />
-            <button onClick={() => setShowKey((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--ui-muted)] hover:text-[var(--ui-text)]">
+            <button aria-label={tr(showKey ? "Hide API key" : "Show API key")} onClick={() => setShowKey((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--ui-muted)] hover:text-[var(--ui-text)]">
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
         </label>
         <label className="block space-y-1 md:col-span-2">
-          <span className="text-xs text-[var(--ui-muted)]">Base URL</span>
+          <span className="text-xs text-[var(--ui-muted)]">{tr("Base URL")}</span>
           <input className={inputCls + ' font-mono'} value={p.baseUrl} onChange={(e) => update({ baseUrl: e.target.value.trim() })} />
         </label>
         <label className="flex items-start gap-2 md:col-span-2">
           <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--ui-contrast)]" checked={p.useProxy} onChange={(e) => update({ useProxy: e.target.checked })} />
-          <span className="text-sm">
-            Use proxy <span className="text-[var(--ui-muted)]">(/api/proxy on your Vercel deployment)</span>
-            <span className="block text-xs text-[var(--ui-muted)]">
-              Enable if you see CORS / network errors. The proxy is stateless and only forwards to allow-listed AI hosts.
-            </span>
+          <span className="text-sm">{tr("Use proxy ")}<span className="text-[var(--ui-muted)]">{tr("(/api/proxy on your Vercel deployment)")}</span>
+            <span className="block text-xs text-[var(--ui-muted)]">{tr("Enable if you see CORS / network errors. The proxy is stateless and only forwards to allow-listed AI hosts.")}</span>
           </span>
         </label>
       </div>
@@ -288,30 +281,29 @@ function ProviderEditor({
             className="flex items-center gap-2 rounded-lg ui-primary px-3 py-2 text-sm font-medium text-[var(--ui-text)] hover:ui-primary disabled:opacity-60"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : p.models.length ? <RefreshCw className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-            {p.models.length ? 'Refresh models' : 'Fetch models'}
+            {p.models.length ? tr("Refresh models") : tr("Fetch models")}
           </button>
           <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-2">
             <Search className="h-4 w-4 text-[var(--ui-muted)]" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Filter by model name…"
+              placeholder={tr("Filter by model name…")}
               className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--ui-muted)]"
             />
           </div>
           <label className="flex items-center gap-1.5 text-xs text-[var(--ui-muted)]">
             <input type="checkbox" className="accent-[var(--ui-contrast)]" checked={visionOnly} onChange={(e) => setVisionOnly(e.target.checked)} />
-            <Eye className="h-3.5 w-3.5 text-[var(--ui-text)]" /> Vision only
-          </label>
+            <Eye className="h-3.5 w-3.5 text-[var(--ui-text)]" />{tr(" Vision only")}</label>
         </div>
 
-        {err && <div className="border-b border-[var(--ui-border)] bg-[var(--ui-selected)] px-3 py-2 text-xs text-[var(--ui-text)]">{err}</div>}
+        {err && <div className="border-b border-[var(--ui-border)] bg-[var(--ui-selected)] px-3 py-2 text-xs text-[var(--ui-text)]">{tr(err)}</div>}
 
         <div className="max-h-[300px] overflow-y-auto">
           {p.models.length === 0 ? (
-            <div className="p-6 text-center text-sm text-[var(--ui-muted)]">No models loaded yet.</div>
+            <div className="p-6 text-center text-sm text-[var(--ui-muted)]">{tr("No models loaded yet.")}</div>
           ) : filtered.length === 0 ? (
-            <div className="p-6 text-center text-sm text-[var(--ui-muted)]">No models match the filter.</div>
+            <div className="p-6 text-center text-sm text-[var(--ui-muted)]">{tr("No models match the filter.")}</div>
           ) : (
             filtered.map((m) => {
               const active = settings.activeProviderId === p.id && settings.activeModelId === m.id;
@@ -329,8 +321,8 @@ function ProviderEditor({
                     {m.name !== m.id && <span className="block truncate font-mono text-[11px] text-[var(--ui-muted)]">{m.id}</span>}
                   </span>
                   {m.context ? <span className="text-[11px] text-[var(--ui-muted)]">{Math.round(m.context / 1000)}k</span> : null}
-                  {m.vision === true && <span className="rounded bg-[var(--ui-selected)] px-1.5 py-0.5 text-[10px] text-[var(--ui-text)]">vision</span>}
-                  {m.vision === false && <span className="rounded bg-[var(--ui-selected)]/40 px-1.5 py-0.5 text-[10px] text-[var(--ui-muted)]">text</span>}
+                  {m.vision === true && <span className="rounded bg-[var(--ui-selected)] px-1.5 py-0.5 text-[10px] text-[var(--ui-text)]">{tr("vision")}</span>}
+                  {m.vision === false && <span className="rounded bg-[var(--ui-selected)]/40 px-1.5 py-0.5 text-[10px] text-[var(--ui-muted)]">{tr("text")}</span>}
                 </button>
               );
             })
@@ -338,19 +330,16 @@ function ProviderEditor({
         </div>
         <div className="flex items-center justify-between gap-2 border-t border-[var(--ui-border)] p-3">
           <span className="text-xs text-[var(--ui-muted)]">
-            {filtered.length}/{p.models.length} models
-          </span>
+            {filtered.length}/{p.models.length}{tr(" models")}</span>
           <div className="flex items-center gap-2">
             <input
               value={manual}
               onChange={(e) => setManual(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addManual()}
-              placeholder="or type a model id manually"
+              placeholder={tr("or type a model id manually")}
               className="w-56 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-2 py-1.5 font-mono text-xs outline-none focus:border-[var(--ui-border)]"
             />
-            <button onClick={addManual} className="rounded-lg border border-[var(--ui-border)] px-2 py-1.5 text-xs hover:border-[var(--ui-border)]">
-              Use
-            </button>
+            <button onClick={addManual} className="rounded-lg border border-[var(--ui-border)] px-2 py-1.5 text-xs hover:border-[var(--ui-border)]">{tr("Use")}</button>
           </div>
         </div>
       </div>

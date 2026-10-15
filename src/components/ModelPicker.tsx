@@ -1,3 +1,4 @@
+import { tr } from '../lib/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Eye, Search, Settings2 } from 'lucide-react';
 import type { AppSettings } from '../types';
@@ -44,12 +45,12 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
       <button
         onClick={() => (total ? setOpen((o) => !o) : onOpenSettings())}
         className="flex max-w-[280px] items-center gap-2 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface)] px-3 py-1.5 text-sm text-[var(--ui-text)] hover:border-[var(--ui-border)]"
-        title={label}
+        title={active && settings.activeModelId ? label : tr(label)}
         aria-expanded={open}
         aria-haspopup="true"
       >
         {active && <span className="rounded bg-[var(--ui-selected)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--ui-text)]">{active.name}</span>}
-        <span className="truncate">{label}</span>
+        <span className="truncate">{active && settings.activeModelId ? label : tr(label)}</span>
         <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ui-muted)]" />
       </button>
 
@@ -59,15 +60,15 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
             <Search className="h-4 w-4 text-[var(--ui-muted)]" />
             <input
               autoFocus
-              aria-label="Search models"
+              aria-label={tr("Search models")}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder={`Search ${total} models by name…`}
+              placeholder={tr("Search {0} models by name…", [total])}
               className="w-full bg-transparent text-sm text-[var(--ui-text)] outline-none placeholder:text-[var(--ui-muted)]"
             />
           </div>
           <div className="max-h-[360px] overflow-y-auto py-1">
-            {groups.length === 0 && <div className="px-4 py-6 text-center text-sm text-[var(--ui-muted)]">No models match “{q}”.</div>}
+            {groups.length === 0 && <div className="px-4 py-6 text-center text-sm text-[var(--ui-muted)]">{tr("No models match “{0}”.", [q])}</div>}
             {groups.map(({ provider, models }) => (
               <div key={provider.id}>
                 <div className="sticky top-0 bg-[var(--ui-surface)]/95 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--ui-muted)]">
@@ -95,7 +96,7 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
                           m.id
                         )}
                       </span>
-                      {m.vision && <Eye className="h-3.5 w-3.5 shrink-0 text-[var(--ui-text)]" aria-label="vision" />}
+                      {m.vision && <Eye className="h-3.5 w-3.5 shrink-0 text-[var(--ui-text)]" aria-label={tr("vision")} />}
                     </button>
                   );
                 })}
@@ -109,8 +110,7 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
             }}
             className="flex w-full items-center gap-2 border-t border-[var(--ui-border)] px-3 py-2 text-sm text-[var(--ui-muted)] hover:bg-[var(--ui-hover)] hover:text-[var(--ui-text)]"
           >
-            <Settings2 className="h-4 w-4" /> Manage providers & API keys
-          </button>
+            <Settings2 className="h-4 w-4" />{tr(" Manage providers & API keys")}</button>
         </div>
       )}
     </div>

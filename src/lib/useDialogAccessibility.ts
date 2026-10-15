@@ -5,7 +5,7 @@ export function useDialogAccessibility() {
     let current: HTMLElement | undefined;
     let restore: HTMLElement | null = null;
     const timers = new Set<ReturnType<typeof setTimeout>>();
-    const closeButton = (dialog: HTMLElement) => dialog.querySelector<HTMLElement>('[data-dialog-close]') || Array.from(dialog.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.trim() === 'Close');
+    const closeButton = (dialog: HTMLElement) => dialog.querySelector<HTMLElement>('[data-dialog-close]') || Array.from(dialog.querySelectorAll<HTMLButtonElement>('button')).find(button => ['Close','إغلاق'].includes(button.textContent?.trim() || ''));
     const dismiss = (dialog: HTMLElement, close: HTMLElement) => {
       if (dialog.dataset.closing) return;
       const finish = () => { if (dialog.isConnected) { dialog.dataset.closeReady = 'true'; close.click(); } };

@@ -1,3 +1,4 @@
+import { tr } from '../lib/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -138,57 +139,57 @@ export function PreviewPane(p: Props) {
 
   return (
     <div className="preview-pane" onClick={e => { if (exportMenuRef.current?.open && !exportMenuRef.current.contains(e.target as Node)) exportMenuRef.current.removeAttribute('open'); }}>
-      <div className="panel-heading preview-heading"><span className="panel-number">02</span><strong>Preview</strong><span className="panel-caption">{p.code ? 'Your idea, brought to life' : 'A blank page, full of possibility'}</span>
-        {p.versionCount > 0 && <div className="version-control"><button onClick={p.onPrev} disabled={p.versionIndex <= 0} className="ui-icon" title="Previous version" aria-label="Previous version"><ChevronLeft size={13} /></button><span>v{p.versionIndex + 1}<span className="version-total">/{p.versionCount}</span></span><button onClick={p.onNext} disabled={p.versionIndex >= p.versionCount - 1} className="ui-icon" title="Next version" aria-label="Next version"><ChevronRight size={13} /></button></div>}
+      <div className="panel-heading preview-heading"><span className="panel-number">02</span><strong>{tr("Preview")}</strong><span className="panel-caption">{p.code ? tr("Your idea, brought to life") : tr("A blank page, full of possibility")}</span>
+        {p.versionCount > 0 && <div className="version-control"><button onClick={p.onPrev} disabled={p.versionIndex <= 0} className="ui-icon" title={tr("Previous version")} aria-label={tr("Previous version")}><ChevronLeft size={13} /></button><span>v{p.versionIndex + 1}<span className="version-total">/{p.versionCount}</span></span><button onClick={p.onNext} disabled={p.versionIndex >= p.versionCount - 1} className="ui-icon" title={tr("Next version")} aria-label={tr("Next version")}><ChevronRight size={13} /></button></div>}
       </div>
       <div className="preview-viewbar">
-        <div className="segmented" aria-label="Preview display"><button onClick={() => setTab('preview')} aria-pressed={tab === 'preview'}><MonitorPlay size={13} />Preview</button><button onClick={() => setTab('code')} aria-pressed={tab === 'code'}><Code2 size={13} />Code</button></div>
-        {tab === 'preview' && <div className="segmented device-switch" aria-label="Preview device">{([['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const).map(([d, Icon]) => <button key={d} onClick={() => setDevice(d)} title={d} aria-label={d} aria-pressed={device === d}><Icon size={13} /></button>)}</div>}
-        <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : device === 'desktop' ? 'Fit to workspace' : WIDTH[device]}</span>
+        <div className="segmented" aria-label={tr("Preview display")}><button onClick={() => setTab('preview')} aria-pressed={tab === 'preview'}><MonitorPlay size={13} />{tr("Preview")}</button><button onClick={() => setTab('code')} aria-pressed={tab === 'code'}><Code2 size={13} />{tr("Code")}</button></div>
+        {tab === 'preview' && <div className="segmented device-switch" aria-label={tr("Preview device")}>{([['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const).map(([d, Icon]) => <button key={d} onClick={() => setDevice(d)} title={tr(d)} aria-label={tr(d)} aria-pressed={device === d}><Icon size={13} /></button>)}</div>}
+        <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : device === 'desktop' ? tr("Fit to workspace") : WIDTH[device]}</span>
       </div>
-      <div className="preview-actions" aria-label="Preview actions">
-        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select"><MousePointer2 size={13} /><span>Select element</span></button>
-        <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className="ui-icon" aria-label="Test UI" title="Test UI"><FlaskConical size={15} /></button>
+      <div className="preview-actions" aria-label={tr("Preview actions")}>
+        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select"><MousePointer2 size={13} /><span>{tr("Select element")}</span></button>
+        <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className="ui-icon" aria-label={tr("Test UI")} title={tr("Test UI")}><FlaskConical size={15} /></button>
         <span className="actions-spacer" />
-        <button disabled={!p.code || p.generating || !Object.keys(exportFiles).length} onClick={() => setShowShare(true)} className="ui-button" aria-label="Share / review" title="Share / review"><Share2 size={15} /><span>Share</span></button>
+        <button disabled={!p.code || p.generating || !Object.keys(exportFiles).length} onClick={() => setShowShare(true)} className="ui-button" aria-label={tr("Share / review")} title={tr("Share / review")}><Share2 size={15} /><span>{tr("Share")}</span></button>
         <details ref={exportMenuRef} className="export-menu" onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); exportMenuRef.current?.removeAttribute('open'); exportMenuRef.current?.querySelector('summary')?.focus(); } }}>
-          <summary className="ui-button" aria-label="Export options"><Download size={15} /><span>Export</span><ChevronRight size={12} /></summary>
-          <div className="export-dropdown" aria-label="Export options" onClick={e => { if ((e.target as HTMLElement).closest('button:not(:disabled)')) exportMenuRef.current?.removeAttribute('open'); }}>
-            <span className="studio-eyebrow">TAKE YOUR WORK WITH YOU</span>
-            <button disabled={!p.code || exporting || p.generating} onClick={exportProject} aria-label={exporting ? 'Exporting…' : 'Project ZIP'}><Download size={16} /><span>Project ZIP<small>Complete React + Vite project</small></span></button>
-            <button disabled={!p.code || p.generating} onClick={() => setShowGitHub(true)} aria-label="GitHub"><Github size={16} /><span>GitHub<small>Review changes & create a PR</small></span></button>
+          <summary className="ui-button" aria-label={tr("Export options")}><Download size={15} /><span>{tr("Export")}</span><ChevronRight size={12} /></summary>
+          <div className="export-dropdown" aria-label={tr("Export options")} onClick={e => { if ((e.target as HTMLElement).closest('button:not(:disabled)')) exportMenuRef.current?.removeAttribute('open'); }}>
+            <span className="studio-eyebrow">{tr("TAKE YOUR WORK WITH YOU")}</span>
+            <button disabled={!p.code || exporting || p.generating} onClick={exportProject} aria-label={exporting ? tr("Exporting…") : tr("Project ZIP")}><Download size={16} /><span>{tr("Project ZIP")}<small>{tr("Complete React + Vite project")}</small></span></button>
+            <button disabled={!p.code || p.generating} onClick={() => setShowGitHub(true)} aria-label={tr("GitHub")}><Github size={16} /><span>{tr("GitHub")}<small>{tr("Review changes & create a PR")}</small></span></button>
             <hr />
-            <button disabled={!p.code} onClick={copy} aria-label={copied ? 'Copied' : 'Copy'}>{copied ? <Check size={16} /> : <Copy size={16} />}<span>{copied ? 'Copied' : 'Copy JSX'}</span></button>
-            <button disabled={!p.code} onClick={() => download('App.jsx', backendBootstrap(p.backend) + '\n' + materializeAssets(materializeLibrary(p.code)), 'text/javascript')} aria-label=".jsx"><FileCode2 size={16} /><span>Download JSX</span></button>
-            <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} aria-label=".html"><Code2 size={16} /><span>Standalone HTML</span></button>
+            <button disabled={!p.code} onClick={copy} aria-label={copied ? tr("Copied") : tr("Copy")}>{copied ? <Check size={16} /> : <Copy size={16} />}<span>{copied ? tr("Copied") : tr("Copy JSX")}</span></button>
+            <button disabled={!p.code} onClick={() => download('App.jsx', backendBootstrap(p.backend) + '\n' + materializeAssets(materializeLibrary(p.code)), 'text/javascript')} aria-label={tr(".jsx")}><FileCode2 size={16} /><span>{tr("Download JSX")}</span></button>
+            <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} aria-label={tr(".html")}><Code2 size={16} /><span>{tr("Standalone HTML")}</span></button>
           </div>
         </details>
       </div>
-      {editing && tab === 'preview' && selected === null && <p className="selection-hint"><MousePointer2 size={13} />Select anything in the preview to edit its properties.</p>}
-      {!!p.locks.length && <details className="locks-list"><summary>Locked elements ({p.locks.length}) — protected in saved JSX</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>Unlock</button></div>)}</details>}
-      {exportError && <p role="alert" className="mx-3 my-2 text-xs">{exportError}</p>}
-      {p.apiError && <div role="alert" className="preview-error"><AlertTriangle size={15} /><span>{p.apiError}</span><button onClick={p.onDismissError} aria-label="Dismiss error">✕</button></div>}
-      {!!screenNavigation(p.project).length && <nav aria-label="Screen navigation" className="screen-navigation">{screenNavigation(p.project).map((link, i) => <button key={i} className="ui-button" onClick={() => p.onNavigate(link.id)}>{link.label}<ArrowUpRight size={12} /></button>)}</nav>}
+      {editing && tab === 'preview' && selected === null && <p className="selection-hint"><MousePointer2 size={13} />{tr("Select anything in the preview to edit its properties.")}</p>}
+      {!!p.locks.length && <details className="locks-list"><summary>{tr("Locked elements (")}{p.locks.length}{tr(") — protected in saved JSX")}</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>{tr("Unlock")}</button></div>)}</details>}
+      {exportError && <p role="alert" className="mx-3 my-2 text-xs">{tr(exportError)}</p>}
+      {p.apiError && <div role="alert" className="preview-error"><AlertTriangle size={15} /><span>{p.apiError}</span><button onClick={p.onDismissError} aria-label={tr("Dismiss error")}>✕</button></div>}
+      {!!screenNavigation(p.project).length && <nav aria-label={tr("Screen navigation")} className="screen-navigation">{screenNavigation(p.project).map((link, i) => <button key={i} className="ui-button" onClick={() => p.onNavigate(link.id)}>{link.label}<ArrowUpRight size={12} /></button>)}</nav>}
       {showTests && createPortal(<TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />, document.body)}
       {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}
       {showShare && createPortal(<SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />, document.body)}
       <div className="preview-workarea"><div className="preview-stage">
-        <div className="preview-tab-content" hidden={tab !== 'preview'}>{p.code ? <div className="preview-document" style={{ width: WIDTH[device] }} data-device={device}><iframe ref={iframeRef} title="Live preview" srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>React / JSX</span></div><pre>{p.code || '// Your code will appear here'}</pre></div>
-        {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>Something needs a quick fix</strong><p>{runtimeError}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />Fix with AI</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label="Dismiss runtime error">✕</button></div>}
-        {p.generating && <div className="generation-overlay"><div className="generation-heading"><span className="generation-icon"><Sparkles size={20} /></span><div><strong>Bringing your idea to life</strong><p>Generating with {p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11} />Stop</button></div><div className="generation-progress"><span /></div><pre ref={streamRef} className="generation-code">{p.stream.slice(-6000) || 'Reading your sketch and shaping the interface…'}<span className="generation-cursor" /></pre><span className="generation-caption">{p.stream.length ? p.stream.length.toLocaleString() + ' characters generated' : 'Good things start with a rough idea.'}</span></div>}
+        <div className="preview-tab-content" hidden={tab !== 'preview'}>{p.code ? <div className="preview-document" style={{ width: WIDTH[device] }} data-device={device}><iframe ref={iframeRef} title={tr("Live preview")} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>{tr("React / JSX")}</span></div><pre>{p.code || '// ' + tr('Your code will appear here')}</pre></div>
+        {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>{tr("Something needs a quick fix")}</strong><p>{tr(runtimeError)}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />{tr("Fix with AI")}</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label={tr("Dismiss runtime error")}>✕</button></div>}
+        {p.generating && <div className="generation-overlay"><div className="generation-heading"><span className="generation-icon"><Sparkles size={20} /></span><div><strong>{tr("Bringing your idea to life")}</strong><p>{tr("Generating with ")}{p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11} />{tr("Stop")}</button></div><div className="generation-progress"><span /></div><pre ref={streamRef} className="generation-code">{p.stream.slice(-6000) || tr("Reading your sketch and shaping the interface…")}<span className="generation-cursor" /></pre><span className="generation-caption">{p.stream.length ? p.stream.length.toLocaleString() + ' characters generated' : tr("Good things start with a rough idea.")}</span></div>}
       </div>
       {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />}
       </div>
-      <div className="panel-footnote preview-footnote"><span className="status-dot" />{tab === 'preview' ? 'Interactive preview' : 'Your generated source'}<span>{p.code ? 'Ready to refine' : 'Waiting for your first idea'}</span></div>
+      <div className="panel-footnote preview-footnote"><span className="status-dot" />{tab === 'preview' ? tr("Interactive preview") : tr("Your generated source")}<span>{p.code ? tr("Ready to refine") : tr("Waiting for your first idea")}</span></div>
     </div>
   );
 }
 
 function EmptyState({ hasModel, onOpenSettings }: { hasModel: boolean; onOpenSettings: () => void }) {
   return <div className="empty-state"><div className="empty-state-inner">
-    <div className="empty-visual" aria-hidden="true"><div className="empty-wireframe"><div className="mini-window-bar"><i /><i /><i /></div><div className="wireframe-content"><span /><span /><div><i /><i /></div><b /></div></div><span className="empty-connector">↗</span><div className="empty-output"><span>{'</>'}</span><div><i /><i /><i /></div><b>Made real<span /></b></div></div>
-    <p className="empty-eyebrow">A SPACE FOR YOUR NEXT IDEA</p><h2>Draw an idea.<br /><em>Make it real.</em></h2><p className="empty-description">Turn rough sketches into thoughtful interfaces.<br />Start on the canvas. We'll meet you on the other side.</p>
-    <div className="empty-steps"><span><b>1</b>Sketch</span><i /><span><b>2</b>Generate</span><i /><span><b>3</b>Refine</span></div>
-    {!hasModel ? <button onClick={onOpenSettings} className="ui-button empty-setup" aria-label="Open Settings"><Plus size={13} />Connect your first model<ArrowUpRight size={13} /></button> : <p className="model-ready"><Check size={13} />Your model is connected. You're ready to create.</p>}
+    <div className="empty-visual" aria-hidden="true"><div className="empty-wireframe"><div className="mini-window-bar"><i /><i /><i /></div><div className="wireframe-content"><span /><span /><div><i /><i /></div><b /></div></div><span className="empty-connector">↗</span><div className="empty-output"><span>{'</>'}</span><div><i /><i /><i /></div><b>{tr("Made real")}<span /></b></div></div>
+    <p className="empty-eyebrow">{tr("A SPACE FOR YOUR NEXT IDEA")}</p><h2>{tr("Draw an idea.")}<br /><em>{tr("Make it real.")}</em></h2><p className="empty-description">{tr("Turn rough sketches into thoughtful interfaces.")}<br />{tr("Start on the canvas. We'll meet you on the other side.")}</p>
+    <div className="empty-steps"><span><b>1</b>{tr("Sketch")}</span><i /><span><b>2</b>{tr("Generate")}</span><i /><span><b>3</b>{tr("Refine")}</span></div>
+    {!hasModel ? <button onClick={onOpenSettings} className="ui-button empty-setup" aria-label={tr("Open Settings")}><Plus size={13} />{tr("Connect your first model")}<ArrowUpRight size={13} /></button> : <p className="model-ready"><Check size={13} />{tr("Your model is connected. You're ready to create.")}</p>}
   </div></div>;
 }
