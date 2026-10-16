@@ -139,7 +139,7 @@
 .canvas-studio .quick-prompts { flex:1; flex-wrap:nowrap; overflow:auto; }
 .canvas-studio .quick-prompt { font-size:9px; white-space:nowrap; }
 .canvas-studio .workspace-status { font-size:8px; min-height:28px; }
-@media(min-width:901px) { .canvas-studio .studio-content .workspace-grid[data-focus='preview']>.output-panel { max-width:1100px; width:100%; justify-self:center; } }
+@media(min-width:901px) { .canvas-studio .studio-content .workspace-grid[data-focus='preview']>.output-panel { max-width:1100px; width:100%; justify-self:center; } .canvas-studio .composer-model { display:none } }
 @media(max-width:1200px) { .home-layout { grid-template-columns:minmax(0,1fr) 260px; gap:20px; padding-left:24px; }.home-main { padding-right:0; }.home-intro h1 { font-size:54px; }.inspiration-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.starter-art { height:180px; }.home-model { max-width:45%; } }
 @media(max-width:900px) {
  .home-header { height:65px; padding:0 18px; }.home-wordmark { font-size:18px; }.home-wordmark>span { display:none; }.home-layout { grid-template-columns:minmax(0,1fr); padding:0 20px 24px; gap:24px; }.home-main { padding:28px 0 0; }.home-intro h1 { font-size:54px; letter-spacing:-2.7px; }.home-projects { min-height:260px; }.project-recents { margin-top:16px; }.home-project-row { max-width:100%; }.home-inspiration { margin-top:32px; }.project-local-note { padding-top:20px; }
