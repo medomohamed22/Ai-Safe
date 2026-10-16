@@ -8,7 +8,7 @@ export function suggestNextSteps(code: string, screenCount = 1, max = 5): string
   const add = (s: string) => { if (!picks.includes(s)) picks.push(s); };
   if (code) {
     if (!/dark:/.test(code)) add('Add a dark mode toggle');
-    if (/(<table|\$|%|stat|metric)/i.test(code) && !/(chart|polyline|<svg)/i.test(code)) add('Add a data chart');
+    if (/(<table|\$\d|\d%|\b(stats?|metrics?|revenue|kpi)\b)/i.test(code) && !/(recharts|LineChart|BarChart|PieChart|AreaChart|chart|polyline|<svg)/i.test(code)) add('Add a data chart');
     if (/<table/i.test(code) && !/search/i.test(code)) add('Add search and filters');
     if (!/<form/i.test(code)) add('Add a form with validation');
     if (screenCount <= 1) add('Add a second screen');
