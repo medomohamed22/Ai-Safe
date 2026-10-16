@@ -7,6 +7,7 @@ import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Se
 
 import type { AppSettings } from './types';
 import { KEYS, load, loadSettings, save } from './lib/storage';
+import { suggestNextSteps } from './lib/next-steps';
 import { libraryPrompt } from './lib/componentLibrary';
 import { planKey, planPrompt } from './lib/plans';
 import { generate } from './lib/providers';
@@ -49,7 +50,6 @@ const blobToDataUrl = (b: Blob) =>
     r.readAsDataURL(b);
   });
 
-const QUICK_PROMPTS = ['Improve spacing', 'Make it responsive', 'Add a footer', 'Simplify the layout', 'Add a settings modal'];
 const PRESET_ICONS = { dashboard: LayoutDashboard, landing: Globe, mobile: Smartphone } as const;
 
 interface RunOpts {
@@ -537,7 +537,7 @@ function WorkspaceApp() {
             <span className="composer-shortcut"><kbd>{tr("Ctrl")}</kbd><kbd>↵</kbd></span>
             <button onClick={() => { if (generating) stop(); else { runRef.current({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary send-button" aria-label={generating ? tr("Stop generation") : tr("Send")} title={generating ? tr("Stop generation") : tr("Generate interface (Ctrl + Enter)")}>{generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}<span>{generating ? tr("Stop") : code ? tr("Update interface") : tr("Generate interface")}</span><ArrowUp size={16} /></button>
           </div>
-          <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><div className="quick-prompts">{(code ? QUICK_PROMPTS : ['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']).map(q => <button key={q} disabled={generating} onClick={() => { setPrompt(tr(q)); document.querySelector<HTMLInputElement>('footer input')?.focus(); }} className="quick-prompt">{tr(q)}</button>)}</div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
+          <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><div className="quick-prompts">{code && <span className="next-steps-label">{tr("Next steps")}</span>}{(code ? suggestNextSteps(code, liveProject.screens.length) : ['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']).map(q => <button key={q} disabled={generating} onClick={() => { setPrompt(tr(q)); document.querySelector<HTMLInputElement>('footer input')?.focus(); }} className="quick-prompt">{tr(q)}</button>)}</div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
         </div>
         <div className="workspace-status"><span>{generating ? tr("Bringing your idea to life…") : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
       </footer>

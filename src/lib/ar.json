@@ -837,5 +837,12 @@
   "HTTP {0}: {1}": "خطأ HTTP {0}: {1}",
   "Your code will appear here": "سيظهر الكود هنا",
   "Wait for the current generation to finish": "انتظر حتى ينتهي الإنشاء الحالي",
-  "Switch to the Preview tab to select elements": "بدّل إلى تبويب المعاينة لتحديد العناصر"
+  "Switch to the Preview tab to select elements": "بدّل إلى تبويب المعاينة لتحديد العناصر",
+  "Next steps": "الخطوات التالية",
+  "Add a dark mode toggle": "أضف مبدّل الوضع الليلي",
+  "Add a data chart": "أضف رسمًا بيانيًا",
+  "Add search and filters": "أضف بحثًا وفلاتر",
+  "Add a form with validation": "أضف نموذجًا مع تحقّق",
+  "Add a second screen": "أضف شاشة ثانية",
+  "Add loading and empty states": "أضف حالات التحميل والفراغ"
 }
