@@ -1,6 +1,6 @@
 export interface Screen { id: string; name: string; versions: string[]; vIndex: number; scene: any }
 export interface ScreenLink { from: string; to: string; label: string }
-export interface ScreenProject { activeId: string; screens: Screen[]; links: ScreenLink[] }
+export interface ScreenProject { activeId: string; screens: Screen[]; links: ScreenLink[]; mapPositions?: Record<string, { x: number; y: number }> }
 export function screenCode(screen: Screen) { return screen.versions[screen.vIndex] || ''; }
 export function screenNavigation(project: ScreenProject) {
   return project.links.filter(link => link.from === project.activeId).map(link => ({ id: link.to, label: link.label }));

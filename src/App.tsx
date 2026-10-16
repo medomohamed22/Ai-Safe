@@ -19,6 +19,7 @@ import { PreviewPane } from './components/PreviewPane';
 import { BackendPanel } from './components/BackendPanel';
 import { backendPrompt, DEFAULT_BACKEND, type BackendConfig } from './lib/backend';
 import { ScreensPanel } from './components/ScreensPanel';
+import { ScreenMap } from './components/ScreenMap';
 import type { ScreenProject } from './lib/screens';
 import { BrandPanel } from './components/BrandPanel';
 import { brandPrompt, DEFAULT_BRAND, type Brand } from './lib/brand';
@@ -109,6 +110,7 @@ function WorkspaceApp() {
   const [showProductivity, setShowProductivity] = useState(false);
   const productivityAbort = useRef<AbortController | null>(null);
   const [showScreens, setShowScreens] = useState(false);
+  const [showScreenMap, setShowScreenMap] = useState(false);
   const [brand, setBrand] = useState<Brand>(() => load(KEYS.brand, DEFAULT_BRAND));
   const [showBrand, setShowBrand] = useState(false);
   const [reference, setReference] = useState<ReferenceImage | null>(() => load(KEYS.reference, null));
@@ -560,7 +562,8 @@ function WorkspaceApp() {
       {showBrand && <BrandPanel brand={brand} onChange={setBrand} onClose={() => setShowBrand(false)} />}
       {showReference && <ReferencePanel reference={reference} onChange={setReference} onClose={() => setShowReference(false)} />}
       {showAlternatives && <AlternativesPanel error={apiError} onStop={stop} alternatives={alternatives[project.activeId] || []} backend={backend} busy={generating} onClose={() => setShowAlternatives(false)} onChoose={code => { pushVersion(code); setShowAlternatives(false); }} />}
-      {showScreens && <ScreensPanel project={liveProject} onClose={() => setShowScreens(false)} onSelect={(id) => { selectScreen(id); setShowScreens(false); }} onAdd={addScreen} onRename={(id, name) => setProject(prev => ({ ...prev, screens: prev.screens.map(s => s.id === id ? { ...s, name } : s) }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} onDelete={(id) => { const snapshot = snapshotProject(); const next = { ...snapshot, screens: snapshot.screens.filter(s => s.id !== id), links: snapshot.links.filter(l => l.from !== id && l.to !== id) }; if (id === project.activeId) selectScreen(next.screens[0].id, next); else setProject(next); }} />}
+      {showScreens && <ScreensPanel project={liveProject} onOpenMap={() => { setShowScreens(false); setShowScreenMap(true); }} onClose={() => setShowScreens(false)} onSelect={(id) => { selectScreen(id); setShowScreens(false); }} onAdd={addScreen} onRename={(id, name) => setProject(prev => ({ ...prev, screens: prev.screens.map(s => s.id === id ? { ...s, name } : s) }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} onDelete={(id) => { const snapshot = snapshotProject(); const next = { ...snapshot, screens: snapshot.screens.filter(s => s.id !== id), links: snapshot.links.filter(l => l.from !== id && l.to !== id) }; if (id === project.activeId) selectScreen(next.screens[0].id, next); else setProject(next); }} />}
+      {showScreenMap && <ScreenMap project={liveProject} onClose={() => setShowScreenMap(false)} onSelect={(id) => { selectScreen(id); setShowScreenMap(false); }} onAdd={() => { const base = 'New screen'; let name = base; let i = 2; while (liveProject.screens.some(s => s.name === name)) name = `${base} ${i++}`; addScreen(name); }} onPositions={(positions) => setProject(prev => ({ ...prev, mapPositions: positions }))} />}
     </div>
     {showSettings && <SettingsModal settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />}
     </>
