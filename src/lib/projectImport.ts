@@ -19,8 +19,25 @@ export async function importZip(file: File): Promise<ImportedProject> {
 export async function importRepository(repo:string,token:string):Promise<ImportedProject>{
  if(!/^[\w.-]+\/[\w.-]+$/.test(repo))throw new Error('Use owner/repository.');
  const metadata=await githubRequest(token,`/repos/${repo}`);const tree=await githubRequest(token,`/repos/${repo}/git/trees/${encodeURIComponent(metadata.default_branch)}?recursive=1`);if(tree.truncated)throw new Error('Repository tree is truncated.');
- const entries=tree.tree.filter((e:any)=>e.type==='blob'&&allowed(e.path));if(entries.length>80)throw new Error('Repository exceeds 80 supported files. Import a smaller ZIP.');const files:Record<string,string>={};
- for(const item of entries){if(item.size>200000)throw new Error(`File too large: ${item.path}`);const blob=await githubRequest(token,`/repos/${repo}/git/blobs/${item.sha}`);if(blob.encoding!=='base64')throw new Error('Unsupported GitHub blob encoding');const binary=atob(blob.content.replace(/\s/g,''));if(/\.(png|jpe?g|webp)$/.test(item.path))files[item.path]=`data:image/${item.path.endsWith('png')?'png':item.path.endsWith('webp')?'webp':'jpeg'};base64,${blob.content.replace(/\s/g,'')}`;else files[item.path]=new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0)));validateFiles(files);}
+ const entries=tree.tree.filter((e:any)=>e.type==='blob'&&allowed(e.path));if(entries.length>80)throw new Error('Repository exceeds 80 supported files. Import a smaller ZIP.');
+ for(const item of entries){if(item.size>200000)throw new Error(`File too large: ${item.path}`);}
+ const files:Record<string,string>={};
+ const batchSize = 8;
+ for (let i = 0; i < entries.length; i += batchSize) {
+   const batch = entries.slice(i, i + batchSize);
+   const loaded = await Promise.all(batch.map(async (item: any) => {
+     const blob = await githubRequest(token, `/repos/${repo}/git/blobs/${item.sha}`);
+     if (blob.encoding !== 'base64') throw new Error('Unsupported GitHub blob encoding');
+     const cleanBase64 = blob.content.replace(/\s/g, '');
+     if (/\.(png|jpe?g|webp)$/.test(item.path)) {
+       return [item.path, `data:image/${item.path.endsWith('png') ? 'png' : item.path.endsWith('webp') ? 'webp' : 'jpeg'};base64,${cleanBase64}`] as const;
+     }
+     const binary = atob(cleanBase64);
+     return [item.path, new TextDecoder().decode(Uint8Array.from(binary, c => c.charCodeAt(0)))] as const;
+   }));
+   for (const [path, content] of loaded) files[path] = content;
+   validateFiles(files);
+ }
  const entry=Object.keys(files).find(p=>/(^|\/)App\.[jt]sx?$/.test(p));if(!entry)throw new Error('Choose a ZIP for repositories without App.jsx/tsx.');return{files,entry,name:repo};
 }
 export async function buildImported(project:ImportedProject){validateFiles(project.files);const response=await serviceRequest('/api/project-bundle',project);const data=await response.json();if(!response.ok||typeof data.code!=='string')throw new Error(data.error||'Import bundler unavailable');return data.code as string;}
