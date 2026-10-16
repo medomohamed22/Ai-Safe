@@ -43,7 +43,7 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => (total ? setOpen((o) => !o) : onOpenSettings())}
+        onClick={() => setOpen((o) => !o)}
         className="flex max-w-[280px] items-center gap-2 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface)] px-3 py-1.5 text-sm text-[var(--ui-text)] hover:border-[var(--ui-border)]"
         title={active && settings.activeModelId ? label : tr(label)}
         aria-expanded={open}
@@ -56,7 +56,7 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
 
       {open && (
         <div onKeyDown={e => { if (!['ArrowDown', 'ArrowUp'].includes(e.key)) return; const options = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('.model-option')); if (!options.length) return; e.preventDefault(); const index = options.indexOf(document.activeElement as HTMLButtonElement); const next = index < 0 ? (e.key === 'ArrowDown' ? 0 : options.length - 1) : (index + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length; options[next].focus(); }} className="model-popover absolute right-0 z-50 mt-2 overflow-hidden rounded-xl border border-[var(--ui-border)] bg-[var(--ui-surface)] shadow-2xl">
-          <div className="flex items-center gap-2 border-b border-[var(--ui-border)] px-3 py-2">
+          {total > 0 && <div className="flex items-center gap-2 border-b border-[var(--ui-border)] px-3 py-2">
             <Search className="h-4 w-4 text-[var(--ui-muted)]" />
             <input
               autoFocus
@@ -66,7 +66,20 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
               placeholder={tr("Search {0} models by name…", [total])}
               className="w-full bg-transparent text-sm text-[var(--ui-text)] outline-none placeholder:text-[var(--ui-muted)]"
             />
-          </div>
+          </div>}
+          {total === 0 ? (
+            <div className="px-4 py-6 text-center">
+              <p className="text-sm text-[var(--ui-text)]">{tr("No models loaded yet.")}</p>
+              <p className="mt-1 text-xs text-[var(--ui-muted)]">{tr("Add a provider and fetch its models first — then you can pick a model here.")}</p>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onOpenSettings();
+                }}
+                className="ui-primary mt-3 rounded-lg px-3 py-1.5 text-sm font-medium"
+              >{tr("Open Settings")}</button>
+            </div>
+          ) : (
           <div className="max-h-[360px] overflow-y-auto py-1">
             {groups.length === 0 && <div className="px-4 py-6 text-center text-sm text-[var(--ui-muted)]">{tr("No models match “{0}”.", [q])}</div>}
             {groups.map(({ provider, models }) => (
@@ -103,6 +116,7 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
               </div>
             ))}
           </div>
+          )}
           <button
             onClick={() => {
               setOpen(false);
