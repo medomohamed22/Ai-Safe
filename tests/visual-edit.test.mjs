@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { applyElementEdit, describeElement, instrumentPreview, assertLockedElements } from '../src/lib/visualEdit.ts';
+import { applyElementEdit, applyElementMove, describeElement, instrumentPreview, assertLockedElements } from '../src/lib/visualEdit.ts';
 
 const original = `import { useState } from 'react';
 export default function App() {
@@ -21,4 +21,19 @@ assert.equal((instrumentPreview(original).match(/data-s2ui-id=/g) || []).length,
 assert.doesNotMatch(changed, /data-s2ui-id/);
 assertLockedElements(changed, [describeElement(original, 1).snippet]);
 assert.throws(() => assertLockedElements(changed, [describeElement(original, 2).snippet]), /locked element/);
+const stack = 'export default function App() { return <div className="flex flex-col"><section>Alpha</section><section>Beta</section><section>Gamma</section></div>; }';
+const resized = applyElementEdit(stack, 2, { width: 240, height: 96 });
+assert.match(resized, /width: 240/);
+assert.match(resized, /height: 96/);
+assert.throws(() => applyElementEdit(stack, 2, { width: 5000 }), /Size must be between/);
+const movedDown = applyElementMove(stack, 1, 3, false);
+assert.ok(movedDown.code.indexOf('Gamma') < movedDown.code.indexOf('Alpha'));
+assert.equal(movedDown.id, 3);
+const movedUp = applyElementMove(stack, 3, 1, true);
+assert.ok(movedUp.code.indexOf('Gamma') < movedUp.code.indexOf('Alpha'));
+assert.equal(movedUp.id, 1);
+assert.equal(applyElementMove(stack, 2, 2, true).code, stack);
+const nested = 'export default function App() { return <div><div><span>Inner</span></div><p>Outer</p></div>; }';
+assert.throws(() => applyElementMove(nested, 2, 3, true), /same parent/);
 console.log('Visual edit source checks passed (handlers, dynamic styles/text, literal text, repeat edits, validation, instrumentation).');
+console.log('Direct manipulation checks passed (resize commit + validation, reorder within parent, cross-parent refusal).');

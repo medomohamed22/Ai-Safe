@@ -21,7 +21,7 @@ import { materializeAssets } from '../lib/designAssets';
 import { materializeLibrary } from '../lib/componentLibrary';
 import { buildPreviewHtml } from '../lib/preview';
 import { VisualEditor } from './VisualEditor';
-import { describeElement } from '../lib/visualEdit';
+import { applyElementEdit, applyElementMove, describeElement, type ElementEdit } from '../lib/visualEdit';
 import { projectFiles, projectZip } from '../lib/projectExport';
 import type { BackendConfig } from '../lib/backend';
 import { backendBootstrap } from '../lib/backend';
@@ -66,6 +66,7 @@ export function PreviewPane(p: Props) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
+  const [directError, setDirectError] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [showTests, setShowTests] = useState(false);
@@ -87,6 +88,7 @@ export function PreviewPane(p: Props) {
   useEffect(() => {
     setRuntimeError(null);
     setSelected(null);
+    setDirectError('');
     if (p.code) setTab('preview');
   }, [p.code]);
 
@@ -99,6 +101,17 @@ export function PreviewPane(p: Props) {
       if (d.type === 'ready') sendMode(editingRef.current && !p.generating && tab === 'preview');
       if (d.type === 'element-selected' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && d.id >= 0) {
         try { describeElement(p.code, d.id); setSelected(d.id); } catch { setSelected(null); }
+      }
+      if (d.type === 'element-resized' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && d.id >= 0) {
+        const edit: ElementEdit = {};
+        if (typeof d.width === 'number' && Number.isFinite(d.width)) edit.width = Math.round(d.width);
+        if (typeof d.height === 'number' && Number.isFinite(d.height)) edit.height = Math.round(d.height);
+        if (edit.width !== undefined || edit.height !== undefined) {
+          try { p.onCodeChange(applyElementEdit(p.code, d.id, edit)); setDirectError(''); } catch (e) { setDirectError((e as Error).message); }
+        }
+      }
+      if (d.type === 'element-reordered' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && Number.isInteger(d.targetId)) {
+        try { p.onCodeChange(applyElementMove(p.code, d.id, d.targetId, !!d.before).code); setDirectError(''); } catch (e) { setDirectError((e as Error).message); }
       }
     };
     window.addEventListener('message', h);
@@ -178,6 +191,7 @@ export function PreviewPane(p: Props) {
         {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>{tr("Something needs a quick fix")}</strong><p>{tr(runtimeError)}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />{tr("Fix with AI")}</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label={tr("Dismiss runtime error")}>✕</button></div>}
         {p.generating && <div className="generation-overlay"><div className="generation-heading"><span className="generation-icon"><Sparkles size={20} /></span><div><strong>{tr("Bringing your idea to life")}</strong><p>{tr("Generating with ")}{p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11} />{tr("Stop")}</button></div><div className="generation-progress"><span /></div><pre ref={streamRef} className="generation-code">{p.stream.slice(-6000) || tr("Reading your sketch and shaping the interface…")}<span className="generation-cursor" /></pre><span className="generation-caption">{p.stream.length ? p.stream.length.toLocaleString() + ' characters generated' : tr("Good things start with a rough idea.")}</span></div>}
       </div>
+      {directError && tab === 'preview' && <p role="alert" className="direct-error">{tr(directError)}</p>}
       {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />}
       </div>
       <div className="panel-footnote preview-footnote"><span className="status-dot" />{tab === 'preview' ? tr("Interactive preview") : tr("Your generated source")}<span>{p.code ? tr("Ready to refine") : tr("Waiting for your first idea")}</span></div>
