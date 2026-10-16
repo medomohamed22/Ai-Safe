@@ -4,16 +4,36 @@ import JSZip from 'jszip';
 import { backendBootstrap, DEFAULT_BACKEND, type BackendConfig } from './backend';
 import { screenFiles, type ScreenProject } from './screens';
 
+function detectExtraDependencies(sources: string[]): Record<string, string> {
+  const extra: Record<string, string> = {};
+  const builtin = new Set(['react', 'react-dom', 'react/jsx-runtime', 'react-dom/client', 'lucide-react', 'recharts']);
+  const importRegex = /(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g;
+  for (const src of sources) {
+    for (const match of src.matchAll(importRegex)) {
+      const spec = match[2];
+      if (!spec || spec.startsWith('.') || spec.startsWith('/') || /^https?:/.test(spec)) continue;
+      const pkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
+      if (pkg && !builtin.has(pkg) && !builtin.has(spec) && !pkg.endsWith('.css')) {
+        extra[pkg] = 'latest';
+      }
+    }
+  }
+  return extra;
+}
+
 export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACKEND, project?: ScreenProject): Record<string, string> {
+  const extraScreens = project && project.screens.length > 1 ? screenFiles(project) : {};
+  const jsxSources = [code, ...Object.values(extraScreens)].map(s => materializeAssets(materializeLibrary(s)));
+  const extraDeps = detectExtraDependencies(jsxSources);
   const files: Record<string, string> = {
     'package.json': JSON.stringify({ name: 'sketch2ui-export', private: true, version: '1.0.0', type: 'module',
       scripts: { dev: 'vite', build: 'vite build', preview: 'vite preview' },
-      dependencies: { react: '18.3.1', 'react-dom': '18.3.1', 'lucide-react': '0.468.0', recharts: '2.15.0' },
+      dependencies: { react: '18.3.1', 'react-dom': '18.3.1', 'lucide-react': '0.468.0', recharts: '2.15.0', ...extraDeps },
       devDependencies: { vite: '6.4.4', '@vitejs/plugin-react': '4.7.0', tailwindcss: '3.4.17', postcss: '8.5.6', autoprefixer: '10.4.21' },
     }, null, 2),
     'index.html': '<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Sketch2UI Export</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>',
     'src/App.jsx': code,
-    ...(project && project.screens.length > 1 ? screenFiles(project) : {}),
+    ...extraScreens,
     'src/backend.js': backendBootstrap(backend),
     'API_CONTRACT.json': JSON.stringify(backend, null, 2),
     'src/main.jsx': "import './backend';\nimport React from 'react';\nimport {createRoot} from 'react-dom/client';\nimport App from './App';\nimport './index.css';\ncreateRoot(document.getElementById('root')).render(<App/>);\n",
