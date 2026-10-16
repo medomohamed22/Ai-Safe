@@ -835,5 +835,7 @@
   "Network/CORS error calling {0}. {1}({2})": "خطأ في الشبكة أو CORS عند الاتصال بـ {0}. {1}({2})",
   "Try enabling \"Use proxy\" for this provider in Settings.": "جرّب تفعيل «استخدام الوسيط» لهذا المزوّد من الإعدادات.",
   "HTTP {0}: {1}": "خطأ HTTP {0}: {1}",
-  "Your code will appear here": "سيظهر الكود هنا"
+  "Your code will appear here": "سيظهر الكود هنا",
+  "Wait for the current generation to finish": "انتظر حتى ينتهي الإنشاء الحالي",
+  "Switch to the Preview tab to select elements": "بدّل إلى تبويب المعاينة لتحديد العناصر"
 }
