@@ -73,6 +73,28 @@ function WorkspaceApp() {
   const enteredDraft = useRef(false);
   const enterStudio = () => { location.hash = 'studio'; setHome(false); };
   useEffect(() => { const change = () => setHome(location.hash !== '#studio'); window.addEventListener('hashchange',change); return () => window.removeEventListener('hashchange',change); }, []);
+  // Workaround for a typo in @excalidraw/excalidraw's bundled ar-SA locale: its
+  // "extra tools" label contains a stray U+FEF7 ligature ("\u0627\u0644\u0645\u0632\u064A\u062F \u0645\u0646 \u0623\uFEF7\u062F\u0648\u0627\u062A").
+  // Correct the rendered label/title in Arabic mode until upstream fixes it.
+  useEffect(() => {
+    if (language !== 'ar' || home) return;
+    const broken = '\u0627\u0644\u0645\u0632\u064A\u062F \u0645\u0646 \u0623\uFEF7\u062F\u0648\u0627\u062A';
+    const fixed = '\u0627\u0644\u0645\u0632\u064A\u062F \u0645\u0646 \u0627\u0644\u0623\u062F\u0648\u0627\u062A';
+    const surface = document.querySelector('.drawing-surface');
+    if (!surface) return;
+    const fixLabels = () => {
+      surface.querySelectorAll('[aria-label],[title]').forEach((el) => {
+        for (const attr of ['aria-label', 'title']) {
+          const value = el.getAttribute(attr);
+          if (value && value.includes(broken)) el.setAttribute(attr, value.split(broken).join(fixed));
+        }
+      });
+    };
+    fixLabels();
+    const observer = new MutationObserver(fixLabels);
+    observer.observe(surface, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'title'] });
+    return () => observer.disconnect();
+  }, [language, home]);
   const workspaceSaveStatus = useWorkspaceAutosave();
   const { theme } = useTheme();
   const initialProject = useMemo<ScreenProject>(() => load(KEYS.project, { activeId: 'home', links: [], screens: [{ id: 'home', name: 'Home', versions: load(KEYS.versions, []), vIndex: load(KEYS.vIndex, -1), scene: load(KEYS.scene, null) }] }), []);
