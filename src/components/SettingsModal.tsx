@@ -15,6 +15,7 @@ const TYPES: ProviderType[] = ['openrouter', 'meta', 'gemini', 'openai'];
 
 export function SettingsModal({ settings, setSettings, onClose }: Props) {
   const [selId, setSelId] = useState<string | null>(settings.activeProviderId ?? settings.providers[0]?.id ?? null);
+  const [confirmClear, setConfirmClear] = useState(false);
   const sel = settings.providers.find((p) => p.id === selId) ?? null;
 
   useEffect(() => {
@@ -24,6 +25,15 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
   }, [onClose]);
 
   const add = (type: ProviderType) => {
+    const preset = PROVIDER_PRESETS[type];
+    // Reuse an untouched provider of the same type instead of stacking empty duplicates.
+    const existing = settings.providers.find(
+      (x) => x.type === type && x.name === preset.label && x.baseUrl === preset.baseUrl && x.useProxy === preset.defaultProxy && !x.apiKey && x.models.length === 0,
+    );
+    if (existing) {
+      setSelId(existing.id);
+      return;
+    }
     const p = createProvider(type);
     setSettings((s) => ({ ...s, providers: [...s.providers, p] }));
     setSelId(p.id);
@@ -122,16 +132,31 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
             </div>
 
             <div className="mt-auto border-t border-[var(--ui-border)] pt-4">
-              <button
-                onClick={() => {
-                  if (confirm(tr("Delete ALL local data (providers, keys, sketch, code history)?"))) {
-                    clearAll();
-                    location.reload();
-                  }
-                }}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--ui-border)]/60 px-3 py-2 text-xs text-[var(--ui-text)] hover:bg-[var(--ui-selected)]"
-              >
-                <Trash2 className="h-3.5 w-3.5" />{tr(" Clear all local data")}</button>
+              {confirmClear ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-[var(--ui-text)]">{tr("Delete ALL local data (providers, keys, sketch, code history)?")}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        clearAll();
+                        location.reload();
+                      }}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--ui-selected)] px-3 py-2 text-xs font-semibold text-[var(--ui-text)]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />{tr("Clear all local data")}</button>
+                    <button
+                      onClick={() => setConfirmClear(false)}
+                      className="flex items-center justify-center rounded-lg border border-[var(--ui-border)]/60 px-3 py-2 text-xs text-[var(--ui-text)] hover:bg-[var(--ui-selected)]"
+                    >{tr("Cancel")}</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmClear(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--ui-border)]/60 px-3 py-2 text-xs text-[var(--ui-text)] hover:bg-[var(--ui-selected)]"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />{tr(" Clear all local data")}</button>
+              )}
             </div>
           </aside>
 
@@ -170,6 +195,7 @@ function ProviderEditor({
   const [q, setQ] = useState('');
   const [visionOnly, setVisionOnly] = useState(false);
   const [manual, setManual] = useState('');
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   const update = (patch: Partial<ProviderConfig>) =>
     setSettings((s) => ({ ...s, providers: s.providers.map((x) => (x.id === p.id ? { ...x, ...patch } : x)) }));
@@ -177,7 +203,6 @@ function ProviderEditor({
   const selectModel = (modelId: string) => setSettings((s) => ({ ...s, activeProviderId: p.id, activeModelId: modelId }));
 
   const remove = () => {
-    if (!confirm(tr("Remove provider \"{0}\"?", [p.name]))) return;
     setSettings((s) => {
       const wasActive = s.activeProviderId === p.id;
       return {
@@ -231,8 +256,17 @@ function ProviderEditor({
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--ui-text)]">{tr(preset.label)}</div>
           <p className="mt-1 max-w-xl text-xs text-[var(--ui-muted)]">{tr(preset.hint)}</p>
         </div>
-        <button onClick={remove} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--ui-text)] hover:bg-[var(--ui-selected)]">
-          <Trash2 className="h-3.5 w-3.5" />{tr(" Remove")}</button>
+        {confirmRemove ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--ui-text)]">{tr('Remove provider "{0}"?', [p.name])}</span>
+            <button onClick={remove} className="flex items-center gap-1 rounded-lg bg-[var(--ui-selected)] px-2 py-1 text-xs font-semibold text-[var(--ui-text)]">
+              <Trash2 className="h-3.5 w-3.5" />{tr("Remove")}</button>
+            <button onClick={() => setConfirmRemove(false)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--ui-text)] hover:bg-[var(--ui-selected)]">{tr("Cancel")}</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmRemove(true)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--ui-text)] hover:bg-[var(--ui-selected)]">
+            <Trash2 className="h-3.5 w-3.5" />{tr(" Remove")}</button>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
