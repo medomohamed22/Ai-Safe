@@ -71,7 +71,7 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
     [['e', 'ew-resize'], ['s', 'ns-resize'], ['se', 'nwse-resize']].forEach(function (def) {
       var h = document.createElement('div');
       h.setAttribute('data-s2ui-handle', def[0]);
-      h.style.cssText = 'position:fixed;width:11px;height:11px;margin:-6px 0 0 -6px;background:#fff;border:2px solid #6366f1;border-radius:3px;box-sizing:border-box;pointer-events:auto;display:none;cursor:' + def[1] + ';';
+      h.style.cssText = 'position:fixed;width:15px;height:15px;margin:-8px 0 0 -8px;background:#fff;border:2px solid #6366f1;border-radius:3px;box-sizing:border-box;pointer-events:auto;display:none;cursor:' + def[1] + ';';
       overlay.appendChild(h);
       handles[def[0]] = h;
     });
@@ -186,7 +186,20 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
       var handle = e.target.closest && e.target.closest('[data-s2ui-handle]');
       if (e.type === 'pointerdown' && handle && selectedEl) { startResize(handle.getAttribute('data-s2ui-handle'), e); return; }
       var el = e.target.closest && e.target.closest('[data-s2ui-id]');
-      if (e.type === 'pointerdown') { if (el) { selectEl(el); postSelected(el); startMove(el, e); } return; }
+      if (e.type === 'pointerdown') {
+        if (el) {
+          if (el === selectedEl) {
+            var r = el.getBoundingClientRect();
+            var nearR = Math.abs(e.clientX - r.right) <= 12 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6;
+            var nearB = Math.abs(e.clientY - r.bottom) <= 12 && e.clientX >= r.left - 6 && e.clientX <= r.right + 6;
+            if (nearR && nearB) { startResize('se', e); return; }
+            if (nearR) { startResize('e', e); return; }
+            if (nearB) { startResize('s', e); return; }
+          }
+          selectEl(el); postSelected(el); startMove(el, e);
+        }
+        return;
+      }
       if (e.type !== 'click') return;
       if (suppressClick) { suppressClick = false; return; }
       if (!el) return;
