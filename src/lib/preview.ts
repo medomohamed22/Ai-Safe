@@ -184,14 +184,17 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
       if (!editing) return;
       e.preventDefault(); e.stopImmediatePropagation();
       var handle = e.target.closest && e.target.closest('[data-s2ui-handle]');
-      if (e.type === 'pointerdown' && handle && selectedEl) { startResize(handle.getAttribute('data-s2ui-handle'), e); return; }
+      if (e.type === 'pointerdown' && handle && selectedEl) { suppressClick = false; startResize(handle.getAttribute('data-s2ui-handle'), e); return; }
       var el = e.target.closest && e.target.closest('[data-s2ui-id]');
       if (e.type === 'pointerdown') {
+        suppressClick = false;
         if (el) {
           if (el === selectedEl) {
             var r = el.getBoundingClientRect();
-            var nearR = Math.abs(e.clientX - r.right) <= 12 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6;
-            var nearB = Math.abs(e.clientY - r.bottom) <= 12 && e.clientX >= r.left - 6 && e.clientX <= r.right + 6;
+            var bandX = Math.min(12, Math.max(4, r.width / 4));
+            var bandY = Math.min(12, Math.max(4, r.height / 4));
+            var nearR = Math.abs(e.clientX - r.right) <= bandX && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6;
+            var nearB = Math.abs(e.clientY - r.bottom) <= bandY && e.clientX >= r.left - 6 && e.clientX <= r.right + 6;
             if (nearR && nearB) { startResize('se', e); return; }
             if (nearR) { startResize('e', e); return; }
             if (nearB) { startResize('s', e); return; }
