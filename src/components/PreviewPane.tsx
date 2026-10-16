@@ -144,14 +144,14 @@ export function PreviewPane(p: Props) {
       </div>
       <div className="preview-viewbar">
         <div className="segmented" aria-label={tr("Preview display")}><button onClick={() => setTab('preview')} aria-pressed={tab === 'preview'}><MonitorPlay size={13} />{tr("Preview")}</button><button onClick={() => setTab('code')} aria-pressed={tab === 'code'}><Code2 size={13} />{tr("Code")}</button></div>
-        {tab === 'preview' && <div className="segmented device-switch" aria-label={tr("Preview device")}>{([['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const).map(([d, Icon]) => <button key={d} onClick={() => setDevice(d)} title={tr(d)} aria-label={tr(d)} aria-pressed={device === d}><Icon size={13} /></button>)}</div>}
+        {tab === 'preview' && !!p.code && <div className="segmented device-switch" aria-label={tr("Preview device")}>{([['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const).map(([d, Icon]) => <button key={d} onClick={() => setDevice(d)} title={tr(d)} aria-label={tr(d)} aria-pressed={device === d}><Icon size={13} /></button>)}</div>}
         <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : device === 'desktop' ? tr("Fit to workspace") : WIDTH[device]}</span>
       </div>
-      <div className="preview-actions" aria-label={tr("Preview actions")}>
-        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select"><MousePointer2 size={13} /><span>{tr("Select element")}</span></button>
-        <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className="ui-icon" aria-label={tr("Test UI")} title={tr("Test UI")}><FlaskConical size={15} /></button>
+      {!!p.code && <div className="preview-actions" aria-label={tr("Preview actions")}>
+        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select" title={p.generating ? tr("Wait for the current generation to finish") : tab !== 'preview' ? tr("Switch to the Preview tab to select elements") : tr("Select element")}><MousePointer2 size={13} /><span>{tr("Select element")}</span></button>
+        <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className="ui-icon" aria-label={tr("Test UI")} title={p.generating ? tr("Wait for the current generation to finish") : tr("Test UI")}><FlaskConical size={15} /></button>
         <span className="actions-spacer" />
-        <button disabled={!p.code || p.generating || !Object.keys(exportFiles).length} onClick={() => setShowShare(true)} className="ui-button" aria-label={tr("Share / review")} title={tr("Share / review")}><Share2 size={15} /><span>{tr("Share")}</span></button>
+        <button disabled={!p.code || p.generating || !Object.keys(exportFiles).length} onClick={() => setShowShare(true)} className="ui-button" aria-label={tr("Share / review")} title={p.generating ? tr("Wait for the current generation to finish") : tr("Share / review")}><Share2 size={15} /><span>{tr("Share")}</span></button>
         <details ref={exportMenuRef} className="export-menu" onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); exportMenuRef.current?.removeAttribute('open'); exportMenuRef.current?.querySelector('summary')?.focus(); } }}>
           <summary className="ui-button" aria-label={tr("Export options")}><Download size={15} /><span>{tr("Export")}</span><ChevronRight size={12} /></summary>
           <div className="export-dropdown" aria-label={tr("Export options")} onClick={e => { if ((e.target as HTMLElement).closest('button:not(:disabled)')) exportMenuRef.current?.removeAttribute('open'); }}>
@@ -164,7 +164,7 @@ export function PreviewPane(p: Props) {
             <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} aria-label={tr(".html")}><Code2 size={16} /><span>{tr("Standalone HTML")}</span></button>
           </div>
         </details>
-      </div>
+      </div>}
       {editing && tab === 'preview' && selected === null && <p className="selection-hint"><MousePointer2 size={13} />{tr("Select anything in the preview to edit its properties.")}</p>}
       {!!p.locks.length && <details className="locks-list"><summary>{tr("Locked elements (")}{p.locks.length}{tr(") — protected in saved JSX")}</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>{tr("Unlock")}</button></div>)}</details>}
       {exportError && <p role="alert" className="mx-3 my-2 text-xs">{tr(exportError)}</p>}
@@ -190,6 +190,6 @@ function EmptyState({ hasModel, onOpenSettings }: { hasModel: boolean; onOpenSet
     <div className="empty-visual" aria-hidden="true"><div className="empty-wireframe"><div className="mini-window-bar"><i /><i /><i /></div><div className="wireframe-content"><span /><span /><div><i /><i /></div><b /></div></div><span className="empty-connector">↗</span><div className="empty-output"><span>{'</>'}</span><div><i /><i /><i /></div><b>{tr("Made real")}<span /></b></div></div>
     <p className="empty-eyebrow">{tr("A SPACE FOR YOUR NEXT IDEA")}</p><h2>{tr("Draw an idea.")}<br /><em>{tr("Make it real.")}</em></h2><p className="empty-description">{tr("Turn rough sketches into thoughtful interfaces.")}<br />{tr("Start on the canvas. We'll meet you on the other side.")}</p>
     <div className="empty-steps"><span><b>1</b>{tr("Sketch")}</span><i /><span><b>2</b>{tr("Generate")}</span><i /><span><b>3</b>{tr("Refine")}</span></div>
-    {!hasModel ? <button onClick={onOpenSettings} className="ui-button empty-setup" aria-label={tr("Open Settings")}><Plus size={13} />{tr("Connect your first model")}<ArrowUpRight size={13} /></button> : <p className="model-ready"><Check size={13} />{tr("Your model is connected. You're ready to create.")}</p>}
+    {!hasModel ? <button onClick={onOpenSettings} className="ui-primary empty-setup" aria-label={tr("Open Settings")}><Plus size={13} />{tr("Connect your first model")}<ArrowUpRight size={13} /></button> : <p className="model-ready"><Check size={13} />{tr("Your model is connected. You're ready to create.")}</p>}
   </div></div>;
 }

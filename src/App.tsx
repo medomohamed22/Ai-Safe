@@ -449,10 +449,10 @@ function WorkspaceApp() {
   return (<>
     {home && <DesignHome busy={starting} onStart={startDesign} onContinue={enterStudio} onOpen={openDesign}
       model={<ModelPicker settings={settings} onSelect={(pid,mid)=>setSettings(s=>({...s,activeProviderId:pid,activeModelId:mid}))} onOpenSettings={()=>setShowSettings(true)}/>}
-      actions={<><ThemeToggle/><button className="ui-icon" aria-label={tr("Settings")} onClick={()=>setShowSettings(true)}><Settings size={18}/></button></>}/>}
+      actions={<><ThemeToggle/><button className="ui-icon" aria-label={tr("Settings")} title={tr("Settings")} onClick={()=>setShowSettings(true)}><Settings size={18}/></button></>}/>}
     <div className="workspace-shell studio-shell canvas-studio" style={home ? {display:'none'} : undefined} data-mobile-pane={mobilePane}>
       <header className="app-header">
-        <button className="ui-icon mobile-tools-button" onClick={() => setToolsOpen(true)} aria-label={tr("Open workspace tools")}><Menu size={19} /></button>
+        <button className="ui-icon mobile-tools-button" onClick={() => setToolsOpen(true)} aria-label={tr("Open workspace tools")} title={tr("Open workspace tools")}><Menu size={19} /></button>
         <button className="brand-lockup" aria-label={tr("Back to projects")} onClick={()=>{stop();location.hash='home';setHome(true);}}><span className="brand-mark"><PenTool size={19} strokeWidth={1.6} /></span><div><span className="brand-name">{tr("Sketch2UI")}<span className="brand-period">.</span></span><span className="brand-subtitle">{tr("DESIGN STUDIO")}</span></div></button>
         <div className="workspace-breadcrumb"><span>{tr("Workspace")}</span><ChevronRight size={13} /><strong>{screenLabel(liveProject.screens.find(s => s.id === project.activeId) || {id:'home',name:'Home'})}</strong></div>
         <div className="header-spacer" />
@@ -475,10 +475,7 @@ function WorkspaceApp() {
             </div>
           </div>
           <nav className="canvas-toolrail" aria-label={tr("Canvas tools")}>
-            <button className="ui-icon" aria-label={tr("Focus interactive preview")} title={tr("Interactive preview")} aria-pressed={focusPane==='preview'} onClick={()=>setFocusPane('preview')}><MonitorPlay size={19}/></button>
-            <button className="ui-icon" aria-label={tr("Focus drawing canvas")} title={tr("Drawing canvas")} aria-pressed={focusPane==='sketch'} onClick={()=>setFocusPane('sketch')}><PenTool size={19}/></button>
-            <button className="ui-icon" aria-label={tr("Show both canvases")} title={tr("Split canvas")} aria-pressed={focusPane==='both'} onClick={()=>setFocusPane('both')}><Columns2 size={19}/></button>
-            <span/><button className="ui-icon" aria-label={tr("Canvas reference")} title={tr("Reference image")} onClick={()=>setShowReference(true)}><ImageIcon size={19}/></button>
+            <button className="ui-icon" aria-label={tr("Canvas reference")} title={tr("Reference image")} onClick={()=>setShowReference(true)}><ImageIcon size={19}/></button>
             <button className="ui-icon" aria-label={tr("Canvas brand")} title={tr("Brand")} onClick={()=>setShowBrand(true)}><Palette size={19}/></button>
             <button className="ui-icon" aria-label={tr("Canvas productivity")} title={tr("Productivity tools")} onClick={()=>setShowProductivity(true)}><Sparkles size={19}/></button>
           </nav>
