@@ -844,5 +844,12 @@
   "Add search and filters": "أضف بحثًا وفلاتر",
   "Add a form with validation": "أضف نموذجًا مع تحقّق",
   "Add a second screen": "أضف شاشة ثانية",
-  "Add loading and empty states": "أضف حالات التحميل والفراغ"
+  "Add loading and empty states": "أضف حالات التحميل والفراغ",
+  "Width (px)": "العرض (بكسل)",
+  "Height (px)": "الارتفاع (بكسل)",
+  "Width": "العرض",
+  "Height": "الارتفاع",
+  "Size must be between 0 and 2000 pixels.": "يجب أن يكون الحجم بين 0 و2000 بكسل.",
+  "Elements can only be moved within the same parent container.": "لا يمكن نقل العناصر إلا داخل نفس الحاوية الأب.",
+  "Drag the element in the preview to reorder it, or drag its handles to resize it.": "اسحب العنصر في المعاينة لإعادة ترتيبه، أو اسحب مقابضه لتغيير حجمه."
 }

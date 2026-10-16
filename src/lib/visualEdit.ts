@@ -8,6 +8,8 @@ export interface ElementEdit {
   backgroundColor?: string;
   padding?: number;
   borderRadius?: number;
+  width?: number;
+  height?: number;
 }
 
 function sourceTree(code: string) {
@@ -63,11 +65,12 @@ export function applyElementEdit(code: string, id: number, edit: ElementEdit) {
     node.children = [t.jsxExpressionContainer(t.stringLiteral(edit.text))];
   }
   const properties: t.ObjectProperty[] = [];
-  for (const key of ['color', 'backgroundColor', 'padding', 'borderRadius'] as const) {
+  for (const key of ['color', 'backgroundColor', 'padding', 'borderRadius', 'width', 'height'] as const) {
     const value = edit[key];
     if (value === undefined) continue;
     if (typeof value === 'number') {
-      if (!Number.isFinite(value) || value < 0 || value > 200) throw new Error('Spacing must be between 0 and 200 pixels.');
+      const isSize = key === 'width' || key === 'height';
+      if (!Number.isFinite(value) || value < 0 || value > (isSize ? 2000 : 200)) throw new Error(isSize ? 'Size must be between 0 and 2000 pixels.' : 'Spacing must be between 0 and 200 pixels.');
     } else if (!/^#[0-9a-f]{6}$/i.test(value)) throw new Error('Choose a valid color.');
     properties.push(t.objectProperty(t.identifier(key), typeof value === 'number' ? t.numericLiteral(value) : t.stringLiteral(value)));
   }
@@ -81,4 +84,39 @@ export function applyElementEdit(code: string, id: number, edit: ElementEdit) {
     node.openingElement.attributes.push(t.jsxAttribute(t.jsxIdentifier('style'), t.jsxExpressionContainer(merged)));
   }
   return generate(tree).code;
+}
+
+function parentOf(tree: t.File, target: t.JSXElement): t.JSXElement | null {
+  let found = false;
+  let parent: t.JSXElement | null = null;
+  const visit = (value: unknown, stack: t.JSXElement[]): void => {
+    if (found || !value || typeof value !== 'object') return;
+    if (Array.isArray(value)) { for (const item of value) { visit(item, stack); if (found) return; } return; }
+    const node = value as t.Node;
+    if (node === target) { found = true; parent = stack.length ? stack[stack.length - 1] : null; return; }
+    if (!('type' in node)) return;
+    const next = t.isJSXElement(node) ? [...stack, node] : stack;
+    for (const key of Object.keys(node)) {
+      if (key === 'loc' || key === 'range') continue;
+      visit((node as unknown as Record<string, unknown>)[key], next);
+      if (found) return;
+    }
+  };
+  visit(tree, []);
+  return parent;
+}
+
+export function applyElementMove(code: string, id: number, targetId: number, before: boolean): { code: string; id: number } {
+  const tree = sourceTree(code);
+  const list = elements(tree);
+  const node = list[id];
+  const target = list[targetId];
+  if (!node || !target) throw new Error('This element is no longer available. Select it again.');
+  if (node === target) return { code, id };
+  const parent = parentOf(tree, node);
+  if (!parent || parentOf(tree, target) !== parent) throw new Error('Elements can only be moved within the same parent container.');
+  const children = parent.children;
+  children.splice(children.indexOf(node), 1);
+  children.splice(children.indexOf(target) + (before ? 0 : 1), 0, node);
+  return { code: generate(tree).code, id: elements(tree).indexOf(node) };
 }

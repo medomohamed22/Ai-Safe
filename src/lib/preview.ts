@@ -62,20 +62,136 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
   (function () {
     var token = ${safeJson(editor.token)};
     var editing = false;
+    var selectedEl = null;
+    var drag = null;
+    var suppressClick = false;
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2147483646;';
+    var handles = {};
+    [['e', 'ew-resize'], ['s', 'ns-resize'], ['se', 'nwse-resize']].forEach(function (def) {
+      var h = document.createElement('div');
+      h.setAttribute('data-s2ui-handle', def[0]);
+      h.style.cssText = 'position:fixed;width:11px;height:11px;margin:-6px 0 0 -6px;background:#fff;border:2px solid #6366f1;border-radius:3px;box-sizing:border-box;pointer-events:auto;display:none;cursor:' + def[1] + ';';
+      overlay.appendChild(h);
+      handles[def[0]] = h;
+    });
+    var dropLine = document.createElement('div');
+    dropLine.style.cssText = 'position:fixed;background:#6366f1;border-radius:2px;display:none;pointer-events:none;';
+    overlay.appendChild(dropLine);
+    document.body.appendChild(overlay);
+    function placeHandles() {
+      var show = editing && selectedEl && selectedEl.isConnected;
+      ['e', 's', 'se'].forEach(function (k) { handles[k].style.display = show ? 'block' : 'none'; });
+      if (!show) return;
+      var r = selectedEl.getBoundingClientRect();
+      handles.e.style.left = r.right + 'px'; handles.e.style.top = (r.top + r.height / 2) + 'px';
+      handles.s.style.left = (r.left + r.width / 2) + 'px'; handles.s.style.top = r.bottom + 'px';
+      handles.se.style.left = r.right + 'px'; handles.se.style.top = r.bottom + 'px';
+    }
+    function selectEl(el) {
+      document.querySelectorAll('[data-s2ui-selected]').forEach(function (item) { item.removeAttribute('data-s2ui-selected'); });
+      selectedEl = el;
+      if (el) el.setAttribute('data-s2ui-selected', '');
+      placeHandles();
+    }
+    function postSelected(el) {
+      parent.postMessage({ source: 's2ui-preview', type: 'element-selected', token: token, id: Number(el.getAttribute('data-s2ui-id')) }, '*');
+    }
     window.addEventListener('message', function (e) {
       if (e.source !== parent || !e.data || e.data.token !== token || e.data.type !== 'edit-mode') return;
       editing = !!e.data.enabled;
-      if (!editing) document.querySelectorAll('[data-s2ui-selected]').forEach(function (el) { el.removeAttribute('data-s2ui-selected'); });
+      if (!editing) { if (drag) endDrag(false); selectEl(null); }
+      else placeHandles();
     });
+    window.addEventListener('resize', placeHandles);
+    window.addEventListener('scroll', placeHandles, true);
+    function startResize(kind, e) {
+      var r = selectedEl.getBoundingClientRect();
+      drag = { mode: 'resize', kind: kind, x: e.clientX, y: e.clientY, w: r.width, h: r.height, ow: selectedEl.style.width, oh: selectedEl.style.height };
+    }
+    function startMove(el, e) {
+      var parentEl = el.parentElement;
+      var sibs = parentEl ? Array.prototype.filter.call(parentEl.children, function (c) { return c.hasAttribute && c.hasAttribute('data-s2ui-id'); }) : [];
+      var rects = {};
+      sibs.forEach(function (s) { rects[s.getAttribute('data-s2ui-id')] = s.getBoundingClientRect(); });
+      var axis = 'y';
+      if (sibs.length > 1) {
+        var tops = sibs.map(function (s) { return rects[s.getAttribute('data-s2ui-id')].top; });
+        if (Math.max.apply(null, tops) - Math.min.apply(null, tops) < 8) axis = 'x';
+      }
+      drag = { mode: 'move', el: el, x: e.clientX, y: e.clientY, active: false, sibs: sibs, rects: rects, axis: axis, target: null, ot: el.style.transform, oo: el.style.opacity, op: el.style.position, oz: el.style.zIndex };
+    }
+    function dragMove(e) {
+      if (!drag) return;
+      if (drag.mode === 'resize') {
+        var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (drag.kind === 'e' || drag.kind === 'se') { drag.nw = Math.max(24, Math.round(drag.w + dx)); selectedEl.style.width = drag.nw + 'px'; }
+        if (drag.kind === 's' || drag.kind === 'se') { drag.nh = Math.max(24, Math.round(drag.h + dy)); selectedEl.style.height = drag.nh + 'px'; }
+        placeHandles();
+        return;
+      }
+      var mx = e.clientX - drag.x, my = e.clientY - drag.y;
+      if (!drag.active && Math.abs(mx) + Math.abs(my) > 6) { drag.active = true; drag.el.style.position = 'relative'; drag.el.style.opacity = '.75'; drag.el.style.zIndex = '40'; }
+      if (!drag.active) return;
+      drag.el.style.transform = 'translate(' + mx + 'px,' + my + 'px)';
+      var p = drag.axis === 'y' ? e.clientY : e.clientX;
+      var best = null, bestDist = Infinity;
+      drag.sibs.forEach(function (s) {
+        if (s === drag.el) return;
+        var r = drag.rects[s.getAttribute('data-s2ui-id')];
+        var c = drag.axis === 'y' ? r.top + r.height / 2 : r.left + r.width / 2;
+        var d = Math.abs(p - c);
+        if (d < bestDist) { bestDist = d; best = { el: s, rect: r, before: p < c }; }
+      });
+      drag.target = best;
+      if (best && drag.el.parentElement) {
+        var pr = drag.el.parentElement.getBoundingClientRect();
+        dropLine.style.display = 'block';
+        if (drag.axis === 'y') { dropLine.style.left = pr.left + 'px'; dropLine.style.width = pr.width + 'px'; dropLine.style.height = '3px'; dropLine.style.top = ((best.before ? best.rect.top : best.rect.bottom) - 2) + 'px'; }
+        else { dropLine.style.top = pr.top + 'px'; dropLine.style.height = pr.height + 'px'; dropLine.style.width = '3px'; dropLine.style.left = ((best.before ? best.rect.left : best.rect.right) - 2) + 'px'; }
+      } else dropLine.style.display = 'none';
+    }
+    function endDrag(commit) {
+      if (!drag) return;
+      var d = drag; drag = null;
+      dropLine.style.display = 'none';
+      if (d.mode === 'resize') {
+        if (selectedEl) { selectedEl.style.width = d.ow; selectedEl.style.height = d.oh; }
+        if (commit && selectedEl && (d.nw !== undefined || d.nh !== undefined)) {
+          var msg = { source: 's2ui-preview', type: 'element-resized', token: token, id: Number(selectedEl.getAttribute('data-s2ui-id')) };
+          if (d.nw !== undefined) msg.width = d.nw;
+          if (d.nh !== undefined) msg.height = d.nh;
+          parent.postMessage(msg, '*');
+          suppressClick = true;
+        }
+      } else {
+        d.el.style.transform = d.ot; d.el.style.opacity = d.oo; d.el.style.position = d.op; d.el.style.zIndex = d.oz;
+        if (commit && d.active && d.target) {
+          var mid = Number(d.el.getAttribute('data-s2ui-id'));
+          var tid = Number(d.target.el.getAttribute('data-s2ui-id'));
+          if (tid !== mid) {
+            parent.postMessage({ source: 's2ui-preview', type: 'element-reordered', token: token, id: mid, targetId: tid, before: d.target.before }, '*');
+            suppressClick = true;
+          }
+        }
+      }
+      placeHandles();
+    }
+    window.addEventListener('pointermove', dragMove, true);
+    window.addEventListener('pointerup', function () { endDrag(true); }, true);
+    window.addEventListener('pointercancel', function () { endDrag(false); }, true);
     function intercept(e) {
       if (!editing) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      if (e.type !== 'click') return;
+      var handle = e.target.closest && e.target.closest('[data-s2ui-handle]');
+      if (e.type === 'pointerdown' && handle && selectedEl) { startResize(handle.getAttribute('data-s2ui-handle'), e); return; }
       var el = e.target.closest && e.target.closest('[data-s2ui-id]');
+      if (e.type === 'pointerdown') { if (el) { selectEl(el); postSelected(el); startMove(el, e); } return; }
+      if (e.type !== 'click') return;
+      if (suppressClick) { suppressClick = false; return; }
       if (!el) return;
-      document.querySelectorAll('[data-s2ui-selected]').forEach(function (item) { item.removeAttribute('data-s2ui-selected'); });
-      el.setAttribute('data-s2ui-selected', '');
-      parent.postMessage({ source: 's2ui-preview', type: 'element-selected', token: token, id: Number(el.getAttribute('data-s2ui-id')) }, '*');
+      selectEl(el);
+      postSelected(el);
     }
     ['click', 'dblclick', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'submit', 'keydown', 'input', 'change'].forEach(function (name) { window.addEventListener(name, intercept, true); });
   })();
