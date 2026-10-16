@@ -1,12 +1,12 @@
 :root {
  --ui-bg:#f5f5f4; --ui-surface:#fff; --ui-hover:#f2f2f1; --ui-selected:#ebebea;
- --ui-border:#dededc; --ui-text:#191919; --ui-muted:#696968; --ui-contrast:#171717; --ui-on-contrast:#fff; --ui-accent:#2563eb;
+ --ui-border:#dededc; --ui-text:#191919; --ui-muted:#696968; --ui-faint:#8c8c8a; --ui-contrast:#171717; --ui-on-contrast:#fff; --ui-accent:#2563eb; --ui-on-accent:#fff;
  --ui-shadow:0 12px 42px -24px rgb(0 0 0/.24); --ui-grid:#dededc;
  --motion-fast:140ms; --motion-normal:240ms; --motion-slow:480ms; --motion-ease:cubic-bezier(.22,1,.36,1); color-scheme:light;
 }
 :root[data-ui-theme='dark'] {
  --ui-bg:#111; --ui-surface:#191919; --ui-hover:#242424; --ui-selected:#303030;
- --ui-border:#343434; --ui-text:#ededeb; --ui-muted:#a3a3a0; --ui-contrast:#f1f1ef; --ui-on-contrast:#131313; --ui-accent:#2563eb;
+ --ui-border:#343434; --ui-text:#ededeb; --ui-muted:#a3a3a0; --ui-faint:#787875; --ui-contrast:#f1f1ef; --ui-on-contrast:#131313; --ui-accent:#2563eb; --ui-on-accent:#fff;
  --ui-shadow:0 14px 45px -22px rgb(0 0 0/.65); --ui-grid:#303030; color-scheme:dark;
 }
 html,body,#root { height:100%; margin:0 }
@@ -43,9 +43,9 @@ input[type='color'] { border-radius:7px; overflow:hidden; padding:3px; backgroun
 .ui-icon { width:34px; min-width:34px; border:1px solid transparent; background:transparent }
 .ui-icon:hover:not(:disabled),.ui-tool:hover:not(:disabled),.preset-pill:hover:not(:disabled),.ui-button:hover:not(:disabled) { background:var(--ui-hover); border-color:var(--ui-border) }
 .ui-icon:disabled,.ui-tool:disabled,.ui-button:disabled { opacity:.35 }
-.ui-primary { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:34px; background:var(--ui-accent); border:1px solid var(--ui-accent); border-radius:9px; color:var(--ui-on-contrast); font-weight:550 }
-.ui-primary,.ui-primary svg { color:var(--ui-on-contrast) }
-.ui-primary:hover:not(:disabled) { opacity:.83; box-shadow:0 3px 10px #0002; transform:translateY(-1px) }
+.ui-primary { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:34px; background:var(--ui-accent); border:1px solid var(--ui-accent); border-radius:9px; color:var(--ui-on-accent); font-weight:550 }
+.ui-primary,.ui-primary svg { color:var(--ui-on-accent) }
+.ui-primary:hover:not(:disabled) { opacity:.88; box-shadow:0 3px 10px #0002; transform:translateY(-1px) }
 .ui-primary:disabled { opacity:.35 }
 .header-new { margin-left:3px }
 .generate-button { padding:0 13px; font-size:11px }
