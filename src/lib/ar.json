@@ -851,5 +851,12 @@
   "Height": "الارتفاع",
   "Size must be between 0 and 2000 pixels.": "يجب أن يكون الحجم بين 0 و2000 بكسل.",
   "Elements can only be moved within the same parent container.": "لا يمكن نقل العناصر إلا داخل نفس الحاوية الأب.",
-  "Drag the element in the preview to reorder it, or drag its handles to resize it.": "اسحب العنصر في المعاينة لإعادة ترتيبه، أو اسحب مقابضه لتغيير حجمه."
+  "Drag the element in the preview to reorder it, or drag its handles to resize it.": "اسحب العنصر في المعاينة لإعادة ترتيبه، أو اسحب مقابضه لتغيير حجمه.",
+  "Screen map": "خريطة الشاشات",
+  "Fit view": "ملاءمة العرض",
+  "Zoom in": "تكبير",
+  "Zoom out": "تصغير",
+  "Not generated yet": "لم تُنشأ بعد",
+  "Current screen": "الشاشة الحالية",
+  "Drag to pan, scroll to zoom, and drag a card by its title bar to arrange it.": "اسحب للتحريك، ومرّر بعجلة الفأرة للتقريب، واسحب البطاقة من شريط عنوانها لترتيبها."
 }
