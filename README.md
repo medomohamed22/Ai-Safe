@@ -3,7 +3,7 @@
 Draw a wireframe → get a live, interactive React + Tailwind UI in seconds.
 
 - **Canvas:** Excalidraw (MIT)
-- **Brain:** any vision LLM — Meta Llama API, OpenRouter (incl. Llama 4), Google Gemini, or any OpenAI-compatible API
+- **Brain:** Meta Model API (Muse Spark) first — or any vision LLM via OpenRouter, Google Gemini, Meta Llama API (legacy), or any OpenAI-compatible API
 - **Renderer:** sandboxed iframe (Babel + import maps + Tailwind CDN) — supports `react`, `lucide-react`, `recharts`
 - **Local workspace:** provider settings, sketches and code history stay in your browser. GitHub tokens and backend tester tokens are kept in memory only.
 

@@ -11,7 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-const TYPES: ProviderType[] = ['openrouter', 'meta', 'gemini', 'openai'];
+const TYPES: ProviderType[] = ['meta', 'openrouter', 'gemini', 'openai', 'meta-llama'];
 
 export function SettingsModal({ settings, setSettings, onClose }: Props) {
   const [selId, setSelId] = useState<string | null>(settings.activeProviderId ?? settings.providers[0]?.id ?? null);
@@ -166,7 +166,7 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
               <ProviderEditor key={sel.id} provider={sel} settings={settings} setSettings={setSettings} onDeleted={() => setSelId(null)} />
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-[var(--ui-muted)]">
-                <p className="text-sm">{tr("Add a provider (OpenRouter, Meta Llama API, Gemini or any OpenAI-compatible API)")}</p>
+                <p className="text-sm">{tr("Add a provider (Meta Model API, OpenRouter, Gemini or any OpenAI-compatible API)")}</p>
                 <p className="text-xs">{tr("then paste your API key and click “Fetch models”.")}</p>
               </div>
             )}

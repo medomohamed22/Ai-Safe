@@ -13,7 +13,14 @@ export const PROVIDER_PRESETS: Record<
     hint: 'Hundreds of models incl. Meta Llama 4 vision. Vision-capable models are detected automatically.',
   },
   meta: {
-    label: 'Meta Llama API',
+    label: 'Meta Model API',
+    baseUrl: 'https://api.meta.ai/v1',
+    keyUrl: 'https://dev.meta.ai',
+    defaultProxy: true,
+    hint: 'Meta Model API on dev.meta.ai — Muse Spark, Muse Image and SAM 3.1 (OpenAI-compatible endpoint). Proxy is on by default in case the API blocks browser CORS.',
+  },
+  'meta-llama': {
+    label: 'Meta Llama API (legacy)',
     baseUrl: 'https://api.llama.com/compat/v1',
     keyUrl: 'https://llama.developer.meta.com',
     defaultProxy: true,
@@ -84,7 +91,7 @@ function openAIHeaders(p: ProviderConfig): Record<string, string> {
 function guessVision(type: ProviderType, id: string): boolean | undefined {
   const s = id.toLowerCase();
   if (type === 'gemini') return !/embedding|aqa|imagen|tts/.test(s);
-  if (/llama-4|vision|gpt-4o|gpt-4\.1|gpt-5|claude|gemini|pixtral|qwen.*vl|-vl/.test(s)) return true;
+  if (/muse-spark|llama-4|vision|gpt-4o|gpt-4\.1|gpt-5|claude|gemini|pixtral|qwen.*vl|-vl/.test(s)) return true;
   return undefined;
 }
 
@@ -109,6 +116,13 @@ export async function fetchModels(p: ProviderConfig): Promise<ModelInfo[]> {
   await ensureOk(res);
   const j = await res.json();
   const list: any[] = Array.isArray(j) ? j : j.data || j.models || [];
+  if (p.type === 'meta' && list.length === 0) {
+    // The Meta Model API model list can be empty for new keys; seed the known Muse chat models.
+    return [
+      { id: 'muse-spark-1.3', name: 'Muse Spark 1.3', vision: true },
+      { id: 'muse-spark-1.2', name: 'Muse Spark 1.2', vision: true },
+    ];
+  }
   return list
     .map((m: any) => {
       const id = String(m.id ?? m.name);
@@ -121,6 +135,8 @@ export async function fetchModels(p: ProviderConfig): Promise<ModelInfo[]> {
 }
 
 const PREFERRED = [
+  'muse-spark-1.3',
+  'muse-spark',
   'llama-4-maverick',
   'gemini-2.5-flash',
   'gemini-2.0-flash',
@@ -247,7 +263,7 @@ async function generateRaw(a: GenerateArgs): Promise<string> {
     return readResponse(res, a.onToken, a.onUsage);
   }
 
-  // OpenAI-compatible: OpenRouter, Meta Llama API (compat), OpenAI, Groq, ...
+  // OpenAI-compatible: Meta Model API, OpenRouter, Meta Llama API (legacy compat), OpenAI, Groq, ...
   const content: any[] = [{ type: 'text', text: a.userText }];
   for (const image of images) content.push({ type: 'image_url', image_url: { url: image } });
   const body: Record<string, unknown> = {
@@ -259,7 +275,7 @@ async function generateRaw(a: GenerateArgs): Promise<string> {
       { role: 'user', content: images.length ? content : a.userText },
     ],
   };
-  if (p.type !== 'meta') body.max_tokens = 12000;
+  if (p.type !== 'meta-llama') body.max_tokens = 12000;
 
   const res = await request(p, `${base}/chat/completions`, {
     method: 'POST',
