@@ -343,6 +343,56 @@ export async function generateImage(p: ProviderConfig, model: string, prompt: st
   }
 }
 
+/** Extracts the text lane from a Responses-shaped (or chat-shaped) payload. */
+function extractOutputText(j: any): string {
+  if (typeof j?.output_text === 'string') return j.output_text;
+  const parts: string[] = [];
+  for (const item of j?.output ?? []) {
+    for (const c of item?.content ?? []) if (typeof c?.text === 'string') parts.push(c.text);
+  }
+  if (parts.length) return parts.join('');
+  return deltaFrom(j);
+}
+
+/**
+ * Calls SAM 3.1 on the Meta Model API (Responses surface) and returns the raw
+ * output text, which carries the SAM 3 protocol segmentation tokens
+ * (<|box;...|> / <|mask;...|> records). Returns null for non-Meta providers or
+ * on any failure; callers fall back to vision-based segmentation. Never throws.
+ */
+export async function segmentImageSam(p: ProviderConfig, imageDataUrl: string, prompt: string, signal?: AbortSignal): Promise<string | null> {
+  if (p.type !== 'meta') return null;
+  let finish: ReturnType<typeof reserveRequest> | null = null;
+  try {
+    finish = reserveRequest('sam-3.1', p.id || p.type, 'segment', [imageDataUrl]);
+    const base = trimSlash(p.baseUrl);
+    const res = await request(p, `${base}/responses`, {
+      method: 'POST',
+      signal,
+      headers: openAIHeaders(p),
+      body: JSON.stringify({
+        model: 'sam-3.1',
+        input: [
+          {
+            role: 'user',
+            content: [
+              { type: 'input_text', text: prompt },
+              { type: 'input_image', image_url: imageDataUrl },
+            ],
+          },
+        ],
+      }),
+    });
+    await ensureOk(res);
+    const text = extractOutputText(await res.json());
+    finish?.(text ? 'done' : 'failed', '', { input: 0, output: 0 });
+    return text || null;
+  } catch {
+    try { finish?.('failed', '', { input: 0, output: 0 }); } catch { /* ledger already settled */ }
+    return null;
+  }
+}
+
 export async function generate(a: GenerateArgs): Promise<string> {
  if (a.signal.aborted) throw new DOMException('Aborted', 'AbortError');
  const finish = reserveRequest(a.model, a.provider.id || a.provider.type, a.temperature + '\n' + a.system + '\n' + a.userText, a.imageDataUrls ?? (a.imageDataUrl ? [a.imageDataUrl] : []));

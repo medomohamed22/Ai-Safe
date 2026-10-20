@@ -26,6 +26,7 @@ export interface AppSettings {
   activeModelId: string | null;
   autoSync: boolean;
   autoImages: boolean;
+  autoSegment: boolean;
   debounceMs: number;
   temperature: number;
 }

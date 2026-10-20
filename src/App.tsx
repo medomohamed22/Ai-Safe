@@ -12,6 +12,7 @@ import { libraryPrompt } from './lib/componentLibrary';
 import { planKey, planPrompt } from './lib/plans';
 import { createDemoProvider, generate } from './lib/providers';
 import { enhanceCodeWithImages } from './lib/imageGen';
+import { formatElementMap, segmentSketch, type SegmentOverlayData } from './lib/segment';
 import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
 import { PRESETS, type PresetKey } from './lib/presets';
@@ -133,6 +134,7 @@ function WorkspaceApp() {
   const [vIndex, setVIndex] = useState<number>(() => Math.min(initialScreen.vIndex, initialScreen.versions.length - 1));
   const [generating, setGenerating] = useState(false);
   const [stream, setStream] = useState('');
+  const [segmentOverlay, setSegmentOverlay] = useState<SegmentOverlayData | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [prompt, setPrompt] = useState(draft?.text || '');
@@ -281,6 +283,17 @@ function WorkspaceApp() {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    // Segmentation pre-pass: SAM 3.1 on Meta (vision fallback) -> element map for the prompt + overlay.
+    let segmentMap = '';
+    if (image && s.autoSegment && !opts.fixError) {
+      const seg = await segmentSketch(provider, s.activeModelId, image, ctrl.signal);
+      if (ctrl.signal.aborted || projectRef.current.activeId !== screenId) return;
+      if (seg && seg.boxes.length) {
+        segmentMap = formatElementMap(seg.boxes, seg.source);
+        setSegmentOverlay({ image, boxes: seg.boxes, source: seg.source });
+      }
+    }
+
     setMobilePane('preview');
     setGenerating(true);
     setStream('');
@@ -290,7 +303,7 @@ function WorkspaceApp() {
         provider,
         model: s.activeModelId,
         system: SYSTEM_PROMPT + libraryPrompt() + planPrompt(load(planKey(screenId), null)) + brandPrompt(brandRef.current) + lockPrompt(locksRef.current[screenId] || []),
-        userText: buildUserPrompt({ hasImage: !!image, currentCode: current, instruction: opts.instruction || (styleReference && !image ? 'Create an interface based on the attached style reference.' : undefined), fixError: opts.fixError }) + backendPrompt(backendRef.current) + (styleReference ? `\nIMAGE ROLES: ${image ? 'Image 1 is the wireframe and controls layout. Image 2' : 'Image 1'} is a visual style reference. ${styleReference.instruction}\nDo not render designer annotations as content. Saved brand identity takes precedence over conflicting reference colors.\n` : ''),
+        userText: buildUserPrompt({ hasImage: !!image, currentCode: current, instruction: opts.instruction || (styleReference && !image ? 'Create an interface based on the attached style reference.' : undefined), fixError: opts.fixError }) + backendPrompt(backendRef.current) + (styleReference ? `\nIMAGE ROLES: ${image ? 'Image 1 is the wireframe and controls layout. Image 2' : 'Image 1'} is a visual style reference. ${styleReference.instruction}\nDo not render designer annotations as content. Saved brand identity takes precedence over conflicting reference colors.\n` : '') + (segmentMap ? `\n${segmentMap}\n` : ''),
         imageDataUrls: [image, styleReference?.dataUrl].filter((value): value is string => !!value),
         temperature: s.temperature,
         signal: ctrl.signal,
@@ -565,6 +578,8 @@ function WorkspaceApp() {
             onOpenSettings={() => setShowSettings(true)}
             onCodeChange={code => { assertLockedElements(code, locksRef.current[project.activeId] || []); pushVersion(code); }}
             onElementRequest={(instruction) => runRef.current({ instruction })}
+            segmentOverlay={segmentOverlay}
+            onCloseSegments={() => setSegmentOverlay(null)}
           />
         </section>
       </main>
