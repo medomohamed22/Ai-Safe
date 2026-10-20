@@ -862,5 +862,6 @@
   "Meta Model API": "Meta Model API",
   "Meta Llama API (legacy)": "Meta Llama API (القديم)",
   "Meta Model API on dev.meta.ai — Muse Spark, Muse Image and SAM 3.1 (OpenAI-compatible endpoint). Proxy is on by default in case the API blocks browser CORS.": "واجهة Meta Model API على dev.meta.ai — نماذج Muse Spark وMuse Image وSAM 3.1 (نقطة اتصال متوافقة مع OpenAI). الوسيط مفعّل افتراضيًا تحسبًا لحجب طلبات المتصفح بسبب CORS.",
-  "Add a provider (Meta Model API, OpenRouter, Gemini or any OpenAI-compatible API)": "أضف مزوّدًا (Meta Model API أو OpenRouter أو Gemini أو أي API متوافق مع OpenAI)"
+  "Add a provider (Meta Model API, OpenRouter, Gemini or any OpenAI-compatible API)": "أضف مزوّدًا (Meta Model API أو OpenRouter أو Gemini أو أي API متوافق مع OpenAI)",
+  "Demo provider: generations run on the hosted demo key. Paste your own Meta Model API key above for unrestricted use.": "مزوّد تجريبي: تتم عمليات الإنشاء بمفتاح العرض التجريبي المستضاف. الصق مفتاح Meta Model API الخاص بك أعلاه للاستخدام بلا قيود."
 }
