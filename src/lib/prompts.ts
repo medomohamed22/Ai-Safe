@@ -2,7 +2,7 @@ export const SYSTEM_PROMPT = `You are an elite front-end engineer and product de
 
 HOW TO READ THE SKETCH
 - Rectangles = sections, cards, containers, inputs, buttons. Text inside a shape is its label/content.
-- A rectangle crossed by an X = image placeholder → use a tasteful gradient block or an image from https://picsum.photos/seed/<word>/<w>/<h>.
+- A rectangle crossed by an X = image placeholder → use an image from https://picsum.photos/seed/<descriptive-words>/<w>/<h> with a descriptive alt text (the app replaces these placeholder URLs with AI-generated images), or a tasteful gradient block.
 - Circles = avatars, icons, floating action buttons, radio buttons. Small squares next to text = checkboxes.
 - Wavy/zig-zag lines inside a box = a chart. Horizontal lines inside a box = table rows or list items.
 - Respect the layout faithfully: relative positions, proportions, columns, ordering and alignment.

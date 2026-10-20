@@ -11,6 +11,7 @@ import { suggestNextSteps } from './lib/next-steps';
 import { libraryPrompt } from './lib/componentLibrary';
 import { planKey, planPrompt } from './lib/plans';
 import { createDemoProvider, generate } from './lib/providers';
+import { enhanceCodeWithImages } from './lib/imageGen';
 import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
 import { PRESETS, type PresetKey } from './lib/presets';
@@ -299,7 +300,13 @@ function WorkspaceApp() {
       if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
       if (!c || c.length < 30) throw new Error('The model did not return any code. Try a stronger vision model.');
       assertLockedElements(c, locksRef.current[screenId] || []);
-      if (reviewEnabled) { setPendingChange({base:current,next:c,scope:screenId}); setShowProductivity(true); } else pushVersion(c);
+      let finalCode = c;
+      if (s.autoImages) {
+        // Replace placeholder images with AI-generated ones (graceful: failures keep the placeholder).
+        finalCode = await enhanceCodeWithImages(c, provider, ctrl.signal);
+        if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
+      }
+      if (reviewEnabled) { setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else pushVersion(finalCode);
       if (!reviewEnabled && autoQuality) setShowProductivity(true);
     } catch (e: any) {
       if (ctrl.signal.aborted) return;
