@@ -858,5 +858,9 @@
   "Zoom out": "تصغير",
   "Not generated yet": "لم تُنشأ بعد",
   "Current screen": "الشاشة الحالية",
-  "Drag to pan, scroll to zoom, and drag a card by its title bar to arrange it.": "اسحب للتحريك، ومرّر بعجلة الفأرة للتقريب، واسحب البطاقة من شريط عنوانها لترتيبها."
+  "Drag to pan, scroll to zoom, and drag a card by its title bar to arrange it.": "اسحب للتحريك، ومرّر بعجلة الفأرة للتقريب، واسحب البطاقة من شريط عنوانها لترتيبها.",
+  "Meta Model API": "Meta Model API",
+  "Meta Llama API (legacy)": "Meta Llama API (القديم)",
+  "Meta Model API on dev.meta.ai — Muse Spark, Muse Image and SAM 3.1 (OpenAI-compatible endpoint). Proxy is on by default in case the API blocks browser CORS.": "واجهة Meta Model API على dev.meta.ai — نماذج Muse Spark وMuse Image وSAM 3.1 (نقطة اتصال متوافقة مع OpenAI). الوسيط مفعّل افتراضيًا تحسبًا لحجب طلبات المتصفح بسبب CORS.",
+  "Add a provider (Meta Model API, OpenRouter, Gemini or any OpenAI-compatible API)": "أضف مزوّدًا (Meta Model API أو OpenRouter أو Gemini أو أي API متوافق مع OpenAI)"
 }

@@ -1,4 +1,4 @@
-export type ProviderType = 'openrouter' | 'meta' | 'gemini' | 'openai';
+export type ProviderType = 'openrouter' | 'meta' | 'meta-llama' | 'gemini' | 'openai';
 
 export interface ModelInfo {
   id: string;
