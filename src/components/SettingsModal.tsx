@@ -4,6 +4,7 @@ import { Check, Download, ExternalLink, Eye, EyeOff, Loader2, Plus, RefreshCw, S
 import type { AppSettings, ProviderConfig, ProviderType } from '../types';
 import { PROVIDER_PRESETS, createProvider, fetchModels, pickDefaultModel } from '../lib/providers';
 import { clearAll } from '../lib/storage';
+import { DEMO_DISMISSED_KEY } from '../lib/demo';
 
 interface Props {
   settings: AppSettings;
@@ -71,6 +72,7 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
                     <span className={`h-2 w-2 rounded-full ${p.apiKey ? 'bg-[var(--ui-selected)]' : 'bg-[var(--ui-selected)]'}`} />
                     <span className="flex-1 truncate">{p.name}</span>
                     {p.id === settings.activeProviderId && <span className="rounded bg-[var(--ui-selected)] px-1.5 text-[10px] text-[var(--ui-text)]">{tr("active")}</span>}
+                    {p.demo && <span className="rounded bg-[var(--ui-selected)] px-1.5 text-[10px] text-[var(--ui-text)]">{tr("Demo")}</span>}
                     <span className="text-[11px] text-[var(--ui-muted)]">{p.models.length || ''}</span>
                   </button>
                 ))}
@@ -203,6 +205,13 @@ function ProviderEditor({
   const selectModel = (modelId: string) => setSettings((s) => ({ ...s, activeProviderId: p.id, activeModelId: modelId }));
 
   const remove = () => {
+    if (p.demo) {
+      try {
+        localStorage.setItem(DEMO_DISMISSED_KEY, '1');
+      } catch {
+        /* Dismissal persistence is best-effort. */
+      }
+    }
     setSettings((s) => {
       const wasActive = s.activeProviderId === p.id;
       return {
@@ -255,6 +264,7 @@ function ProviderEditor({
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--ui-text)]">{tr(preset.label)}</div>
           <p className="mt-1 max-w-xl text-xs text-[var(--ui-muted)]">{tr(preset.hint)}</p>
+          {p.demo && <p className="mt-1 max-w-xl text-xs font-medium text-[var(--ui-text)]">{tr("Demo provider: generations run on the hosted demo key. Paste your own Meta Model API key above for unrestricted use.")}</p>}
         </div>
         {confirmRemove ? (
           <div className="flex items-center gap-2">

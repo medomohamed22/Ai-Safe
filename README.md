@@ -7,6 +7,14 @@ Draw a wireframe → get a live, interactive React + Tailwind UI in seconds.
 - **Renderer:** sandboxed iframe (Babel + import maps + Tailwind CDN) — supports `react`, `lucide-react`, `recharts`
 - **Local workspace:** provider settings, sketches and code history stay in your browser. GitHub tokens and backend tester tokens are kept in memory only.
 
+## Hosted demo mode (optional)
+
+A deployment can offer a no-key demo so visitors (and hackathon judges) can generate immediately:
+
+1. In Vercel → Project → Settings → Environment Variables, set `META_MODEL_API_KEY` to a Meta Model API key.
+2. Redeploy. The site detects demo mode via `/api/demo`, adds a **Meta Model API (Demo)** provider automatically on a visitor's first visit, and routes its requests through `/api/proxy`, which injects the key server-side for `api.meta.ai` requests only.
+3. Guardrails: demo requests are rate-limited per visitor (40 per 10 minutes, best effort per instance) on top of the in-app usage budgets, and a visitor's own key is never overridden. The key is never exposed to the browser. Remove the variable and redeploy to disable demo mode.
+
 ## Features (MVP)
 
 1. Split-screen workspace: canvas ↔ live preview / code tab (copy, download `.jsx` / `.html`)
