@@ -39,6 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   activeModelId: null,
   autoSync: false,
   autoImages: true,
+  autoSegment: true,
   debounceMs: 2000,
   temperature: 0.2,
 };

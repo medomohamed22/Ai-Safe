@@ -24,6 +24,7 @@ import { VisualEditor } from './VisualEditor';
 import { applyElementEdit, applyElementMove, describeElement, type ElementEdit } from '../lib/visualEdit';
 import { projectFiles, projectZip } from '../lib/projectExport';
 import type { BackendConfig } from '../lib/backend';
+import type { SegmentOverlayData } from '../lib/segment';
 import { backendBootstrap } from '../lib/backend';
 import { TestsPanel } from './TestsPanel';
 import { screenNavigation, type ScreenProject } from '../lib/screens';
@@ -52,6 +53,8 @@ interface Props {
   onOpenSettings: () => void;
   onCodeChange: (code: string) => void;
   onElementRequest: (instruction: string) => void;
+  segmentOverlay?: SegmentOverlayData | null;
+  onCloseSegments?: () => void;
 }
 
 type Device = 'desktop' | 'tablet' | 'mobile';
@@ -225,6 +228,24 @@ export function PreviewPane(p: Props) {
       {showTests && createPortal(<TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />, document.body)}
       {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}
       {showShare && createPortal(<SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />, document.body)}
+      {p.segmentOverlay && (
+        <div style={{ margin: '8px 12px', border: '1px solid var(--ui-border)', borderRadius: 12, padding: 10, background: 'var(--ui-surface)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <strong style={{ fontSize: 12 }}>{tr("Sketch elements")}</strong>
+            <span style={{ fontSize: 11, color: 'var(--ui-muted)' }}>{p.segmentOverlay.source === 'sam-3.1' ? tr("Segmented by SAM 3.1") : tr("Segmented by the vision model (SAM 3.1 unavailable)")}</span>
+            <span style={{ flex: 1 }} />
+            <button onClick={p.onCloseSegments} aria-label={tr("Close")} className="ui-icon">✕</button>
+          </div>
+          <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+            <img src={p.segmentOverlay.image} alt={tr("Sketch elements")} style={{ display: 'block', maxHeight: 220, maxWidth: '100%', borderRadius: 8 }} />
+            {p.segmentOverlay.boxes.map((b, i) => (
+              <span key={i} style={{ position: 'absolute', left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%`, border: '1.5px solid #e03131', borderRadius: 3, boxSizing: 'border-box', pointerEvents: 'none' }}>
+                <span style={{ position: 'absolute', top: -14, left: 0, fontSize: 9, lineHeight: '12px', background: '#e03131', color: '#fff', padding: '0 3px', borderRadius: 2, whiteSpace: 'nowrap' }}>{b.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="preview-workarea"><div className="preview-stage">
         <div className="preview-tab-content" ref={stageRef} hidden={tab !== 'preview'}>{p.code ? <div className={`preview-viewport${fitMode === 'actual' ? ' is-actual' : ''}`}><div className="preview-size-placeholder" style={{ width: designWidth * scale, height: designHeight * scale }}><div className="preview-document" style={{ width: designWidth, height: designHeight, transform: `scale(${scale})` }} data-device={device}><iframe ref={iframeRef} title={tr("Live preview")} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div></div></div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>{tr("React / JSX")}</span></div><pre>{p.code || '// ' + tr('Your code will appear here')}</pre></div>
         {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>{tr("Something needs a quick fix")}</strong><p>{tr(runtimeError)}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />{tr("Fix with AI")}</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label={tr("Dismiss runtime error")}>✕</button></div>}
