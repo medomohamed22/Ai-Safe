@@ -313,6 +313,36 @@ async function generateRaw(a: GenerateArgs): Promise<string> {
 }
 
 
+/**
+ * One image generation call on the provider's OpenAI-compatible images endpoint.
+ * Returns an image URL or a data URL, or null on any failure (callers fall back
+ * to the placeholder). Never throws: image enhancement must not break generation.
+ * Usage is reserved through the same budget ledger as chat requests.
+ */
+export async function generateImage(p: ProviderConfig, model: string, prompt: string, signal?: AbortSignal): Promise<string | null> {
+  if (p.type === 'gemini') return null; // Gemini's native image API is not OpenAI-shaped.
+  let finish: ReturnType<typeof reserveRequest> | null = null;
+  try {
+    finish = reserveRequest(model, p.id || p.type, 'image:' + prompt, []);
+    const base = trimSlash(p.baseUrl);
+    const res = await request(p, `${base}/images/generations`, {
+      method: 'POST',
+      signal,
+      headers: openAIHeaders(p),
+      body: JSON.stringify({ model, prompt, n: 1 }),
+    });
+    await ensureOk(res);
+    const j = await res.json();
+    const d = j?.data?.[0];
+    const out = typeof d?.url === 'string' ? d.url : typeof d?.b64_json === 'string' ? `data:image/png;base64,${d.b64_json}` : null;
+    finish?.(out ? 'done' : 'failed', '', { input: 0, output: 0 });
+    return out;
+  } catch {
+    try { finish?.('failed', '', { input: 0, output: 0 }); } catch { /* ledger already settled */ }
+    return null;
+  }
+}
+
 export async function generate(a: GenerateArgs): Promise<string> {
  if (a.signal.aborted) throw new DOMException('Aborted', 'AbortError');
  const finish = reserveRequest(a.model, a.provider.id || a.provider.type, a.temperature + '\n' + a.system + '\n' + a.userText, a.imageDataUrls ?? (a.imageDataUrl ? [a.imageDataUrl] : []));
