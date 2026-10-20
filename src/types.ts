@@ -15,6 +15,8 @@ export interface ProviderConfig {
   apiKey: string;
   baseUrl: string;
   useProxy: boolean;
+  /** Hosted demo provider: no local key; the deployment proxy injects a server-side key. */
+  demo?: boolean;
   models: ModelInfo[];
 }
 

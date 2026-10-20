@@ -55,11 +55,38 @@ export function createProvider(type: ProviderType): ProviderConfig {
   };
 }
 
+export const META_CHAT_MODELS: ModelInfo[] = [
+  { id: 'muse-spark-1.3', name: 'Muse Spark 1.3', vision: true },
+  { id: 'muse-spark-1.2', name: 'Muse Spark 1.2', vision: true },
+];
+
+/** Provider backed by the hosted demo key (see api/demo.js); carries no local key. */
+export function createDemoProvider(): ProviderConfig {
+  const preset = PROVIDER_PRESETS.meta;
+  return {
+    id: crypto.randomUUID(),
+    type: 'meta',
+    name: 'Meta Model API (Demo)',
+    apiKey: '',
+    baseUrl: preset.baseUrl,
+    useProxy: true,
+    demo: true,
+    models: META_CHAT_MODELS.map((m) => ({ ...m })),
+  };
+}
+
 const trimSlash = (s: string) => s.replace(/\/+$/, '');
 
 function request(p: ProviderConfig, url: string, init: RequestInit = {}) {
   const final = p.useProxy ? `/api/proxy?url=${encodeURIComponent(url)}` : url;
-  return fetch(final, init).catch((e) => {
+  let finalInit = init;
+  if (p.demo && !p.apiKey && p.useProxy) {
+    // Flag the request so the deployment proxy injects the server-side demo key.
+    const headers = new Headers(init.headers);
+    headers.set('x-s2ui-demo', '1');
+    finalInit = { ...init, headers };
+  }
+  return fetch(final, finalInit).catch((e) => {
     throw new Error(
       `Network/CORS error calling ${new URL(url).host}. ${p.useProxy ? '' : 'Try enabling "Use proxy" for this provider in Settings. '}(${e?.message || e})`,
     );
@@ -97,6 +124,7 @@ function guessVision(type: ProviderType, id: string): boolean | undefined {
 
 export async function fetchModels(p: ProviderConfig): Promise<ModelInfo[]> {
   const base = trimSlash(p.baseUrl);
+  if (p.demo) return META_CHAT_MODELS.map((m) => ({ ...m }));
   if (!p.apiKey && p.type !== 'openrouter') throw new Error('Add an API key first.');
 
   if (p.type === 'gemini') {
@@ -118,10 +146,7 @@ export async function fetchModels(p: ProviderConfig): Promise<ModelInfo[]> {
   const list: any[] = Array.isArray(j) ? j : j.data || j.models || [];
   if (p.type === 'meta' && list.length === 0) {
     // The Meta Model API model list can be empty for new keys; seed the known Muse chat models.
-    return [
-      { id: 'muse-spark-1.3', name: 'Muse Spark 1.3', vision: true },
-      { id: 'muse-spark-1.2', name: 'Muse Spark 1.2', vision: true },
-    ];
+    return META_CHAT_MODELS.map((m) => ({ ...m }));
   }
   return list
     .map((m: any) => {

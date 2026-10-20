@@ -10,7 +10,8 @@ import { KEYS, load, loadSettings, save } from './lib/storage';
 import { suggestNextSteps } from './lib/next-steps';
 import { libraryPrompt } from './lib/componentLibrary';
 import { planKey, planPrompt } from './lib/plans';
-import { generate } from './lib/providers';
+import { createDemoProvider, generate } from './lib/providers';
+import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
 import { PRESETS, type PresetKey } from './lib/presets';
 import { ModelPicker } from './components/ModelPicker';
@@ -189,6 +190,37 @@ function WorkspaceApp() {
   const sigRef = useRef<string>(sigOf(initialData.elements));
 
   useEffect(() => save(KEYS.settings, settings), [settings]);
+  // Hosted demo mode: on a first visit, if this deployment offers a demo key,
+  // add the demo provider so visitors can generate without their own API key.
+  useEffect(() => {
+    let cancelled = false;
+    try {
+      if (localStorage.getItem(DEMO_CHECKED_KEY) || localStorage.getItem(DEMO_DISMISSED_KEY)) return;
+      localStorage.setItem(DEMO_CHECKED_KEY, '1');
+    } catch {
+      return;
+    }
+    fetchDemoStatus()
+      .then((d) => {
+        if (cancelled || !d.demo) return;
+        setSettings((s) => {
+          if (s.providers.some((p) => p.demo)) return s;
+          const provider = createDemoProvider();
+          const activate = !s.activeProviderId;
+          return {
+            ...s,
+            providers: [...s.providers, provider],
+            activeProviderId: activate ? provider.id : s.activeProviderId,
+            activeModelId: activate ? d.model : s.activeModelId,
+          };
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     save(KEYS.versions, versions);
     save(KEYS.vIndex, vIndex);
