@@ -2,7 +2,7 @@ import { tr } from '../lib/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AlertTriangle,
+  AlertTriangle, Maximize2, Minimize2, MoreHorizontal, Eye,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -55,13 +55,20 @@ interface Props {
 }
 
 type Device = 'desktop' | 'tablet' | 'mobile';
-const WIDTH: Record<Device, string> = { desktop: '100%', tablet: '820px', mobile: '390px' };
+const WIDTH: Record<Device, number> = { desktop: 1280, tablet: 820, mobile: 390 };
+const HEIGHT: Record<Device, number> = { desktop: 800, tablet: 900, mobile: 844 };
 
 export function PreviewPane(p: Props) {
   const [libraryRevision, setLibraryRevision] = useState(0);
   useEffect(() => { const update = () => setLibraryRevision(v => v + 1); window.addEventListener('s2ui-library-change', update); return () => window.removeEventListener('s2ui-library-change', update); }, []);
   const [tab, setTab] = useState<'preview' | 'code'>('preview');
   const [device, setDevice] = useState<Device>('desktop');
+  const [fitMode, setFitMode] = useState<'fit' | 'actual'>('fit');
+  const [fullScreen, setFullScreen] = useState(false);
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showGenerationDetails, setShowGenerationDetails] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -78,6 +85,27 @@ export function PreviewPane(p: Props) {
   editingRef.current = editing;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const streamRef = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    const node = stageRef.current;
+    if (!node) return;
+    const update = () => setStageSize({ width: node.clientWidth, height: node.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [tab, fullScreen]);
+  useEffect(() => {
+    if (!fullScreen) return;
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setFullScreen(false); };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [fullScreen]);
+  const designWidth = device === 'desktop' ? Math.max(960, stageSize.width - 36) : WIDTH[device];
+  const designHeight = HEIGHT[device];
+  const fitScale = stageSize.width > 0 && stageSize.height > 0
+    ? Math.min(1, (stageSize.width - 36) / designWidth, (stageSize.height - 36) / designHeight)
+    : 1;
+  const scale = fitMode === 'fit' ? Math.max(0.1, fitScale) : 1;
 
   const token = useMemo(() => crypto.randomUUID(), [p.code]);
   const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token }, p.backend) : ''), [p.code, token, p.backend, libraryRevision]);
@@ -151,20 +179,24 @@ export function PreviewPane(p: Props) {
   };
 
   return (
-    <div className="preview-pane" onClick={e => { if (exportMenuRef.current?.open && !exportMenuRef.current.contains(e.target as Node)) exportMenuRef.current.removeAttribute('open'); }}>
+    <div className={`preview-pane${fullScreen ? ' preview-fullscreen' : ''}`} onClick={e => { if (exportMenuRef.current?.open && !exportMenuRef.current.contains(e.target as Node)) exportMenuRef.current.removeAttribute('open'); }}>
       <div className="panel-heading preview-heading"><span className="panel-number">02</span><strong>{tr("Preview")}</strong><span className="panel-caption">{p.code ? tr("Your idea, brought to life") : tr("A blank page, full of possibility")}</span>
         {p.versionCount > 0 && <div className="version-control"><button onClick={p.onPrev} disabled={p.versionIndex <= 0} className="ui-icon" title={tr("Previous version")} aria-label={tr("Previous version")}><ChevronLeft size={13} /></button><span>v{p.versionIndex + 1}<span className="version-total">/{p.versionCount}</span></span><button onClick={p.onNext} disabled={p.versionIndex >= p.versionCount - 1} className="ui-icon" title={tr("Next version")} aria-label={tr("Next version")}><ChevronRight size={13} /></button></div>}
       </div>
       <div className="preview-viewbar">
         <div className="segmented" aria-label={tr("Preview display")}><button onClick={() => setTab('preview')} aria-pressed={tab === 'preview'}><MonitorPlay size={13} />{tr("Preview")}</button><button onClick={() => setTab('code')} aria-pressed={tab === 'code'}><Code2 size={13} />{tr("Code")}</button></div>
         {tab === 'preview' && !!p.code && <div className="segmented device-switch" aria-label={tr("Preview device")}>{([['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const).map(([d, Icon]) => <button key={d} onClick={() => setDevice(d)} title={tr(d)} aria-label={tr(d)} aria-pressed={device === d}><Icon size={13} /></button>)}</div>}
-        <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : device === 'desktop' ? tr("Fit to workspace") : WIDTH[device]}</span>
+        {tab === 'preview' && !!p.code && <div className="preview-viewport-tools">
+          <button className="ui-icon" onClick={() => setFitMode(mode => mode === 'fit' ? 'actual' : 'fit')} title={fitMode === 'fit' ? 'Show actual size with scrolling' : 'Fit the entire viewport'} aria-label={fitMode === 'fit' ? 'Actual size' : 'Fit to screen'} aria-pressed={fitMode === 'fit'}><Eye size={16}/><span className="preview-tool-text">{fitMode === 'fit' ? 'Fit' : '100%'}</span></button>
+          <button className="ui-icon" onClick={() => setFullScreen(v => !v)} title={fullScreen ? 'Exit fullscreen (Esc)' : 'Expand preview'} aria-label={fullScreen ? 'Exit fullscreen' : 'Expand preview'}>{fullScreen ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}</button>
+        </div>}
+        <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : `${device === 'desktop' ? 'Desktop' : device === 'tablet' ? 'Tablet' : 'Mobile'} · ${Math.round(scale * 100)}%`}</span>
       </div>
       {!!p.code && <div className="preview-actions" aria-label={tr("Preview actions")}>
         <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select" title={p.generating ? tr("Wait for the current generation to finish") : tab !== 'preview' ? tr("Switch to the Preview tab to select elements") : tr("Select element")}><MousePointer2 size={13} /><span>{tr("Select element")}</span></button>
-        <button disabled={!p.code || p.generating} onClick={() => setShowTests(true)} className="ui-icon" aria-label={tr("Test UI")} title={p.generating ? tr("Wait for the current generation to finish") : tr("Test UI")}><FlaskConical size={15} /></button>
+
         <span className="actions-spacer" />
-        <button disabled={!p.code || p.generating || !Object.keys(exportFiles).length} onClick={() => setShowShare(true)} className="ui-button" aria-label={tr("Share / review")} title={p.generating ? tr("Wait for the current generation to finish") : tr("Share / review")}><Share2 size={15} /><span>{tr("Share")}</span></button>
+
         <details ref={exportMenuRef} className="export-menu" onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); exportMenuRef.current?.removeAttribute('open'); exportMenuRef.current?.querySelector('summary')?.focus(); } }}>
           <summary className="ui-button" aria-label={tr("Export options")}><Download size={15} /><span>{tr("Export")}</span><ChevronRight size={12} /></summary>
           <div className="export-dropdown" aria-label={tr("Export options")} onClick={e => { if ((e.target as HTMLElement).closest('button:not(:disabled)')) exportMenuRef.current?.removeAttribute('open'); }}>
@@ -177,6 +209,13 @@ export function PreviewPane(p: Props) {
             <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} aria-label={tr(".html")}><Code2 size={16} /><span>{tr("Standalone HTML")}</span></button>
           </div>
         </details>
+        <div className="preview-more-wrap">
+          <button className="ui-icon" onClick={() => setShowAdvanced(v => !v)} aria-expanded={showAdvanced} aria-label="More preview tools" title="More tools"><MoreHorizontal size={18}/></button>
+          {showAdvanced && <div className="preview-more-menu">
+            <button disabled={p.generating} onClick={() => {setShowTests(true);setShowAdvanced(false);}}><FlaskConical size={15}/>{tr('Test UI')}</button>
+            <button disabled={p.generating || !Object.keys(exportFiles).length} onClick={() => {setShowShare(true);setShowAdvanced(false);}}><Share2 size={15}/>{tr('Share')}</button>
+          </div>}
+        </div>
       </div>}
       {editing && tab === 'preview' && selected === null && <p className="selection-hint"><MousePointer2 size={13} />{tr("Select anything in the preview to edit its properties.")}</p>}
       {!!p.locks.length && <details className="locks-list"><summary>{tr("Locked elements (")}{p.locks.length}{tr(") — protected in saved JSX")}</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>{tr("Unlock")}</button></div>)}</details>}
@@ -187,9 +226,21 @@ export function PreviewPane(p: Props) {
       {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}
       {showShare && createPortal(<SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />, document.body)}
       <div className="preview-workarea"><div className="preview-stage">
-        <div className="preview-tab-content" hidden={tab !== 'preview'}>{p.code ? <div className="preview-document" style={{ width: WIDTH[device] }} data-device={device}><iframe ref={iframeRef} title={tr("Live preview")} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>{tr("React / JSX")}</span></div><pre>{p.code || '// ' + tr('Your code will appear here')}</pre></div>
+        <div className="preview-tab-content" ref={stageRef} hidden={tab !== 'preview'}>{p.code ? <div className={`preview-viewport${fitMode === 'actual' ? ' is-actual' : ''}`}><div className="preview-size-placeholder" style={{ width: designWidth * scale, height: designHeight * scale }}><div className="preview-document" style={{ width: designWidth, height: designHeight, transform: `scale(${scale})` }} data-device={device}><iframe ref={iframeRef} title={tr("Live preview")} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div></div></div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>{tr("React / JSX")}</span></div><pre>{p.code || '// ' + tr('Your code will appear here')}</pre></div>
         {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>{tr("Something needs a quick fix")}</strong><p>{tr(runtimeError)}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />{tr("Fix with AI")}</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label={tr("Dismiss runtime error")}>✕</button></div>}
-        {p.generating && <div className="generation-overlay"><div className="generation-heading"><span className="generation-icon"><Sparkles size={20} /></span><div><strong>{tr("Bringing your idea to life")}</strong><p>{tr("Generating with ")}{p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11} />{tr("Stop")}</button></div><div className="generation-progress"><span /></div><pre ref={streamRef} className="generation-code">{p.stream.slice(-6000) || tr("Reading your sketch and shaping the interface…")}<span className="generation-cursor" /></pre><span className="generation-caption">{p.stream.length ? p.stream.length.toLocaleString() + ' characters generated' : tr("Good things start with a rough idea.")}</span></div>}
+        {p.generating && <div className="generation-overlay" role="status" aria-live="polite">
+          <div className="generation-heading"><span className="generation-icon"><Sparkles size={20}/></span><div><strong>{tr("Bringing your idea to life")}</strong><p>{tr("Generating with ")}{p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11}/>{tr("Stop")}</button></div>
+          <div className="generation-center">
+            <div className="generation-art" aria-hidden="true"><div className="generation-art-sketch"><span/><span/><span/></div><Sparkles className="generation-art-spark" size={24}/><div className="generation-art-page"><span/><span/><span/><span/></div></div>
+            <strong>{p.stream.length ? 'Building your interface' : 'Understanding your sketch'}</strong>
+            <p>{p.stream.length ? 'Creating components and interactions…' : 'Preparing a beautiful, working preview…'}</p>
+            <div className="generation-progress"><span/></div>
+            <div className="generation-steps"><span className="is-active">01 · Analyze</span><span className={p.stream.length ? 'is-active' : ''}>02 · Generate</span><span>03 · Preview</span></div>
+            <button className="generation-details-toggle" onClick={() => setShowGenerationDetails(v => !v)} aria-expanded={showGenerationDetails}>{showGenerationDetails ? 'Hide code details' : 'View code details'} <Code2 size={13}/></button>
+            {showGenerationDetails && <pre ref={streamRef} className="generation-code">{p.stream.slice(-3000) || 'Waiting for model output…'}</pre>}
+          </div>
+          <span className="generation-caption">{p.stream.length ? p.stream.length.toLocaleString() + ' characters received' : 'Your project is being created'}</span>
+        </div>}
       </div>
       {directError && tab === 'preview' && <p role="alert" className="direct-error">{tr(directError)}</p>}
       {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />}
