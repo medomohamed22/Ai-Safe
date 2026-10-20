@@ -7,6 +7,7 @@ export const config = { runtime: 'edge' };
 
 // Only these hosts can be reached through the proxy (prevents an open proxy).
 const ALLOWED_HOSTS = [
+  'api.meta.ai',
   'openrouter.ai',
   'api.llama.com',
   'generativelanguage.googleapis.com',
@@ -18,7 +19,7 @@ const ALLOWED_HOSTS = [
   'api.figma.com',
 ];
 
-const FORWARD_HEADERS = ['authorization', 'content-type', 'accept', 'x-goog-api-key', 'http-referer', 'x-title', 'x-figma-token'];
+const FORWARD_HEADERS = ['authorization', 'content-type', 'accept', 'x-goog-api-key', 'http-referer', 'x-title', 'x-figma-token', 'x-s2ui-demo'];
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -31,6 +32,20 @@ function json(status, message) {
     status,
     headers: { 'content-type': 'application/json', ...CORS },
   });
+}
+
+// Hosted demo mode (best-effort, per-instance): flagged demo requests are
+// limited per visitor IP so a shared demo key cannot be drained by one visitor.
+const DEMO_WINDOW_MS = 10 * 60 * 1000;
+const DEMO_MAX = 40;
+const demoHits = new Map();
+function demoSlot(ip) {
+  const now = Date.now();
+  const hits = (demoHits.get(ip) || []).filter((t) => now - t < DEMO_WINDOW_MS);
+  if (hits.length >= DEMO_MAX) { demoHits.set(ip, hits); return false; }
+  hits.push(now);
+  demoHits.set(ip, hits);
+  return true;
 }
 
 export default async function handler(req) {
@@ -52,6 +67,17 @@ export default async function handler(req) {
   for (const k of FORWARD_HEADERS) {
     const v = req.headers.get(k);
     if (v) headers.set(k, v);
+  }
+
+  // Demo key injection: only for flagged demo requests to api.meta.ai, only
+  // when the visitor sent no key of their own, and only when the deployment
+  // owner configured META_MODEL_API_KEY. The key never reaches the browser.
+  if (req.headers.get('x-s2ui-demo') === '1' && target.hostname === 'api.meta.ai' && !headers.has('authorization')) {
+    const demoKey = process.env.META_MODEL_API_KEY;
+    if (!demoKey) return json(503, 'Demo mode is not enabled on this deployment. Add your own Meta Model API key in Settings.');
+    const ip = (req.headers.get('x-forwarded-for') || 'unknown').split(',')[0].trim();
+    if (!demoSlot(ip)) return json(429, 'Demo rate limit reached for now. Add your own Meta Model API key in Settings for unrestricted use.');
+    headers.set('authorization', `Bearer ${demoKey}`);
   }
 
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
