@@ -29,6 +29,7 @@ import { brandPrompt, DEFAULT_BRAND, type Brand } from './lib/brand';
 import { ReferencePanel, type ReferenceImage } from './components/ReferencePanel';
 import { AlternativesPanel, type DesignAlternative } from './components/AlternativesPanel';
 import { ReviewPage } from './components/ReviewPage';
+import { PublishedApp } from './components/PublishedApp';
 import { assertLockedElements, lockPrompt } from './lib/visualEdit';
 import { ThemeToggle, useTheme } from './components/ThemeProvider';
 import { useWorkspaceAutosave } from './lib/useWorkspaceAutosave';
@@ -66,7 +67,8 @@ export default function App() {
   useLanguage();
   useDialogAccessibility();
   const [review] = useState(() => location.hash.startsWith('#review=') ? location.hash.slice(8) : null);
-  return review ? <ReviewPage encoded={review} /> : <WorkspaceApp />;
+  const [published] = useState(() => location.hash.startsWith('#app=') ? location.hash.slice(5) : null);
+  return review ? <ReviewPage encoded={review} /> : published ? <PublishedApp encoded={published} /> : <WorkspaceApp />;
 }
 
 function WorkspaceApp() {
