@@ -868,5 +868,18 @@
   "Segment sketch before generation": "تقطيع الرسم إلى عناصر قبل الإنشاء",
   "Sketch elements": "عناصر الرسم",
   "Segmented by SAM 3.1": "تم التقطيع بواسطة SAM 3.1",
-  "Segmented by the vision model (SAM 3.1 unavailable)": "تم التقطيع بواسطة نموذج الرؤية (SAM 3.1 غير متاح)"
+  "Segmented by the vision model (SAM 3.1 unavailable)": "تم التقطيع بواسطة نموذج الرؤية (SAM 3.1 غير متاح)",
+  "Publish": "نشر",
+  "Publish app": "نشر التطبيق",
+  "Create publish link": "إنشاء رابط النشر",
+  "Open published app": "فتح التطبيق المنشور",
+  "Publish link": "رابط النشر",
+  "Publish puts the current app on a shareable link that opens it full-screen - no editor, no settings, no API keys. The link contains a compressed snapshot of the app, like a review link.": "يضع النشر التطبيق الحالي على رابط قابل للمشاركة يفتحه بملء الشاشة — بدون محرر أو إعدادات أو مفاتيح API. يحتوي الرابط على لقطة مضغوطة من التطبيق، مثل رابط المراجعة.",
+  "QR code for the published app": "رمز QR للتطبيق المنشور",
+  "Scan to open the app": "امسح لفتح التطبيق",
+  "This link is too long for a QR code.": "هذا الرابط أطول من أن يسعه رمز QR.",
+  "Published with Sketch2UI": "نُشر بواسطة Sketch2UI",
+  "Create your own": "أنشئ تطبيقك",
+  "Loading app…": "جارٍ تحميل التطبيق…",
+  "Unable to open this published app.": "تعذر فتح هذا التطبيق المنشور."
 }

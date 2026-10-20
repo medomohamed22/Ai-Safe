@@ -15,7 +15,7 @@ import {
   Smartphone,
   Square,
   Tablet,
-  Plus, Wand2, MousePointer2, Github, Share2, FlaskConical, FileCode2, Sparkles, ArrowUpRight,
+  Plus, Wand2, MousePointer2, Github, Share2, FlaskConical, FileCode2, Sparkles, ArrowUpRight, Rocket,
 } from 'lucide-react';
 import { materializeAssets } from '../lib/designAssets';
 import { materializeLibrary } from '../lib/componentLibrary';
@@ -30,6 +30,7 @@ import { TestsPanel } from './TestsPanel';
 import { screenNavigation, type ScreenProject } from '../lib/screens';
 import { GitHubPanel } from './GitHubPanel';
 import { SharePanel } from './SharePanel';
+import { PublishPanel } from './PublishPanel';
 
 interface Props {
   locks: string[];
@@ -82,6 +83,7 @@ export function PreviewPane(p: Props) {
   const [showTests, setShowTests] = useState(false);
   const [showGitHub, setShowGitHub] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
   const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const exportFiles = useMemo(() => { try { return projectFiles(p.code, p.backend, p.project); } catch { return {}; } }, [p.code, p.backend, p.project, libraryRevision]);
   const editingRef = useRef(editing);
@@ -217,6 +219,7 @@ export function PreviewPane(p: Props) {
           {showAdvanced && <div className="preview-more-menu">
             <button disabled={p.generating} onClick={() => {setShowTests(true);setShowAdvanced(false);}}><FlaskConical size={15}/>{tr('Test UI')}</button>
             <button disabled={p.generating || !Object.keys(exportFiles).length} onClick={() => {setShowShare(true);setShowAdvanced(false);}}><Share2 size={15}/>{tr('Share')}</button>
+            <button disabled={p.generating || !p.code} onClick={() => {setShowPublish(true);setShowAdvanced(false);}}><Rocket size={15}/>{tr('Publish')}</button>
           </div>}
         </div>
       </div>}
@@ -227,6 +230,7 @@ export function PreviewPane(p: Props) {
       {!!screenNavigation(p.project).length && <nav aria-label={tr("Screen navigation")} className="screen-navigation">{screenNavigation(p.project).map((link, i) => <button key={i} className="ui-button" onClick={() => p.onNavigate(link.id)}>{link.label}<ArrowUpRight size={12} /></button>)}</nav>}
       {showTests && createPortal(<TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />, document.body)}
       {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}
+      {showPublish && createPortal(<PublishPanel project={p.project} backend={p.backend} onClose={() => setShowPublish(false)} />, document.body)}
       {showShare && createPortal(<SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />, document.body)}
       {p.segmentOverlay && (
         <div style={{ margin: '8px 12px', border: '1px solid var(--ui-border)', borderRadius: 12, padding: 10, background: 'var(--ui-surface)' }}>
