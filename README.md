@@ -1,11 +1,25 @@
 # ✏️ Sketch2UI — Live Sketch-to-UI Engine
 
-Draw a wireframe → get a live, interactive React + Tailwind UI in seconds.
+**Draw a wireframe → get a live, interactive React + Tailwind UI in seconds.**
 
+Built for the **Meta Global AI Developer Hackathon** (Indie track) on the **Meta Model API**. One sketch runs through three Meta model families in a single, visible pipeline:
+
+1. **SAM 3.1 — segmentation pre-pass.** The sketch is segmented first; the resulting element map (shown as a labelled box overlay on your sketch) is fed into the generation prompt so the layout is placed faithfully. If SAM is unavailable, the app falls back to the vision model for the map — and the overlay honestly labels which engine ran.
+2. **Muse Spark 1.3 — vision + code generation.** It reads the sketch, your annotations (red notes and arrows act as instructions) and the element map, then writes a working React + Tailwind app that renders live in a sandboxed preview. Iterate in words; the current code is sent along so the model *updates* instead of rebuilding.
+3. **Muse Image 1.0 — real assets.** Image placeholders in the generated UI are replaced automatically with AI-generated images (provider-generic; Muse Image on Meta).
+
+When the app looks right, **Publish** puts it on a shareable full-screen link (`#app=…`) with a QR code — visitors see only the app: no editor, no settings, no API keys.
+
+- **Live demo:** https://ai-check-blond.vercel.app/ — bring your own key, or see *Hosted demo mode* below.
 - **Canvas:** Excalidraw (MIT)
-- **Brain:** Meta Model API (Muse Spark) first — or any vision LLM via OpenRouter, Google Gemini, Meta Llama API (legacy), or any OpenAI-compatible API
 - **Renderer:** sandboxed iframe (Babel + import maps + Tailwind CDN) — supports `react`, `lucide-react`, `recharts`
+- **Providers:** Meta Model API (Muse Spark) first — or any vision LLM via OpenRouter, Google Gemini, Meta Llama API (legacy), or any OpenAI-compatible API
+- **Interface:** full English / Arabic (RTL) — and it generates Arabic UIs, not just English ones.
 - **Local workspace:** provider settings, sketches and code history stay in your browser. GitHub tokens and backend tester tokens are kept in memory only.
+
+## Demo
+
+> 📹 **Demo video & screenshots — placeholder, coming soon.** A short walkthrough (paper sketch → photo → working app, with the SAM overlay and Muse Image assets) will be linked here.
 
 ## Hosted demo mode (optional)
 
@@ -23,6 +37,7 @@ A deployment can offer a no-key demo so visitors (and hackathon judges) can gene
 4. Annotation recognition: red notes + arrows act as instructions to the model
 5. Live Sync (debounced auto-generate), streaming output, version history, “Fix with AI” for runtime errors
 6. Multi-provider settings: add API keys, fetch the model list, search by model name, filter to vision models
+7. Meta pipeline: SAM 3.1 segmentation pre-pass with overlay, automatic Muse Image asset generation, one-click Publish (full-screen `#app=` link + QR code), optional hosted demo mode
 
 ## Workspace tools
 
@@ -136,13 +151,14 @@ these settings under **Settings → Build and Deployment**.
 3. Deploy. No environment variables are needed.
 
 `api/proxy.js` deploys automatically as an Edge Function. It's an optional, stateless CORS
-pass-through, used only when **“Use proxy”** is turned on for a provider (on by default for Meta Llama API).
+pass-through, used only when **“Use proxy”** is turned on for a provider (on by default for the Meta Model API). It also powers hosted demo mode (see above).
 It only forwards to the hosts in its `ALLOWED_HOSTS` list. Edit that list if you add a custom endpoint.
 
 ## Recommended models
 
 | Provider | Model |
 | --- | --- |
+| Meta Model API | `muse-spark-1.3` (chat/vision) · `muse-image-1.0` (images) · `sam-3.1` (segmentation) |
 | Meta Llama API | `Llama-4-Maverick-17B-128E-Instruct-FP8` |
 | OpenRouter | `meta-llama/llama-4-maverick`, `google/gemini-2.5-flash` |
 | Gemini | `gemini-2.5-flash` / `gemini-2.5-pro` |
