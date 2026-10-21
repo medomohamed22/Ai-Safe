@@ -1,7 +1,7 @@
 import { tr, screenLabel } from './lib/i18n';
 import {useLanguage} from './components/LanguageToggle';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Excalidraw, convertToExcalidrawElements, exportToBlob } from '@excalidraw/excalidraw';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// Excalidraw loads lazily with the studio canvas (item 18): no static import here.
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Settings, ShoppingBag, Smartphone, Sparkles, Zap, Layers, Palette, Image as ImageIcon, Cable, Columns2, PenTool, ChevronRight, Plus, ArrowUp, Command }  from 'lucide-react';
 
@@ -22,7 +22,8 @@ import { PreviewPane } from './components/PreviewPane';
 import { BackendPanel } from './components/BackendPanel';
 import { backendPrompt, DEFAULT_BACKEND, type BackendConfig } from './lib/backend';
 import { ScreensPanel } from './components/ScreensPanel';
-import { ScreenMap } from './components/ScreenMap';
+const ScreenMap = lazy(() => import('./components/ScreenMap').then(m => ({ default: m.ScreenMap })));
+const SketchCanvas = lazy(() => import('./components/SketchCanvas'));
 import type { ScreenProject } from './lib/screens';
 import { BrandPanel } from './components/BrandPanel';
 import { brandPrompt, DEFAULT_BRAND, type Brand } from './lib/brand';
@@ -74,6 +75,8 @@ export default function App() {
 function WorkspaceApp() {
   const language=useLanguage();
   const [home, setHome] = useState(() => location.hash !== '#studio');
+  const [enteredStudio, setEnteredStudio] = useState(() => location.hash === '#studio');
+  useEffect(() => { if (!home) setEnteredStudio(true); }, [home ]);
   const [starting, setStarting] = useState(false);
   const [draft] = useState<{text:string;reference:boolean;preset?:PresetKey}|null>(() => { try { return JSON.parse(sessionStorage.getItem('s2ui.start-draft') || 'null'); } catch { return null; } });
   const enteredDraft = useRef(false);
@@ -250,6 +253,7 @@ function WorkspaceApp() {
     if (!a) return null;
     const elements = a.getSceneElements().filter((e) => !e.isDeleted);
     if (!elements.length) return null;
+    const { exportToBlob } = await import('@excalidraw/excalidraw');
     const blob = await exportToBlob({
       elements,
       appState: { ...a.getAppState(), exportBackground: true, viewBackgroundColor: '#ffffff', exportWithDarkMode: false },
@@ -465,9 +469,10 @@ function WorkspaceApp() {
     }
   }, []);
 
-  const loadPreset = (key: PresetKey) => {
+  const loadPreset = async (key: PresetKey) => {
     const a = apiRef.current;
     if (!a) return;
+    const { convertToExcalidrawElements } = await import('@excalidraw/excalidraw');
     const els = convertToExcalidrawElements(PRESETS[key].elements as any, { regenerateIds: true });
     a.updateScene({ elements: els });
     a.scrollToContent(els, { fitToContent: true, animate: true });
@@ -563,14 +568,17 @@ function WorkspaceApp() {
           <div className="panel-heading"><span className="panel-number">01</span><strong>{tr("Sketch")}</strong><span className="panel-caption">{tr("Start with a rough idea")}</span><button onClick={clearCanvas} className="ui-icon" aria-label={tr("Clear sketch")} title={tr("Clear sketch")}><Eraser size={16} /></button></div>
           <div className="preset-strip"><span>{tr("Start with")}</span>{(Object.keys(PRESETS) as PresetKey[]).map(k => { const Icon = PRESET_ICONS[k]; return <button key={k} onClick={() => loadPreset(k)} disabled={!api} className="preset-pill"><Icon size={13} />{tr(PRESETS[k].label)}</button>; })}</div>
           <div className="drawing-surface">
-            <Excalidraw
-              langCode={language==='ar'?'ar-SA':'en'}
-              excalidrawAPI={(a) => setApi(a)}
-              initialData={initialData}
-              onChange={onChange}
-              theme={theme as 'light' | 'dark'}
-              UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: false, toggleTheme: false } }}
-            />
+            {!enteredStudio && <div className="canvas-loading">{tr("Loading canvas…")}</div>}
+            {enteredStudio && <Suspense fallback={<div className="canvas-loading">{tr("Loading canvas…")}</div>}>
+              <SketchCanvas
+                langCode={language==='ar'?'ar-SA':'en'}
+                excalidrawAPI={(a) => setApi(a)}
+                initialData={initialData}
+                onChange={onChange}
+                theme={theme as 'light' | 'dark'}
+                UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: false, toggleTheme: false } }}
+              />
+            </Suspense>}
           </div>
           <div className="panel-footnote"><span className="status-dot" />{tr("Your canvas, your starting point.")}<span className="desktop-only">{tr("Red notes become instructions.")}</span></div>
         </section>
@@ -643,7 +651,7 @@ function WorkspaceApp() {
       {showReference && <ReferencePanel reference={reference} onChange={setReference} onClose={() => setShowReference(false)} />}
       {showAlternatives && <AlternativesPanel error={apiError} onStop={stop} alternatives={alternatives[project.activeId] || []} backend={backend} busy={generating} onClose={() => setShowAlternatives(false)} onChoose={code => { pushVersion(code); setShowAlternatives(false); }} />}
       {showScreens && <ScreensPanel project={liveProject} onOpenMap={() => { setShowScreens(false); setShowScreenMap(true); }} onClose={() => setShowScreens(false)} onSelect={(id) => { selectScreen(id); setShowScreens(false); }} onAdd={addScreen} onRename={(id, name) => setProject(prev => ({ ...prev, screens: prev.screens.map(s => s.id === id ? { ...s, name } : s) }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} onReorder={(id, dir) => setProject(prev => { const screens = [...prev.screens]; const i = screens.findIndex(x => x.id === id); const j = i + dir; if (i < 0 || j < 0 || j >= screens.length) return prev; [screens[i], screens[j]] = [screens[j], screens[i]]; return { ...prev, screens }; })} onDelete={(id) => { const snapshot = snapshotProject(); const next = { ...snapshot, screens: snapshot.screens.filter(s => s.id !== id), links: snapshot.links.filter(l => l.from !== id && l.to !== id) }; if (id === project.activeId) selectScreen(next.screens[0].id, next); else setProject(next); }} />}
-      {showScreenMap && <ScreenMap project={liveProject} onClose={() => setShowScreenMap(false)} onSelect={(id) => { selectScreen(id); setShowScreenMap(false); }} onAdd={() => { const base = 'New screen'; let name = base; let i = 2; while (liveProject.screens.some(s => s.name === name)) name = `${base} ${i++}`; addScreen(name); }} onPositions={(positions) => setProject(prev => ({ ...prev, mapPositions: positions }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} />}
+      {showScreenMap && <Suspense fallback={null}><ScreenMap project={liveProject} onClose={() => setShowScreenMap(false)} onSelect={(id) => { selectScreen(id); setShowScreenMap(false); }} onAdd={() => { const base = 'New screen'; let name = base; let i = 2; while (liveProject.screens.some(s => s.name === name)) name = `${base} ${i++}`; addScreen(name); }} onPositions={(positions) => setProject(prev => ({ ...prev, mapPositions: positions }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} /></Suspense>}
     </div>
     {showSettings && <SettingsModal settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />}
     </>
