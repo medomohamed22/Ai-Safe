@@ -3,7 +3,7 @@ import {useLanguage} from './components/LanguageToggle';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Excalidraw, convertToExcalidrawElements, exportToBlob } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
-import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Settings, Smartphone, Sparkles, Zap, Layers, Palette, Image as ImageIcon, Cable, Columns2, PenTool, ChevronRight, Plus, ArrowUp, Command }  from 'lucide-react';
+import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Settings, ShoppingBag, Smartphone, Sparkles, Zap, Layers, Palette, Image as ImageIcon, Cable, Columns2, PenTool, ChevronRight, Plus, ArrowUp, Command }  from 'lucide-react';
 
 import type { AppSettings } from './types';
 import { KEYS, load, loadSettings, save } from './lib/storage';
@@ -55,7 +55,7 @@ const blobToDataUrl = (b: Blob) =>
     r.readAsDataURL(b);
   });
 
-const PRESET_ICONS = { dashboard: LayoutDashboard, landing: Globe, mobile: Smartphone } as const;
+const PRESET_ICONS = { dashboard: LayoutDashboard, landing: Globe, mobile: Smartphone, store: ShoppingBag, dashboardAr: LayoutDashboard, storeAr: ShoppingBag, mobileAr: Smartphone } as const;
 
 interface RunOpts {
   instruction?: string;
@@ -75,7 +75,7 @@ function WorkspaceApp() {
   const language=useLanguage();
   const [home, setHome] = useState(() => location.hash !== '#studio');
   const [starting, setStarting] = useState(false);
-  const [draft] = useState<{text:string;reference:boolean}|null>(() => { try { return JSON.parse(sessionStorage.getItem('s2ui.start-draft') || 'null'); } catch { return null; } });
+  const [draft] = useState<{text:string;reference:boolean;preset?:PresetKey}|null>(() => { try { return JSON.parse(sessionStorage.getItem('s2ui.start-draft') || 'null'); } catch { return null; } });
   const enteredDraft = useRef(false);
   const enterStudio = () => { location.hash = 'studio'; setHome(false); };
   useEffect(() => { const change = () => setHome(location.hash !== '#studio'); window.addEventListener('hashchange',change); return () => window.removeEventListener('hashchange',change); }, []);
@@ -335,11 +335,19 @@ function WorkspaceApp() {
   };
   const runRef = useRef(run);
   runRef.current = run;
+  const loadPresetRef = useRef<(key: PresetKey) => void>(() => {});
   useEffect(() => {
     if (!api || home || !draft || enteredDraft.current) return;
     enteredDraft.current = true;
     sessionStorage.removeItem('s2ui.start-draft');
     if (draft.reference) { setShowReference(true); return; }
+    if (draft.preset && PRESETS[draft.preset]) {
+      setMobilePane('sketch');
+      // Give the hosted-demo provider check a moment to land so the first
+      // generation does not race it on a fresh visit.
+      setTimeout(() => loadPresetRef.current(draft.preset!), 400);
+      return;
+    }
     if (draft.text) {
       setFocusPane('preview'); setMobilePane('preview');
       runRef.current({instruction:draft.text});
@@ -353,6 +361,17 @@ function WorkspaceApp() {
       await saveCurrentWorkspace();
       const record = await newWorkspace(text.trim().slice(0,60) || 'Untitled design');
       sessionStorage.setItem('s2ui.start-draft',JSON.stringify({text:text.trim() ? `${text.trim()}\nTarget platform: ${mode === 'app' ? 'mobile app, responsive on desktop too' : 'responsive website, desktop and mobile'}.` : '',reference}));
+      location.hash = 'studio';
+      await openWorkspace(record,false);
+    } finally { setStarting(false); }
+  };
+  const startSketch = async (key:PresetKey) => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      await saveCurrentWorkspace();
+      const record = await newWorkspace(`${PRESETS[key].label} sketch`);
+      sessionStorage.setItem('s2ui.start-draft',JSON.stringify({text:'',reference:false,preset:key}));
       location.hash = 'studio';
       await openWorkspace(record,false);
     } finally { setStarting(false); }
@@ -456,6 +475,8 @@ function WorkspaceApp() {
     setTimeout(() => runRef.current({ fresh: true }), 150);
   };
 
+  loadPresetRef.current = loadPreset;
+
   const clearCanvas = () => {
     const a = apiRef.current;
     if (!a) return;
@@ -503,7 +524,7 @@ function WorkspaceApp() {
   const modelLabel = settings.activeModelId ?? '';
 
   return (<>
-    {home && <DesignHome busy={starting} onStart={startDesign} onContinue={enterStudio} onOpen={openDesign}
+    {home && <DesignHome busy={starting} onStart={startDesign} onStartSketch={startSketch} onContinue={enterStudio} onOpen={openDesign}
       model={<ModelPicker settings={settings} onSelect={(pid,mid)=>setSettings(s=>({...s,activeProviderId:pid,activeModelId:mid}))} onOpenSettings={()=>setShowSettings(true)}/>}
       actions={<><ThemeToggle/><button className="ui-icon" aria-label={tr("Settings")} title={tr("Settings")} onClick={()=>setShowSettings(true)}><Settings size={18}/></button></>}/>}
     <div className="workspace-shell studio-shell canvas-studio" style={home ? {display:'none'} : undefined} data-mobile-pane={mobilePane}>

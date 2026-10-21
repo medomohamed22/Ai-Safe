@@ -181,10 +181,191 @@ const mobile: El[] = [
   A(420, 622, -55, 0),
 ];
 
+const storeProducts: [string, string][] = [
+  ['Wooden chair', '$120'],
+  ['Desk lamp', '$45'],
+  ['Coffee table', '$230'],
+  ['Bookshelf', '$98'],
+  ['Fabric sofa', '$750'],
+  ['Wall clock', '$32'],
+  ['Ceramic vase', '$21'],
+  ['Wool rug', '$185'],
+];
+
+const store: El[] = [
+  R(0, 0, 1000, 800, undefined, { roundness: null }),
+  // header
+  T(30, 26, 'LOGO', 26),
+  R(300, 16, 340, 38, 'Search products...'),
+  R(850, 16, 120, 38, 'Cart (0)'),
+  L(0, 82, [[0, 0], [1000, 0]]),
+  T(30, 96, 'Home     Shop     Categories     Sale', 18),
+  // hero
+  R(30, 140, 940, 170, undefined),
+  T(60, 168, 'SALE — up to 50% off', 40),
+  T(60, 228, 'New season collection is here', 20),
+  R(60, 262, 140, 44, 'Shop now'),
+  // category chips
+  R(30, 340, 90, 36, 'All'),
+  R(135, 340, 110, 36, 'Furniture'),
+  R(260, 340, 100, 36, 'Lighting'),
+  R(375, 340, 90, 36, 'Decor'),
+  // product grid
+  ...[400, 585].flatMap((y, row) =>
+    [30, 265, 500, 735].flatMap((x, col) => {
+      const p = storeProducts[row * 4 + col];
+      return [
+        ...imagePlaceholder(x, y, 235, 104),
+        T(x + 2, y + 114, `${p[0]}  ${p[1]}`, 16),
+        R(x + 143, y + 106, 88, 30, 'Add'),
+      ];
+    }),
+  ),
+  // annotations
+  T(1070, 30, 'working cart\nwith totals', 20, RED),
+  A(1060, 55, -70, 0),
+  T(1070, 345, 'category filters work', 20, RED),
+  A(1060, 362, -90, 0),
+  T(1070, 470, 'product cards with\nreal photos & prices', 20, RED),
+  A(1060, 495, -80, 40),
+];
+
+// Arabic presets: mirrored (RTL) layouts, Arabic labels, Arabic red
+// annotations — they show judges the Arabic-first generation path.
+const dashboardAr: El[] = [
+  R(0, 0, 1000, 660, undefined, { roundness: null }),
+  // sidebar on the right (RTL)
+  R(810, 0, 190, 660, undefined, { roundness: null }),
+  T(848, 24, 'الشعار', 26),
+  T(848, 100, 'لوحة التحكم'),
+  T(848, 145, 'التحليلات'),
+  T(848, 190, 'العملاء'),
+  T(848, 235, 'الطلبات'),
+  T(848, 280, 'الإعدادات'),
+  // top bar
+  R(0, 0, 810, 70, undefined, { roundness: null }),
+  R(430, 16, 320, 38, 'بحث...'),
+  T(88, 24, 'تنبيهات', 16),
+  E(30, 15, 40, 40),
+  // stats
+  R(540, 100, 240, 110, 'الإيرادات\n$48,200'),
+  R(280, 100, 240, 110, 'المستخدمون\n2,340'),
+  R(20, 100, 240, 110, 'الطلبات\n1,120'),
+  // line chart
+  R(280, 235, 500, 200, undefined),
+  T(590, 248, 'المبيعات الشهرية', 18),
+  L(310, 410, [[0, 0], [80, -40], [160, -10], [240, -90], [320, -55], [440, -120]]),
+  // donut
+  R(20, 235, 240, 200, undefined),
+  T(110, 248, 'مصادر الزيارات', 18),
+  E(80, 280, 120, 120),
+  // table
+  R(20, 460, 760, 180, undefined),
+  T(640, 472, 'أحدث الطلبات', 18),
+  L(20, 510, [[0, 0], [760, 0]]),
+  L(20, 553, [[0, 0], [760, 0]]),
+  L(20, 596, [[0, 0], [760, 0]]),
+  // annotations on the left (mirrored)
+  T(-490, 290, 'رسم دائري\nحسب المصدر', 20, RED),
+  A(-45, 318, 55, 0),
+  T(-490, 480, 'جدول بيانات المبيعات\n+ بحث شغال + شارات حالة', 20, RED),
+  A(-45, 520, 55, 0),
+];
+
+const storeProductsAr: [string, string][] = [
+  ['كرسي خشبي', '1,200 ج.م'],
+  ['مصباح مكتب', '450 ج.م'],
+  ['طاولة قهوة', '2,300 ج.م'],
+  ['رف كتب', '980 ج.م'],
+  ['أريكة قماش', '7,500 ج.م'],
+  ['ساعة حائط', '320 ج.م'],
+  ['مزهرية سيراميك', '210 ج.م'],
+  ['سجادة صوف', '1,850 ج.م'],
+];
+
+const storeAr: El[] = [
+  R(0, 0, 1000, 800, undefined, { roundness: null }),
+  // header (mirrored)
+  T(900, 26, 'الشعار', 26),
+  R(330, 16, 320, 38, 'ابحث عن منتج...'),
+  R(30, 16, 130, 38, 'سلة التسوق'),
+  L(0, 82, [[0, 0], [1000, 0]]),
+  T(590, 96, 'الرئيسية     المتجر     الأقسام     العروض', 18),
+  // hero
+  R(30, 140, 940, 170, undefined),
+  T(600, 168, 'تخفيضات حتى 50%', 40),
+  T(655, 228, 'تشكيلة الموسم الجديد وصلت', 20),
+  R(800, 262, 140, 44, 'تسوق الآن'),
+  // category chips (right to left)
+  R(880, 340, 90, 36, 'الكل'),
+  R(755, 340, 110, 36, 'أثاث'),
+  R(640, 340, 100, 36, 'إضاءة'),
+  R(525, 340, 90, 36, 'ديكور'),
+  // product grid
+  ...[400, 585].flatMap((y, row) =>
+    [30, 265, 500, 735].flatMap((x, col) => {
+      const p = storeProductsAr[row * 4 + col];
+      return [
+        ...imagePlaceholder(x, y, 235, 104),
+        T(x + 2, y + 114, `${p[0]} · ${p[1]}`, 16),
+        R(x + 128, y + 106, 103, 30, 'أضف للسلة'),
+      ];
+    }),
+  ),
+  // annotations on the left (mirrored)
+  T(-490, 30, 'سلة تسوق شغالة\nبالإجمالي', 20, RED),
+  A(-45, 55, 60, 0),
+  T(-490, 345, 'فلترة حسب القسم', 20, RED),
+  A(-45, 362, 60, 0),
+  T(-490, 470, 'بطاقات منتجات\nبصور حقيقية وأسعار', 20, RED),
+  A(-45, 500, 60, 30),
+];
+
+const taskYAr = [235, 315, 395, 475];
+const tasksAr = [
+  ['مراجعة التصميم', 'اليوم 10:00'],
+  ['شراء طلبات البيت', 'اليوم 17:30'],
+  ['الاتصال بأمي', 'غدًا'],
+  ['تمرين الجيم', 'الجمعة 07:00'],
+];
+
+const mobileAr: El[] = [
+  R(0, 0, 380, 760, undefined, { roundness: { type: 3 } }),
+  T(24, 14, '9:41', 14),
+  T(258, 50, 'مهامي', 32),
+  E(24, 50, 46, 46),
+  R(24, 112, 332, 46, 'ابحث في المهام...'),
+  R(256, 175, 100, 38, 'الكل'),
+  R(146, 175, 100, 38, 'اليوم'),
+  R(24, 175, 112, 38, 'تم'),
+  ...taskYAr.flatMap((y, i) => [
+    R(24, y, 332, 66),
+    R(314, y + 21, 24, 24, undefined, { roundness: null }),
+    T(120, y + 10, tasksAr[i][0], 18),
+    T(196, y + 38, tasksAr[i][1], 14),
+  ]),
+  E(24, 590, 64, 64, '+'),
+  L(0, 690, [[0, 0], [380, 0]]),
+  T(292, 712, 'الرئيسية', 16),
+  T(150, 712, 'الإحصائيات', 16),
+  T(36, 712, 'حسابي', 16),
+  // annotations on the left (mirrored)
+  T(-420, 168, 'تبويبات الفلترة\nشغالة', 20, RED),
+  A(-55, 196, 45, 0),
+  T(-420, 250, 'الضغط على المربع =\nإنجاز المهمة (شطب + عدّاد)', 20, RED),
+  A(-55, 272, 45, 0),
+  T(-420, 596, 'يفتح نافذة «مهمة جديدة»\nتضيف مهمة فعلًا', 20, RED),
+  A(-55, 622, 45, 0),
+];
+
 export const PRESETS = {
   dashboard: { label: 'Dashboard', elements: dashboard },
   landing: { label: 'Landing Page', elements: landing },
   mobile: { label: 'Mobile App', elements: mobile },
+  store: { label: 'Store', elements: store },
+  dashboardAr: { label: 'Dashboard (Arabic)', elements: dashboardAr },
+  storeAr: { label: 'Store (Arabic)', elements: storeAr },
+  mobileAr: { label: 'Mobile (Arabic)', elements: mobileAr },
 } as const;
 
 export type PresetKey = keyof typeof PRESETS;

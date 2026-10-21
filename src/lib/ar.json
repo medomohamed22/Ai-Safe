@@ -881,5 +881,14 @@
   "Published with Sketch2UI": "نُشر بواسطة Sketch2UI",
   "Create your own": "أنشئ تطبيقك",
   "Loading app…": "جارٍ تحميل التطبيق…",
-  "Unable to open this published app.": "تعذر فتح هذا التطبيق المنشور."
+  "Unable to open this published app.": "تعذر فتح هذا التطبيق المنشور.",
+  "Store": "متجر",
+  "Dashboard (Arabic)": "لوحة تحكم (عربي)",
+  "Store (Arabic)": "متجر (عربي)",
+  "Mobile (Arabic)": "تطبيق هاتف (عربي)",
+  "Sample sketches": "رسومات جاهزة",
+  "Ready wireframes — one click into the studio.": "رسومات جاهزة — ضغطة واحدة تدخلك الاستوديو.",
+  "English": "الإنجليزية",
+  "Arabic": "العربية",
+  "· Sketch preset": "· رسمة جاهزة"
 }
