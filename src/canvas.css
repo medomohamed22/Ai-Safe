@@ -14,6 +14,14 @@
 .demo-beacon { display:inline-flex; align-items:center; gap:8px; margin-top:16px; font-size:11px; color:var(--ui-muted); border:1px solid var(--ui-border); border-radius:999px; padding:6px 13px; }
 .demo-beacon.is-on { color:var(--ui-text); }
 .demo-beacon.is-on>.status-dot { background:var(--ui-text); }
+.quickstart { border:1px solid var(--ui-border); border-radius:16px; padding:14px 16px; margin-bottom:16px; background:var(--ui-surface); animation:map-fade 240ms var(--motion-ease); }
+.qs-head { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; margin-bottom:10px; }
+.qs-close { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; color:var(--ui-muted); cursor:pointer; flex-shrink:0; }
+.qs-steps { display:flex; gap:14px; flex-wrap:wrap; }
+.qs-step { display:flex; gap:9px; flex:1 1 180px; min-width:0; }
+.qs-num { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border:1px solid var(--ui-line); border-radius:50%; font-size:11px; font-weight:600; flex-shrink:0; }
+.qs-step strong { display:block; font-size:12px; font-weight:500; }
+.qs-step span { font-size:11px; color:var(--ui-muted); line-height:1.5; }
 .home-intro h1 { margin:25px 0 16px; font-size:clamp(44px,4.7vw,72px); line-height:1.06; letter-spacing:-3.8px; font-weight:450; }
 .home-intro h1>span { color:var(--ui-muted); }
 .home-intro p { font-size:13px; color:var(--ui-muted); line-height:1.8; }
