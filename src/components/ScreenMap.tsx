@@ -356,7 +356,7 @@ export function ScreenMap({ project, onClose, onSelect, onAdd, onPositions, onLi
                 </header>
                 <div className="map-card-preview">
                   {html
-                    ? <iframe title={screenLabel(screen)} ref={el => { if (el) frameRefs.current.set(screen.id, el); else frameRefs.current.delete(screen.id); }} srcDoc={html} sandbox="allow-scripts" style={{ width: 1200, height: 844, transform: 'scale(0.25)' }} />
+                    ? <div className="map-frame-scale"><iframe title={screenLabel(screen)} ref={el => { if (el) frameRefs.current.set(screen.id, el); else frameRefs.current.delete(screen.id); }} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" style={{ width: 1200, height: 844 }} /></div>
                     : sketchUrls[screen.id]
                       ? <img className="map-sketch-img" src={sketchUrls[screen.id]} alt={screenLabel(screen)} draggable={false} />
                       : <div className="map-card-empty">{tr('Not generated yet')}</div>}

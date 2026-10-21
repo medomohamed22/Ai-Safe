@@ -177,6 +177,7 @@
 .map-edge-label { fill:var(--ui-muted); font-size:12px; }
 .screen-map-hint { position:absolute; left:14px; bottom:12px; font-size:12px; color:var(--ui-muted); background:var(--ui-surface); border:1px solid var(--ui-line); border-radius:999px; padding:5px 12px; pointer-events:none; }
 .map-card-preview { position:relative; }
+.map-frame-scale { width:1200px; height:844px; transform:scale(.25); transform-origin:0 0; }
 .map-order { display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:19px; padding:0 4px; border:1px solid var(--ui-line); border-radius:999px; font-size:11px; font-weight:600; color:var(--ui-muted); flex-shrink:0; }
 .map-edge-hit { fill:none; stroke:transparent; stroke-width:16; cursor:pointer; }
 .map-edge.is-selected { stroke:var(--ui-text); stroke-width:2.6; }
