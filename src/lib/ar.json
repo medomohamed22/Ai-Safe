@@ -890,5 +890,16 @@
   "Ready wireframes — one click into the studio.": "رسومات جاهزة — ضغطة واحدة تدخلك الاستوديو.",
   "English": "الإنجليزية",
   "Arabic": "العربية",
-  "· Sketch preset": "· رسمة جاهزة"
+  "· Sketch preset": "· رسمة جاهزة",
+  "Link screens": "ربط الشاشات",
+  "Auto-arrange": "ترتيب تلقائي",
+  "Pick the first screen": "اختر الشاشة الأولى",
+  "Pick the target screen": "اختر الشاشة الهدف",
+  "Save link": "حفظ الرابط",
+  "Delete link": "حذف الرابط",
+  "Move up": "نقل لأعلى",
+  "Move down": "نقل لأسفل",
+  "Start screen": "شاشة البداية",
+  "Preview unavailable": "المعاينة غير متاحة",
+  "Sketch preview": "معاينة الرسمة"
 }

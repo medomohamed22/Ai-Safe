@@ -59,3 +59,26 @@ export function mapBounds(positions: Record<string, MapPoint>) {
     maxY: Math.max(...pts.map(p => p.y + MAP_CARD_H)),
   };
 }
+// Flow order for the numbered badges: breadth-first visit order from the
+// first screen along the navigation links; screens no link reaches follow
+// in list order.
+export function flowOrder(project: ScreenProject): Record<string, number> {
+  const order: Record<string, number> = {};
+  if (!project.screens.length) return order;
+  const known = new Set(project.screens.map(s => s.id));
+  const seen = new Set<string>([project.screens[0].id]);
+  const queue = [project.screens[0].id];
+  let n = 0;
+  while (queue.length) {
+    const id = queue.shift()!;
+    order[id] = n++;
+    for (const link of project.links) {
+      if (link.from === id && known.has(link.to) && !seen.has(link.to)) {
+        seen.add(link.to);
+        queue.push(link.to);
+      }
+    }
+  }
+  for (const s of project.screens) if (!(s.id in order)) order[s.id] = n++;
+  return order;
+}
