@@ -919,5 +919,7 @@
   "The AI generates a live, working interface from the sketch.": "الذكاء الاصطناعي يولّد واجهة حية شغالة من الرسمة.",
   "Publish and share": "انشر وشارك",
   "One click gives you a shareable link and a QR code.": "ضغطة واحدة تديك رابط مشاركة وكود QR.",
-  "Loading canvas…": "جارٍ تحميل لوحة الرسم…"
+  "Loading canvas…": "جارٍ تحميل لوحة الرسم…",
+  "Generate from sketch": "التوليد من الرسمة",
+  "Sends your sketch — and your written instruction, if you added one — to the AI to build.": "يرسل رسمتك — وتعليماتك المكتوبة إن أضفتها — إلى الذكاء الاصطناعي للبناء."
 }

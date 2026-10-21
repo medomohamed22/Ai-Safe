@@ -21,6 +21,60 @@ function detectExtraDependencies(sources: string[]): Record<string, string> {
   return extra;
 }
 
+// Backend handoff document: everything a backend developer needs to pick
+// up this export and wire a real API behind the generated frontend.
+export function backendHandoff(backend: BackendConfig, project?: ScreenProject): string {
+  const lines: string[] = [];
+  lines.push('# Backend handoff — Sketch2UI export');
+  lines.push('');
+  lines.push('This project was generated from hand-drawn sketches by Sketch2UI. The frontend is backend-ready: it was built against an explicit data contract so a real API can be connected without rewriting the UI.');
+  lines.push('');
+  lines.push('## How the frontend talks to data');
+  lines.push('');
+  lines.push('- `src/backend.js` installs `globalThis.__S2UI_API__` from `API_CONTRACT.json`. It exposes `request(operationId, { params, query, body, signal })` and already applies the configured response data path and field mapping, so UI code receives normalized data.');
+  lines.push('- Mode `demo` answers from in-memory demo data — no network, no database. Mode `http` calls the configured `baseUrl`. Demo data is sample data, not a production database.');
+  lines.push('- Each generated screen also keeps its own service section near the top of its file: configuration, seed data, and async service functions with the same signatures for demo and HTTP adapters. UI event handlers call that service layer — endpoint strings do not live inside components.');
+  lines.push('- No API secrets, database credentials or server-side authorization are included in this export, by design.');
+  lines.push('');
+  if (backend.endpoints.length) {
+    lines.push('## Configured endpoints (from API_CONTRACT.json)');
+    lines.push('');
+    lines.push('| Operation | Method | Path | Response data path | Response fields (API name → UI name) |');
+    lines.push('|---|---|---|---|---|');
+    for (const e of backend.endpoints) {
+      const fields = Object.entries(e.fields || {}).map(([api, ui]) => `${api} → ${ui}`).join(', ') || '—';
+      lines.push(`| ${e.id} | ${e.method} | ${e.path} | ${e.dataPath || '(root)'} | ${fields} |`);
+    }
+    lines.push('');
+    lines.push('Request/response schemas and parameters, when the source API provided them, are preserved per operation in `API_CONTRACT.json`.');
+    lines.push('');
+  } else {
+    lines.push('## Endpoints');
+    lines.push('');
+    lines.push('No API was configured when this project was exported, so there is no endpoint table yet. Each screen file documents its proposed contract in comments above its service section: assumed paths and methods, request fields, and response shapes. A backend developer can either implement those proposed contracts, or open the project in Sketch2UI, use the Backend panel to import the real OpenAPI spec, and re-export — the configured endpoints then appear here and in `API_CONTRACT.json`.');
+    lines.push('');
+  }
+  lines.push('## Screens and navigation');
+  lines.push('');
+  if (project && project.screens.length) {
+    for (const s of project.screens) lines.push(`- ${s.name} (\`${s.id}\`)`);
+    lines.push('');
+    lines.push('Navigation links between screens are listed in `SCREENS.json`. Multi-screen sources live in `src/screens/`; the active app entry is `src/App.jsx`.');
+    lines.push('');
+  } else {
+    lines.push('Single-screen app: the source is `src/App.jsx`.');
+    lines.push('');
+  }
+  lines.push('## Connecting a real backend — checklist');
+  lines.push('');
+  lines.push('1. Implement the endpoints above (or the proposed contract in each screen) with stable record IDs; list endpoints should accept the pagination/filter parameters the UI sends.');
+  lines.push('2. Allow this frontend origin in CORS, and decide authentication on the server — the frontend only carries the session/token your API issues.');
+  lines.push('3. Point the app at the API: set `baseUrl` and switch `mode` to `http` in `API_CONTRACT.json` (consumed by `src/backend.js`); screens with their own service section take the same base URL in their configuration block.');
+  lines.push('4. Run `npm install && npm run dev` and exercise every screen: loading, empty, error and success states are already wired to the service results.');
+  lines.push('');
+  return lines.join('\n');
+}
+
 export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACKEND, project?: ScreenProject): Record<string, string> {
   const extraScreens = project && project.screens.length > 1 ? screenFiles(project) : {};
   const jsxSources = [code, ...Object.values(extraScreens)].map(s => materializeAssets(materializeLibrary(s)));
@@ -36,6 +90,7 @@ export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACK
     ...extraScreens,
     'src/backend.js': backendBootstrap(backend),
     'API_CONTRACT.json': JSON.stringify(backend, null, 2),
+    'BACKEND.md': backendHandoff(backend, project),
     'src/main.jsx': "import './backend';\nimport React from 'react';\nimport {createRoot} from 'react-dom/client';\nimport App from './App';\nimport './index.css';\ncreateRoot(document.getElementById('root')).render(<App/>);\n",
     'src/index.css': '@tailwind base;\n@tailwind components;\n@tailwind utilities;\nhtml,body,#root{margin:0;min-height:100%;}\n',
     'vite.config.js': "import {defineConfig} from 'vite';\nimport react from '@vitejs/plugin-react';\nexport default defineConfig({plugins:[react()]});\n",
@@ -43,7 +98,7 @@ export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACK
     'postcss.config.js': 'export default {plugins:{tailwindcss:{},autoprefixer:{}}};\n',
     '.gitignore': 'node_modules/\ndist/\n.env\n.env.*\n!.env.example\n.vercel/\n',
     'vercel.json': JSON.stringify({ framework: 'vite', buildCommand: 'npm run build', outputDirectory: 'dist', rewrites: [{ source: '/((?!api/).*)', destination: '/index.html' }] }, null, 2),
-    'README.md': '# Sketch2UI exported project\n\nRun `npm install`, then `npm run dev`. Build with `npm run build`. Commit the generated package-lock.json after installation.\n\nUpload these contents to GitHub; import in Vercel as Vite with build `npm run build`, output `dist`.\n\n## Backend handoff\n\nApp.jsx preserves the generated source and its service adapters. Review its proposed contract, API base URL and backend authentication/CORS before real API use. Demo data is not a production database. No backend or API secrets are included in this export.\n\nReview generated dependencies and external image URLs before production use.\n',
+    'README.md': '# Sketch2UI exported project\n\nRun `npm install`, then `npm run dev`. Build with `npm run build`. Commit the generated package-lock.json after installation.\n\nUpload these contents to GitHub; import in Vercel as Vite with build `npm run build`, output `dist`.\n\n## Backend handoff\n\nApp.jsx preserves the generated source and its service adapters. Start with BACKEND.md — it lists the configured endpoints (or the proposed contract), the screens, and the connection checklist. Review the API base URL and backend authentication/CORS before real API use. Demo data is not a production database. No backend or API secrets are included in this export.\n\nReview generated dependencies and external image URLs before production use.\n',
   };
   for (const name of Object.keys(files)) if (name.endsWith('.jsx')) files[name] = materializeAssets(materializeLibrary(files[name]));
   return files;
