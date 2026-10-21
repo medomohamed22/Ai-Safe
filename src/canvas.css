@@ -41,6 +41,7 @@
 .home-section-heading h2 { display:flex; align-items:center; gap:9px; font-size:17px; font-weight:500; letter-spacing:-.4px; margin:0; }
 .home-section-heading>span { font-size:10px; color:var(--ui-muted); }
 .inspiration-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+.sketch-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
 .inspiration-card { display:block; min-width:0; text-align:left; border-radius:18px; }
 .starter-art { height:190px; border-radius:16px; padding:26px 18px 0; overflow:hidden; background:#d9d9d5; transition:transform 350ms var(--motion-ease); }
 .inspiration-card:hover .starter-art { transform:translateY(-5px); }
