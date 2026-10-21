@@ -2,7 +2,7 @@ import { tr } from '../lib/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildPreviewHtml } from '../lib/preview';
 import { load, save } from '../lib/storage';
-import { parseScenarios, type ScenarioResult } from '../lib/interactionTests';
+import { parseScenarios, resultStatus, STATUS_LABELS, type ScenarioResult } from '../lib/interactionTests';
 import type { BackendConfig } from '../lib/backend';
 
 const sample = JSON.stringify([{ name: 'Page renders', steps: [{ action: 'exists', selector: '#root > *' }] }], null, 2);
@@ -28,11 +28,11 @@ export function TestsPanel({ code, backend, onClose }: { code: string; backend: 
   }, [run]);
   return <div role="dialog" aria-label={tr("Interaction tests")} className="fixed inset-0 z-50 overflow-auto bg-[var(--ui-bg)] p-5 text-[var(--ui-text)]"><div className="mx-auto max-w-4xl space-y-3">
     <div className="flex justify-between"><h2 className="font-bold">{tr("Interaction tests")}</h2><button onClick={onClose}>{tr("Close")}</button></div>
-    <p className="text-sm text-[var(--ui-muted)]">{tr("Runs your explicit scenarios in a fresh demo preview. Actions: exists, click, fill, expectText. Use CSS selectors. Scenarios run in order and share state; external fetch/XHR is blocked. A passing smoke test does not prove every feature works.")}</p>
+    <p className="text-sm text-[var(--ui-muted)]">{tr("Runs your explicit scenarios in a fresh demo preview. Actions: exists, click, fill, expectText. Use CSS selectors or the text form tag:has-text('Visible text'). An invalid selector is reported as a setup error, not an app failure. Scenarios run in order and share state; external fetch/XHR is blocked. A passing smoke test does not prove every feature works.")}</p>
     <textarea dir="ltr" aria-label={tr("Test scenarios JSON")} className="h-56 w-full rounded border border-[var(--ui-border)] bg-[var(--ui-surface)] p-3 font-mono text-xs" value={text} onChange={e => setText(e.target.value)} disabled={pending} />
     <button disabled={pending} className="rounded ui-primary px-4 py-2 disabled:opacity-40" onClick={() => { try { const scenarios = parseScenarios(text); save('s2ui.tests.v1', text); setResults([]); setError(''); setPending(true); setRun({ token: crypto.randomUUID(), scenarios }); } catch (e) { setError((e as Error).message); } }}>{pending ? tr("Running…") : tr("Run scenarios")}</button>
     {error && <p role="alert" className="text-[var(--ui-text)]">{tr(error)}</p>}
-    <ul aria-label={tr("Test results")}>{results.map((result, i) => <li key={i} className={result.passed ? 'text-[var(--ui-text)]' : 'text-[var(--ui-text)]'}>{result.passed ? tr("PASS") : tr("FAIL")} — {result.name}: {tr(result.detail)}</li>)}</ul>
+    <ul aria-label={tr("Test results")}>{results.map((result, i) => <li key={i}>{tr(STATUS_LABELS[resultStatus(result)])} — {result.name}: {tr(result.detail)}</li>)}</ul>
     {run && <iframe key={run.token} ref={frame} title={tr("Test preview")} srcDoc={html} sandbox="allow-scripts" className="h-96 w-full bg-[var(--ui-surface)]" />}
   </div></div>;
 }
