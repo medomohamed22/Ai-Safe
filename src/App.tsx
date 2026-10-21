@@ -160,7 +160,9 @@ function WorkspaceApp() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => load('s2ui.sidebar.collapsed', false));
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [focusPane, setFocusPane] = useState<'both' | 'sketch' | 'preview'>('both');
+  const [focusPane, setFocusPane] = useState<'both' | 'sketch' | 'preview'>(() => initialScreen.versions.length ? 'preview' : 'sketch');
+  const focusPaneRef = useRef(focusPane); focusPaneRef.current = focusPane;
+  const showPreviewStage = () => { if (focusPaneRef.current === 'sketch') setFocusPane('preview'); };
   const [split, setSplit] = useState(() => Math.max(30, Math.min(65, load('s2ui.studio.split', 40))));
   const gridRef = useRef<HTMLElement>(null);
   useEffect(() => save('s2ui.sidebar.collapsed', sidebarCollapsed), [sidebarCollapsed]);
@@ -348,7 +350,7 @@ function WorkspaceApp() {
   const runRef = useRef(run);
   runRef.current = run;
   const lastRunRef = useRef<{ instruction?: string; fresh?: boolean }>({});
-  const runTracked = (args: { instruction?: string; fresh?: boolean }) => { lastRunRef.current = args; beginChatRun(args.instruction); runRef.current(args); };
+  const runTracked = (args: { instruction?: string; fresh?: boolean }) => { lastRunRef.current = args; beginChatRun(args.instruction); showPreviewStage(); runRef.current(args); };
   const chatRunRef = useRef<{ screenId: string } | null>(null);
   const beginChatRun = (text?: string, kind?: 'fix') => {
     const msg: ChatMessage = kind === 'fix' ? { id: crypto.randomUUID(), role: 'user', kind: 'fix' } : text?.trim() ? { id: crypto.randomUUID(), role: 'user', text: text.trim() } : { id: crypto.randomUUID(), role: 'user', kind: 'sketch' };
@@ -363,7 +365,7 @@ function WorkspaceApp() {
     sessionStorage.removeItem('s2ui.start-draft');
     if (draft.reference) { setShowReference(true); return; }
     if (draft.preset && PRESETS[draft.preset]) {
-      setMobilePane('sketch');
+      setMobilePane('sketch'); setFocusPane('sketch');
       // Give the hosted-demo provider check a moment to land so the first
       // generation does not race it on a fresh visit.
       setTimeout(() => loadPresetRef.current(draft.preset!), 400);
@@ -488,6 +490,7 @@ function WorkspaceApp() {
   const loadPreset = async (key: PresetKey) => {
     const a = apiRef.current;
     if (!a) return;
+    setFocusPane('sketch');
     const { convertToExcalidrawElements } = await import('@excalidraw/excalidraw');
     const els = convertToExcalidrawElements(PRESETS[key].elements as any, { regenerateIds: true });
     a.updateScene({ elements: els });
@@ -570,7 +573,7 @@ function WorkspaceApp() {
           <div className="studio-split">
             <section className="chat-column" data-mobile-active={mobilePane === 'instructions'} aria-label={tr("AI conversation")}>
               <div className="chat-head"><span className="studio-eyebrow">{tr("YOUR CREATIVE PARTNER")}</span><strong>{tr("What shall we make?")}</strong><p className="chat-head-sub">{tr("Describe a new interface or refine the current screen.")}</p></div>
-              <ChatThread messages={chat} generating={generating} stream={stream} segmentReady={!!segmentOverlay} hasCode={!!code} suggestions={code ? suggestNextSteps(code, liveProject.screens.length) : []} starters={['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']} onSendSuggestion={(text) => runTracked({ instruction: text })} onRetry={() => { setApiError(null); chatRunRef.current = { screenId: project.activeId }; runRef.current(lastRunRef.current); }} />
+              <ChatThread messages={chat} generating={generating} stream={stream} segmentReady={!!segmentOverlay} hasCode={!!code} suggestions={code ? suggestNextSteps(code, liveProject.screens.length) : []} starters={['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']} onSendSuggestion={(text) => runTracked({ instruction: text })} onRetry={() => { setApiError(null); chatRunRef.current = { screenId: project.activeId }; showPreviewStage(); runRef.current(lastRunRef.current); }} />
 <footer className="workspace-composer" data-mobile-active={mobilePane === 'instructions'}>
         
         <div className="composer-model"><ModelPicker settings={settings} onSelect={(pid, mid) => setSettings(s => ({ ...s, activeProviderId: pid, activeModelId: mid }))} onOpenSettings={() => setShowSettings(true)} /></div>
@@ -643,12 +646,12 @@ function WorkspaceApp() {
             onPrev={() => setVIndex((i) => Math.max(0, i - 1))}
             onNext={() => setVIndex((i) => Math.min(versions.length - 1, i + 1))}
             onStop={stop}
-            onFix={(err) => { beginChatRun(undefined, 'fix'); runRef.current({ fixError: err }); }}
+            onFix={(err) => { beginChatRun(undefined, 'fix'); showPreviewStage(); runRef.current({ fixError: err }); }}
             onDismissError={() => setApiError(null)}
-            onRetryError={() => { setApiError(null); chatRunRef.current = { screenId: project.activeId }; runRef.current(lastRunRef.current); }}
+            onRetryError={() => { setApiError(null); chatRunRef.current = { screenId: project.activeId }; showPreviewStage(); runRef.current(lastRunRef.current); }}
             onOpenSettings={() => setShowSettings(true)}
             onCodeChange={code => { assertLockedElements(code, locksRef.current[project.activeId] || []); pushVersion(code); }}
-            onElementRequest={(instruction) => { beginChatRun(instruction); runRef.current({ instruction }); }}
+            onElementRequest={(instruction) => { beginChatRun(instruction); showPreviewStage(); runRef.current({ instruction }); }}
             segmentOverlay={segmentOverlay}
             onCloseSegments={() => setSegmentOverlay(null)}
           />

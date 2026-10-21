@@ -11,6 +11,9 @@ const REPLY = { choices: [{ message: { content: 'export default function App(){r
   await page.addInitScript(s => localStorage.setItem('s2ui.settings.v1', JSON.stringify(s)), SETTINGS);
   await page.route('https://provider.example.test/**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(REPLY) }));
   await page.goto(process.env.S2UI_TEST_URL || 'http://127.0.0.1:5174/#studio');
+  // Stage model: one big stage — the sketch fills it first, the preview hides.
+  assert.equal(await page.locator('.workspace-grid').getAttribute('data-focus'), 'sketch', 'the stage starts on the sketch');
+  assert.equal(await page.locator('.output-panel').isVisible(), false, 'the preview panel hides behind the stage toggle');
   const chatCol = page.locator('.chat-column');
   await chatCol.waitFor({ state: 'visible', timeout: 15000 });
   const chatBox = await chatCol.boundingBox();
@@ -20,7 +23,18 @@ const REPLY = { choices: [{ message: { content: 'export default function App(){r
   await page.locator('.chat-column .send-button').click();
   await page.locator('.chat-msg.user', { hasText: 'build a chat test page' }).waitFor({ timeout: 15000 });
   await page.locator('.chat-msg.ai.built', { hasText: 'Your new version is ready in the preview.' }).waitFor({ timeout: 20000 });
+  assert.equal(await page.locator('.workspace-grid').getAttribute('data-focus'), 'preview', 'sending flips the stage from sketch to preview');
   await page.locator('.preview-document').waitFor({ timeout: 20000 });
+
+  // Arabic RTL: the chat column stays pinned to the LEFT, content stays RTL.
+  const ar = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await ar.addInitScript(s => localStorage.setItem('s2ui.settings.v1', JSON.stringify(s)), SETTINGS);
+  await ar.goto(process.env.S2UI_TEST_URL || 'http://127.0.0.1:5174/#studio');
+  await ar.getByRole('button', { name: 'العربية', exact: true }).click();
+  await ar.waitForFunction(() => document.documentElement.dir === 'rtl');
+  const arChat = await ar.locator('.chat-column').boundingBox();
+  const arGrid = await ar.locator('.workspace-grid').boundingBox();
+  assert.ok(arChat && arGrid && arChat.x + arChat.width <= arGrid.x + 1, 'in RTL the chat column is still on the left');
 
   // Phone: the Chat tab shows the conversation (thread + composer); the
   // work column hides; a send from the Chat tab generates and the thread

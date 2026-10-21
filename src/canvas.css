@@ -242,3 +242,9 @@
  .chat-thread { padding:14px 12px; }
  .chat-msg { font-size:13px; }
 }
+
+/* Stage division (owner's call): the conversation column is pinned to the
+   left in both languages — the split lays out left-to-right while each
+   column's own content keeps the page direction. */
+.studio-split { direction:ltr; }
+[dir='rtl'] .chat-column, [dir='rtl'] .work-column { direction:rtl; }
