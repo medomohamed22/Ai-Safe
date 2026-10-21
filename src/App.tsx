@@ -580,6 +580,7 @@ function WorkspaceApp() {
               />
             </Suspense>}
           </div>
+          <div className="sketch-generate"><button onClick={() => { if (generating) stop(); else { runTracked({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary sketch-generate-button" aria-label={generating ? tr("Stop generation") : tr("Generate from sketch")} title={generating ? tr("Stop generation") : tr("Generate interface (Ctrl + Enter)")}>{generating ? <Loader2 size={17} className="animate-spin" /> : <Sparkles size={17} />}<span>{generating ? tr("Stop") : code ? tr("Update interface") : tr("Generate from sketch")}</span></button>{!generating && <span className="sketch-generate-hint">{tr("Sends your sketch — and your written instruction, if you added one — to the AI to build.")}</span>}</div>
           <div className="panel-footnote"><span className="status-dot" />{tr("Your canvas, your starting point.")}<span className="desktop-only">{tr("Red notes become instructions.")}</span></div>
         </section>
 

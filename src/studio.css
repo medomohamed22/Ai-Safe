@@ -182,3 +182,8 @@
 }
 @media (max-width:360px) { .studio-shell .brand-mark { display:none; } .context-hint { display:none; } .studio-shell .preview-actions .ui-button { padding:0 6px; gap:4px; } }
 @media (prefers-reduced-motion:reduce) { .studio-sidebar,.studio-divider>span { transition:none; } }
+
+.sketch-generate { display:flex; align-items:center; gap:10px; padding:10px 14px 2px; flex-wrap:wrap; }
+.sketch-generate-button { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:10px 20px; font-weight:600; }
+.sketch-generate-hint { font-size:12px; color:var(--ui-muted); }
+@media (max-width: 900px) { .sketch-generate-button { flex:1; justify-content:center; } .sketch-generate-hint { display:none; } }
