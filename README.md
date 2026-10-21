@@ -10,7 +10,7 @@ Built for the **Meta Global AI Developer Hackathon** (Indie track) on the **Meta
 
 When the app looks right, **Publish** puts it on a shareable full-screen link (`#app=…`) with a QR code — visitors see only the app: no editor, no settings, no API keys.
 
-- **Live demo:** https://ai-check-blond.vercel.app/ — bring your own key, or see *Hosted demo mode* below.
+- **Live demo:** https://sketch2ui-app.vercel.app/ — bring your own key, or see *Hosted demo mode* below.
 - **Canvas:** Excalidraw (MIT)
 - **Renderer:** sandboxed iframe (Babel + import maps + Tailwind CDN) — supports `react`, `lucide-react`, `recharts`
 - **Providers:** Meta Model API (Muse Spark) first — or any vision LLM via OpenRouter, Google Gemini, Meta Llama API (legacy), or any OpenAI-compatible API
