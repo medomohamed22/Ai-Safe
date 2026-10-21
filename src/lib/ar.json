@@ -911,5 +911,12 @@
   "The provider is having trouble right now. Retry in a moment.": "المزود يواجه مشكلة الآن. أعد المحاولة بعد قليل.",
   "The provider returned an error. Retry, or check the provider in Settings.": "أرجع المزود خطأً. أعد المحاولة أو تحقق من المزود في الإعدادات.",
   "Instant demo is live — no key needed": "التجربة الفورية شغالة — مش محتاج مفتاح",
-  "Instant demo is off — add your own key in Settings": "التجربة الفورية متوقفة — أضف مفتاحك من الإعدادات"
+  "Instant demo is off — add your own key in Settings": "التجربة الفورية متوقفة — أضف مفتاحك من الإعدادات",
+  "New here? Start in 60 seconds:": "جديد هنا؟ ابدأ في ٦٠ ثانية:",
+  "Pick a sample sketch": "اختر رسمة جاهزة",
+  "One click loads a ready wireframe into the studio.": "ضغطة واحدة تحمّل رسمة جاهزة في الاستوديو.",
+  "Watch it become an interface": "شاهدها تتحول لواجهة",
+  "The AI generates a live, working interface from the sketch.": "الذكاء الاصطناعي يولّد واجهة حية شغالة من الرسمة.",
+  "Publish and share": "انشر وشارك",
+  "One click gives you a shareable link and a QR code.": "ضغطة واحدة تديك رابط مشاركة وكود QR."
 }
