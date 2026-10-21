@@ -919,5 +919,11 @@
   "The AI generates a live, working interface from the sketch.": "الذكاء الاصطناعي يولّد واجهة حية شغالة من الرسمة.",
   "Publish and share": "انشر وشارك",
   "One click gives you a shareable link and a QR code.": "ضغطة واحدة تديك رابط مشاركة وكود QR.",
-  "Loading canvas…": "جارٍ تحميل لوحة الرسم…"
+  "Loading canvas…": "جارٍ تحميل لوحة الرسم…",
+  "SETUP ERROR": "خطأ إعداد",
+  "BLOCKED": "محجوب",
+  "NOT TESTED": "غير مختبَر",
+  "Checking the build service…": "جارٍ فحص خدمة البناء…",
+  "Build service is available — the production bundle check will run.": "خدمة البناء متاحة — سيعمل فحص حزمة الإنتاج.",
+  "Build service is not available on this deployment — the bundle check will be marked blocked, not failed. Connect a service below or see the README.": "خدمة البناء غير متاحة في هذا النشر — سيُعلَّم فحص الحزمة كمحجوب لا كفشل. وصّل خدمة من الأسفل أو راجع README."
 }
