@@ -20,23 +20,32 @@ const IMPORT_MAP: Record<string, string> = {
 const safeJson = (v: unknown) =>
   JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
+// Arabic designs need a right-to-left document and an Arabic-capable font,
+// or shared/published apps render with a fallback font and an unmirrored
+// layout. Detected from the generated code itself, so every surface that
+// builds this document (studio preview, screen map, published apps) agrees.
+export function isArabicCode(code: string): boolean {
+  return /[\u0600-\u06FF]/.test(code);
+}
+
 export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean; preserveInstrumentation?: boolean }, backend: BackendConfig = DEFAULT_BACKEND): string {
   let source = code;
   if (editor && !editor.preserveInstrumentation) {
     try { source = instrumentPreview(code); } catch { /* Existing runtime error reporting handles invalid JSX. */ }
   }
   try { source = materializeAssets(materializeLibrary(source)); } catch (e) { source = `export default function App(){ throw new Error(${JSON.stringify((e as Error).message)}) }`; }
+  const rtl = isArabicCode(source);
   return `<!DOCTYPE html>
-<html>
+<html${rtl ? ' lang="ar" dir="rtl"' : ''}>
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />${rtl ? '\n<link rel="preconnect" href="https://fonts.googleapis.com" />\n<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />' : ''}
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 <script type="importmap">${safeJson({ imports: IMPORT_MAP })}</script>
 <style>
   html, body { margin: 0; min-height: 100%; }
-  body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { font-family: ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
   #__s2ui_err { display:none; position:fixed; inset:auto 12px 12px 12px; background:#1f0f12; color:#fecaca; border:1px solid #7f1d1d; border-radius:10px; padding:12px 14px; font:12px/1.5 ui-monospace, monospace; white-space:pre-wrap; max-height:40vh; overflow:auto; z-index:2147483647; }
 </style>
 </head>
