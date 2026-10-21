@@ -909,5 +909,7 @@
   "Rate limit reached. Wait a few seconds, then retry.": "تم الوصول إلى حد الطلبات. انتظر بضع ثوانٍ ثم أعد المحاولة.",
   "The provider could not process the request. Check the selected model in Settings.": "تعذّر على المزود معالجة الطلب. تحقق من الموديل المحدد في الإعدادات.",
   "The provider is having trouble right now. Retry in a moment.": "المزود يواجه مشكلة الآن. أعد المحاولة بعد قليل.",
-  "The provider returned an error. Retry, or check the provider in Settings.": "أرجع المزود خطأً. أعد المحاولة أو تحقق من المزود في الإعدادات."
+  "The provider returned an error. Retry, or check the provider in Settings.": "أرجع المزود خطأً. أعد المحاولة أو تحقق من المزود في الإعدادات.",
+  "Instant demo is live — no key needed": "التجربة الفورية شغالة — مش محتاج مفتاح",
+  "Instant demo is off — add your own key in Settings": "التجربة الفورية متوقفة — أضف مفتاحك من الإعدادات"
 }
