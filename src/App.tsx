@@ -19,12 +19,13 @@ import { PRESETS, type PresetKey } from './lib/presets';
 import { ModelPicker } from './components/ModelPicker';
 import { SettingsModal } from './components/SettingsModal';
 import { PreviewPane } from './components/PreviewPane';
+import { ChatThread } from './components/ChatThread';
 import { BackendPanel } from './components/BackendPanel';
 import { backendPrompt, DEFAULT_BACKEND, type BackendConfig } from './lib/backend';
 import { ScreensPanel } from './components/ScreensPanel';
 const ScreenMap = lazy(() => import('./components/ScreenMap').then(m => ({ default: m.ScreenMap })));
 const SketchCanvas = lazy(() => import('./components/SketchCanvas'));
-import type { ScreenProject } from './lib/screens';
+import type { ChatMessage, ScreenProject } from './lib/screens';
 import { BrandPanel } from './components/BrandPanel';
 import { brandPrompt, DEFAULT_BRAND, type Brand } from './lib/brand';
 import { ReferencePanel, type ReferenceImage } from './components/ReferencePanel';
@@ -110,6 +111,7 @@ function WorkspaceApp() {
   const initialScreen = initialProject.screens.find(s => s.id === initialProject.activeId) || initialProject.screens[0];
   const [project, setProject] = useState(initialProject);
   const [screenScene, setScreenScene] = useState<any>(initialScreen.scene);
+  const [chat, setChat] = useState<ChatMessage[]>(initialScreen.chat ?? []);
   const [reviewEnabled,setReviewEnabled] = useState(() => load('s2ui.review-before-apply',false));
   const [pendingChange,setPendingChange] = useState<{base:string;next:string;scope:string}|null>(null);
   useEffect(() => save('s2ui.review-before-apply',reviewEnabled),[reviewEnabled]);
@@ -148,12 +150,13 @@ function WorkspaceApp() {
   const [showBackend, setShowBackend] = useState(false);
   const backendRef = useRef(backend); backendRef.current = backend;
   useEffect(() => save(KEYS.backend, backend), [backend]);
-  const liveProject = useMemo(() => ({ ...project, screens: project.screens.map(s => s.id === project.activeId ? { ...s, versions, vIndex, scene: screenScene } : s) }), [project, versions, vIndex, screenScene]);
+  const liveProject = useMemo(() => ({ ...project, screens: project.screens.map(s => s.id === project.activeId ? { ...s, versions, vIndex, scene: screenScene, chat } : s) }), [project, versions, vIndex, screenScene]);
   const projectRef = useRef(liveProject); projectRef.current = liveProject;
   useEffect(() => save(KEYS.project, liveProject), [liveProject]);
 
   const code = versions[vIndex] ?? '';
   const [mobilePane, setMobilePane] = useState<'sketch' | 'preview' | 'instructions'>(() => initialScreen.versions.length ? 'preview' : 'sketch');
+  const mobilePaneRef = useRef(mobilePane); mobilePaneRef.current = mobilePane;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => load('s2ui.sidebar.collapsed', false));
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -238,7 +241,7 @@ function WorkspaceApp() {
   const hasModel = !!(activeProvider && settings.activeModelId);
 
   const pushVersion = (c: string) => {
-    setMobilePane('preview');
+    if (mobilePaneRef.current !== 'instructions') setMobilePane('preview');
     setVersions((prev) => {
       const next = [...prev.slice(0, vIndexRef.current + 1), c].slice(-30);
       setVIndex(next.length - 1);
@@ -272,6 +275,7 @@ function WorkspaceApp() {
     const provider = s.providers.find((p) => p.id === s.activeProviderId);
     if (!provider || !s.activeModelId) {
       setApiError('Choose a provider and a model first (Settings → add API key → Fetch models).');
+      endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: 'Choose a provider and a model first (Settings → add API key → Fetch models).' });
       setShowSettings(true);
       return;
     }
@@ -282,6 +286,7 @@ function WorkspaceApp() {
     const styleReference = opts.fixError ? null : referenceRef.current;
     if (!image && !styleReference && !opts.instruction?.trim() && !opts.fixError) {
       setApiError('Draw something on the canvas (or pick a demo preset) or type an instruction.');
+      endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: 'Draw something on the canvas (or pick a demo preset) or type an instruction.' });
       return;
     }
 
@@ -300,7 +305,7 @@ function WorkspaceApp() {
       }
     }
 
-    setMobilePane('preview');
+    if (mobilePaneRef.current !== 'instructions') setMobilePane('preview');
     setGenerating(true);
     setStream('');
     setApiError(null);
@@ -326,10 +331,13 @@ function WorkspaceApp() {
         if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
       }
       if (reviewEnabled) { setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else pushVersion(finalCode);
+      endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built' });
       if (!reviewEnabled && autoQuality) setShowProductivity(true);
     } catch (e: any) {
       if (ctrl.signal.aborted) return;
-      setApiError(e?.message || String(e));
+      const msg = e?.message || String(e);
+      setApiError(msg);
+      endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: msg });
     } finally {
       if (abortRef.current === ctrl) {
         abortRef.current = null;
@@ -340,7 +348,14 @@ function WorkspaceApp() {
   const runRef = useRef(run);
   runRef.current = run;
   const lastRunRef = useRef<{ instruction?: string; fresh?: boolean }>({});
-  const runTracked = (args: { instruction?: string; fresh?: boolean }) => { lastRunRef.current = args; runRef.current(args); };
+  const runTracked = (args: { instruction?: string; fresh?: boolean }) => { lastRunRef.current = args; beginChatRun(args.instruction); runRef.current(args); };
+  const chatRunRef = useRef<{ screenId: string } | null>(null);
+  const beginChatRun = (text?: string, kind?: 'fix') => {
+    const msg: ChatMessage = kind === 'fix' ? { id: crypto.randomUUID(), role: 'user', kind: 'fix' } : text?.trim() ? { id: crypto.randomUUID(), role: 'user', text: text.trim() } : { id: crypto.randomUUID(), role: 'user', kind: 'sketch' };
+    setChat(prev => [...prev, msg].slice(-80));
+    chatRunRef.current = { screenId: projectRef.current.activeId };
+  };
+  const endChatRun = (msg: ChatMessage) => { if (!chatRunRef.current) return; chatRunRef.current = null; setChat(prev => [...prev, msg].slice(-80)); };
   const loadPresetRef = useRef<(key: PresetKey) => void>(() => {});
   useEffect(() => {
     if (!api || home || !draft || enteredDraft.current) return;
@@ -393,6 +408,7 @@ function WorkspaceApp() {
 
   const stop = () => {
     abortRef.current?.abort();
+    endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'stopped' });
     abortRef.current = null;
     setGenerating(false);
   };
@@ -436,14 +452,14 @@ function WorkspaceApp() {
     if (!screen) return;
     stop(); window.clearTimeout(debounceRef.current); window.clearTimeout(saveSceneRef.current);
     setProject({ ...nextProject, activeId: id }); setVersions(screen.versions); setVIndex(screen.vIndex); setScreenScene(screen.scene);
-    setApiError(null); setStream(''); setPrompt('');
+    setApiError(null); setStream(''); setPrompt(''); setChat(screen.chat ?? []);
     sigRef.current = sigOf(screen.scene?.elements || []);
     apiRef.current?.resetScene();
     if (screen.scene?.files) apiRef.current?.addFiles(Object.values(screen.scene.files));
     apiRef.current?.updateScene({ elements: screen.scene?.elements || [] });
   };
   const addScreen = (name: string) => {
-    const screen = { id: crypto.randomUUID(), name, versions: [], vIndex: -1, scene: null };
+    const screen = { id: crypto.randomUUID(), name, versions: [], vIndex: -1, scene: null, chat: [] as ChatMessage[] };
     const snapshot = snapshotProject(); selectScreen(screen.id, { ...snapshot, screens: [...snapshot.screens, screen] });
   };
   const persistScene = (elements: readonly any[], files: any) => {
@@ -504,6 +520,7 @@ function WorkspaceApp() {
     setLocks({});
     setApiError(null);
     setPrompt('');
+    setChat([]);
   };
 
   const submitPrompt = () => {
@@ -520,7 +537,7 @@ function WorkspaceApp() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         if (document.querySelector('[role="dialog"]')) return;
         e.preventDefault();
-        runRef.current({ instruction: promptRef.current.trim() || undefined });
+        runTracked({ instruction: promptRef.current.trim() || undefined });
         setPrompt('');
       }
     };
@@ -550,6 +567,25 @@ function WorkspaceApp() {
       <div className="studio-body" data-sidebar-collapsed={sidebarCollapsed}>
         <aside className="studio-sidebar" aria-label={tr("Workspace tools")}>{sidebar}</aside>
         <div className="studio-content">
+          <div className="studio-split">
+            <section className="chat-column" data-mobile-active={mobilePane === 'instructions'} aria-label={tr("AI conversation")}>
+              <div className="chat-head"><span className="studio-eyebrow">{tr("YOUR CREATIVE PARTNER")}</span><strong>{tr("What shall we make?")}</strong><p className="chat-head-sub">{tr("Describe a new interface or refine the current screen.")}</p></div>
+              <ChatThread messages={chat} generating={generating} stream={stream} segmentReady={!!segmentOverlay} hasCode={!!code} suggestions={code ? suggestNextSteps(code, liveProject.screens.length) : []} starters={['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']} onSendSuggestion={(text) => runTracked({ instruction: text })} onRetry={() => { setApiError(null); chatRunRef.current = { screenId: project.activeId }; runRef.current(lastRunRef.current); }} />
+<footer className="workspace-composer" data-mobile-active={mobilePane === 'instructions'}>
+        
+        <div className="composer-model"><ModelPicker settings={settings} onSelect={(pid, mid) => setSettings(s => ({ ...s, activeProviderId: pid, activeModelId: mid }))} onOpenSettings={() => setShowSettings(true)} /></div>
+        <div className="composer-shell">
+          <div className="prompt-row"><span className="composer-mark"><Sparkles size={18} strokeWidth={1.5} /></span>
+            <input aria-label={tr("Describe your interface")} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submitPrompt(); }} disabled={generating} placeholder={code ? tr("What would you like to change?") : tr("Describe your idea, or let your sketch do the talking…")} />
+            <span className="composer-shortcut"><kbd>{tr("Ctrl")}</kbd><kbd>↵</kbd></span>
+            <button onClick={() => { if (generating) stop(); else { runTracked({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary send-button" aria-label={generating ? tr("Stop generation") : tr("Send")} title={generating ? tr("Stop generation") : tr("Generate interface (Ctrl + Enter)")}>{generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}<span>{generating ? tr("Stop") : code ? tr("Update interface") : tr("Generate interface")}</span><ArrowUp size={16} /></button>
+          </div>
+          <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
+        </div>
+        <div className="workspace-status"><span>{generating ? tr("Bringing your idea to life…") : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
+      </footer>
+            </section>
+            <div className="work-column">
           <div className="studio-contextbar">
             <div><span className="studio-eyebrow">{tr("DESIGN STUDIO")}</span><strong>{screenLabel(liveProject.screens.find(s => s.id === project.activeId) || {id:'home',name:'Home'})}</strong><span className="context-hint">{tr("Sketch it. Build it. Make it yours.")}</span></div>
             <div className="segmented desktop-layout" aria-label={tr("Workspace layout")}>
@@ -607,38 +643,28 @@ function WorkspaceApp() {
             onPrev={() => setVIndex((i) => Math.max(0, i - 1))}
             onNext={() => setVIndex((i) => Math.min(versions.length - 1, i + 1))}
             onStop={stop}
-            onFix={(err) => runRef.current({ fixError: err })}
+            onFix={(err) => { beginChatRun(undefined, 'fix'); runRef.current({ fixError: err }); }}
             onDismissError={() => setApiError(null)}
-            onRetryError={() => { setApiError(null); runRef.current(lastRunRef.current); }}
+            onRetryError={() => { setApiError(null); chatRunRef.current = { screenId: project.activeId }; runRef.current(lastRunRef.current); }}
             onOpenSettings={() => setShowSettings(true)}
             onCodeChange={code => { assertLockedElements(code, locksRef.current[project.activeId] || []); pushVersion(code); }}
-            onElementRequest={(instruction) => runRef.current({ instruction })}
+            onElementRequest={(instruction) => { beginChatRun(instruction); runRef.current({ instruction }); }}
             segmentOverlay={segmentOverlay}
             onCloseSegments={() => setSegmentOverlay(null)}
           />
         </section>
       </main>
-
-      <footer className="workspace-composer" data-mobile-active={mobilePane === 'instructions'}>
-        <div className="mobile-instructions-heading"><span className="studio-eyebrow">{tr("YOUR CREATIVE PARTNER")}</span><h2>{tr("What shall we make?")}</h2><p>{tr("Describe a new interface or refine the current screen.")}</p></div>
-        <div className="composer-model"><ModelPicker settings={settings} onSelect={(pid, mid) => setSettings(s => ({ ...s, activeProviderId: pid, activeModelId: mid }))} onOpenSettings={() => setShowSettings(true)} /></div>
-        <div className="composer-shell">
-          <div className="prompt-row"><span className="composer-mark"><Sparkles size={18} strokeWidth={1.5} /></span>
-            <input aria-label={tr("Describe your interface")} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submitPrompt(); }} disabled={generating} placeholder={code ? tr("What would you like to change?") : tr("Describe your idea, or let your sketch do the talking…")} />
-            <span className="composer-shortcut"><kbd>{tr("Ctrl")}</kbd><kbd>↵</kbd></span>
-            <button onClick={() => { if (generating) stop(); else { runTracked({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary send-button" aria-label={generating ? tr("Stop generation") : tr("Send")} title={generating ? tr("Stop generation") : tr("Generate interface (Ctrl + Enter)")}>{generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}<span>{generating ? tr("Stop") : code ? tr("Update interface") : tr("Generate interface")}</span><ArrowUp size={16} /></button>
+            </div>
           </div>
-          <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><div className="quick-prompts">{code && <span className="next-steps-label">{tr("Next steps")}</span>}{(code ? suggestNextSteps(code, liveProject.screens.length) : ['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']).map(q => <button key={q} disabled={generating} onClick={() => { setPrompt(tr(q)); document.querySelector<HTMLInputElement>('footer input')?.focus(); }} className="quick-prompt">{tr(q)}</button>)}</div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
-        </div>
-        <div className="workspace-status"><span>{generating ? tr("Bringing your idea to life…") : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
-      </footer>
+
+
 
         </div>
       </div>
       <nav className="mobile-studio-nav" aria-label={tr("Workspace navigation")}>
         <button aria-label={tr("Show sketch workspace")} aria-pressed={mobilePane === 'sketch'} onClick={() => setMobilePane('sketch')}><PenTool size={20} /><span>{tr("Sketch")}</span></button>
         <button aria-label={tr("Show preview workspace")} aria-pressed={mobilePane === 'preview'} onClick={() => setMobilePane('preview')}><MonitorPlay size={20} /><span>{tr("Preview")}</span></button>
-        <button aria-label={tr("Show instructions workspace")} aria-pressed={mobilePane === 'instructions'} onClick={() => setMobilePane('instructions')}><MessageSquare size={20} /><span>{tr("Instructions")}</span>{generating && <i />}</button>
+        <button aria-label={tr("Show chat workspace")} aria-pressed={mobilePane === 'instructions'} onClick={() => setMobilePane('instructions')}><MessageSquare size={20} /><span>{tr("Chat")}</span>{generating && <i />}</button>
       </nav>
       {toolsOpen && createPortal(<div role="dialog" aria-modal="true" aria-label={tr("Workspace tools")} className="studio-tools-overlay items-center"><section className="studio-tools-sheet"><div className="sheet-heading"><strong>{tr("Workspace tools")}</strong><button className="ui-icon" data-dialog-close onClick={() => setToolsOpen(false)} aria-label={tr("Close workspace tools")}><X size={20} /></button></div>{sidebar}</section></div>, document.body)}
       {showProductivity && <ProductivityPanel reviewEnabled={reviewEnabled} onReviewEnabled={setReviewEnabled} review={pendingChange} onRejectReview={() => setPendingChange(null)} onAcceptReview={(next,base) => { if (codeRef.current !== base || pendingChange && pendingChange.scope !== project.activeId) throw new Error('Source or screen changed. Reject this stale review and regenerate.'); assertLockedElements(next,locksRef.current[project.activeId]||[]); pushVersion(next); setPendingChange(null); }} getSketch={exportSketch} model={settings.activeModelId || ''} reference={reference?.dataUrl} scope={project.activeId} autoQuality={autoQuality} onAutoQuality={setAutoQuality} code={code} backend={backend} onClose={() => { productivityAbort.current?.abort(); setShowProductivity(false); }} onAdopt={next => { assertLockedElements(next, locksRef.current[project.activeId] || []); pushVersion(next); }} ask={async (userText, system, images) => {

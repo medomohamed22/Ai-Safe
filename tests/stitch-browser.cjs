@@ -42,7 +42,7 @@ const url=(process.env.S2UI_TEST_URL||'http://127.0.0.1:5173').split('#')[0];
   await frame.getByRole('heading',{name:'Canvas design'}).waitFor();
   assert.equal(calls.length,1,'Opening a saved project must not regenerate');
   await page.getByRole('button',{name:'Back to projects',exact:true}).click();await page.setViewportSize({width:390,height:844});await page.screenshot({animations:'disabled',path:'tests/stitch-home-mobile.png',fullPage:true});
-  await page.getByRole('button',{name:'Open studio',exact:true}).click();await page.getByRole('button',{name:'Show instructions workspace',exact:true}).click();await page.screenshot({animations:'disabled',path:'tests/stitch-editor-mobile.png'});
+  await page.getByRole('button',{name:'Open studio',exact:true}).click();await page.getByRole('button',{name:'Show chat workspace',exact:true}).click();await page.screenshot({animations:'disabled',path:'tests/stitch-editor-mobile.png'});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   assert.equal(await page.getByRole('button',{name:'Send',exact:true}).locator('svg').last().isVisible(),true,'Phone send action has a visible arrow');
   assert.deepEqual(errors,[]);

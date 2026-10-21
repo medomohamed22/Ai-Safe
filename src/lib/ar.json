@@ -921,5 +921,13 @@
   "One click gives you a shareable link and a QR code.": "ضغطة واحدة تديك رابط مشاركة وكود QR.",
   "Loading canvas…": "جارٍ تحميل لوحة الرسم…",
   "Generate from sketch": "التوليد من الرسمة",
-  "Sends your sketch — and your written instruction, if you added one — to the AI to build.": "يرسل رسمتك — وتعليماتك المكتوبة إن أضفتها — إلى الذكاء الاصطناعي للبناء."
+  "Sends your sketch — and your written instruction, if you added one — to the AI to build.": "يرسل رسمتك — وتعليماتك المكتوبة إن أضفتها — إلى الذكاء الاصطناعي للبناء.",
+  "Chat": "المحادثة",
+  "Show chat workspace": "عرض مساحة المحادثة",
+  "AI conversation": "محادثة الذكاء الاصطناعي",
+  "Analyzing your sketch…": "جارٍ تحليل رسمتك…",
+  "Generating the interface…": "جارٍ بناء الواجهة…",
+  "Your new version is ready in the preview.": "نسختك الجديدة جاهزة في المعاينة.",
+  "Generation stopped.": "توقف التوليد.",
+  "Fix the runtime error": "إصلاح خطأ التشغيل"
 }
