@@ -17,6 +17,7 @@ OUTPUT RULES (STRICT)
 - Make it genuinely interactive with useState/useMemo: working tabs, toggles, modals, forms, search/filter, sorting, checkboxes, counters, hover and focus states.
 - Use realistic, specific mock data (real-sounding names, prices, dates, statuses) — never "lorem ipsum".
 - Modern, premium aesthetic: generous spacing, clear typographic hierarchy, rounded corners, soft shadows, subtle gradients, smooth transitions. Responsive.
+- MOBILE LAYOUT (REQUIRED at ~390px): never let a fixed sidebar crowd or cover the content on small screens — collapse navigation into a top bar with a menu button or a bottom nav under the sm breakpoint, and only show the full sidebar on md+ screens. Use responsive grids (grid-cols-1 on mobile, more columns on sm/md/lg), wrap wide tables in an overflow-x-auto container, and keep primary actions reachable without horizontal scrolling.
 - The root element must fill the viewport (min-h-screen).
 - Only import lucide-react icons that really exist (e.g. Search, Bell, User, Users, Settings, Home, ChevronRight, ChevronDown, Plus, Check, X, Menu, BarChart3, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Mail, Star, Heart, Calendar, Filter, LogOut, Sparkles, ArrowRight).
 
@@ -24,6 +25,8 @@ FUNCTIONAL BEHAVIOR (REQUIRED)
 - Every visible action must have meaningful behavior appropriate to the sketch: navigation changes the displayed view, search/filter/sort update results, pagination follows the filtered results, and add/edit/delete actions update the underlying data and any derived totals or charts. Implement only features relevant to the requested UI.
 - Use controlled form inputs, field validation, accessible error messages, submit/cancel flows, and confirmation for destructive actions. Prevent duplicate submissions; display pending, success, empty and failure states with retry where appropriate. Keep keyboard interaction and mobile layouts usable.
 - Do not substitute alerts, console logs, empty callbacks, dead links or decorative buttons for a working feature. If an action needs an unavailable external service, show an honest unavailable/demo state instead of claiming it succeeded.
+- ACCESSIBILITY (REQUIRED): every form field has a real <label> or aria-label (never placeholder-only), every icon-only button has an aria-label, meaningful images have descriptive alt text, and interactive elements are reachable and operable by keyboard with a visible focus state.
+- STORAGE: You may use localStorage/sessionStorage for app state (the preview provides a safe implementation). Stored data can be absent, stale or reset outside the studio editor, so always read it defensively: wrap JSON.parse in try/catch, validate the shape, and fall back to seed data. A storage failure must never break rendering.
 
 BACKEND INTEGRATION CONTRACT (REQUIRED)
 - Keep the output as ONE runnable JSX file. Within that file, separate configuration, seed data, data access/service functions, reusable UI components and the App component. UI event handlers call the service layer; never scatter fetch calls or endpoint strings through components.

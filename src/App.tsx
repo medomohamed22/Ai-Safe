@@ -7,6 +7,7 @@ import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Se
 
 import type { AppSettings } from './types';
 import { KEYS, load, loadSettings, save } from './lib/storage';
+const draftKey = (screenId: string) => `s2ui.draft.v1.${screenId}`;
 import { suggestNextSteps } from './lib/next-steps';
 import { libraryPrompt } from './lib/componentLibrary';
 import { planKey, planPrompt } from './lib/plans';
@@ -29,6 +30,7 @@ import { BrandPanel } from './components/BrandPanel';
 import { brandPrompt, DEFAULT_BRAND, type Brand } from './lib/brand';
 import { ReferencePanel, type ReferenceImage } from './components/ReferencePanel';
 import { AlternativesPanel, type DesignAlternative } from './components/AlternativesPanel';
+import { Elapsed } from './components/Elapsed';
 import { ReviewPage } from './components/ReviewPage';
 import { PublishedApp } from './components/PublishedApp';
 import { assertLockedElements, lockPrompt } from './lib/visualEdit';
@@ -142,8 +144,10 @@ function WorkspaceApp() {
   const [segmentOverlay, setSegmentOverlay] = useState<SegmentOverlayData | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [prompt, setPrompt] = useState(draft?.text || '');
+  const [prompt, setPrompt] = useState(() => draft?.text || load(draftKey(initialScreen.id), ''));
   const promptRef = useRef(prompt); promptRef.current = prompt;
+  useEffect(() => { const t = window.setTimeout(() => save(draftKey(project.activeId), prompt), 300); return () => window.clearTimeout(t); }, [prompt, project.activeId]);
+  const inFlightRef = useRef<string | null>(null);
   const [backend, setBackend] = useState<BackendConfig>(() => load(KEYS.backend, DEFAULT_BACKEND));
   const [showBackend, setShowBackend] = useState(false);
   const backendRef = useRef(backend); backendRef.current = backend;
@@ -285,6 +289,12 @@ function WorkspaceApp() {
       return;
     }
 
+    // Duplicate guard (P1-05): an identical request already in flight is
+    // not sent twice (double click, eager retry). A different request
+    // still supersedes the running one, as before.
+    const requestKey = [screenId, opts.instruction?.trim() || '', opts.fresh ? 'fresh' : '', opts.fixError ? 'fix' : '', sigRef.current].join('|');
+    if (inFlightRef.current === requestKey) return;
+    inFlightRef.current = requestKey;
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -293,7 +303,7 @@ function WorkspaceApp() {
     let segmentMap = '';
     if (image && s.autoSegment && !opts.fixError) {
       const seg = await segmentSketch(provider, s.activeModelId, image, ctrl.signal);
-      if (ctrl.signal.aborted || projectRef.current.activeId !== screenId) return;
+      if (ctrl.signal.aborted || projectRef.current.activeId !== screenId) { if (inFlightRef.current === requestKey) inFlightRef.current = null; return; }
       if (seg && seg.boxes.length) {
         segmentMap = formatElementMap(seg.boxes, seg.source);
         setSegmentOverlay({ image, boxes: seg.boxes, source: seg.source });
@@ -325,12 +335,18 @@ function WorkspaceApp() {
         finalCode = await enhanceCodeWithImages(c, provider, ctrl.signal);
         if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
       }
+      if (opts.instruction && load(draftKey(screenId), '') === opts.instruction) save(draftKey(screenId), '');
       if (reviewEnabled) { setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else pushVersion(finalCode);
       if (!reviewEnabled && autoQuality) setShowProductivity(true);
     } catch (e: any) {
       if (ctrl.signal.aborted) return;
       setApiError(e?.message || String(e));
+      // P1-05: a failed request keeps its context — the instruction returns
+      // to the composer and the screen's draft so Retry (or an edit) does
+      // not need retyping. The current design/version stays untouched.
+      if (opts.instruction?.trim()) { save(draftKey(screenId), opts.instruction); setPrompt(cur => (cur.trim() ? cur : opts.instruction!)); }
     } finally {
+      if (inFlightRef.current === requestKey) inFlightRef.current = null;
       if (abortRef.current === ctrl) {
         abortRef.current = null;
         setGenerating(false);
@@ -436,11 +452,15 @@ function WorkspaceApp() {
     if (!screen) return;
     stop(); window.clearTimeout(debounceRef.current); window.clearTimeout(saveSceneRef.current);
     setProject({ ...nextProject, activeId: id }); setVersions(screen.versions); setVIndex(screen.vIndex); setScreenScene(screen.scene);
-    setApiError(null); setStream(''); setPrompt('');
+    setApiError(null); setStream(''); setPrompt(load(draftKey(id), ''));
     sigRef.current = sigOf(screen.scene?.elements || []);
     apiRef.current?.resetScene();
     if (screen.scene?.files) apiRef.current?.addFiles(Object.values(screen.scene.files));
     apiRef.current?.updateScene({ elements: screen.scene?.elements || [] });
+    // Fit the newly shown sketch into view (P3-06): without this the canvas
+    // keeps the previous screen's pan/zoom and a sketch can open off-screen.
+    const els = (screen.scene?.elements || []).filter((e: any) => !e.isDeleted);
+    if (els.length) apiRef.current?.scrollToContent(els, { fitToContent: true });
   };
   const addScreen = (name: string) => {
     const screen = { id: crypto.randomUUID(), name, versions: [], vIndex: -1, scene: null };
@@ -629,7 +649,7 @@ function WorkspaceApp() {
           </div>
           <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><div className="quick-prompts">{code && <span className="next-steps-label">{tr("Next steps")}</span>}{(code ? suggestNextSteps(code, liveProject.screens.length) : ['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']).map(q => <button key={q} disabled={generating} onClick={() => { setPrompt(tr(q)); document.querySelector<HTMLInputElement>('footer input')?.focus(); }} className="quick-prompt">{tr(q)}</button>)}</div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
         </div>
-        <div className="workspace-status"><span>{generating ? tr("Bringing your idea to life…") : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
+        <div className="workspace-status"><span>{generating ? <>{tr("Bringing your idea to life…")} <Elapsed /></> : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
       </footer>
 
         </div>

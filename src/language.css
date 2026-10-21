@@ -28,7 +28,7 @@
 [dir='rtl'] .workspace-breadcrumb { margin-left:0; margin-inline-start:22px; }
 [dir='rtl'] .element-inspector { border-left:0; border-right:1px solid var(--ui-border); }
 [dir='rtl'] :is(.export-dropdown,.export-dropdown>button) { text-align:start; }
-[dir='rtl'] .export-dropdown { right:auto; left:0; }
+/* .export-dropdown anchors with inset-inline-end (P2-01), so it follows the text direction on its own. */
 [dir='rtl'] .composer-shortcut { direction:ltr; }
 [dir='rtl'] .workspace-status>div { direction:rtl; }
 [dir='rtl'] :is(pre,code,.source-editor,.code-surface,.drawing-surface) { direction:ltr; text-align:left; }

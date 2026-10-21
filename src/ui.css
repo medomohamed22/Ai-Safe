@@ -114,6 +114,9 @@ input[type='color'] { border-radius:7px; overflow:hidden; padding:3px; backgroun
 details[open]>:not(summary) { animation:panel-enter var(--motion-normal) var(--motion-ease) }
 .model-slot { min-width:0 }
 .model-slot>div>button { font-size:10px; max-width:230px; border-radius:8px; min-height:34px }
+.model-filter { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:12px; color:var(--ui-muted); border-bottom:1px solid var(--ui-border); cursor:pointer; }
+.model-hidden-note { padding:4px 12px 6px; font-size:11px; color:var(--ui-muted); }
+.model-media-chip { font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; padding:1px 5px; border:1px solid var(--ui-border); border-radius:99px; color:var(--ui-muted); }
 .model-popover { width:min(420px,calc(100vw - 24px)); animation:menu-enter var(--motion-normal) var(--motion-ease) }
 iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review preview'],iframe[title^='Alternative '] { background:#fff; color-scheme:light }
 .sketch-panel .excalidraw,.sketch-panel .excalidraw.theme--dark { --color-primary:var(--ui-contrast); --color-primary-darker:var(--ui-text); --color-primary-darkest:var(--ui-text); --color-primary-light:var(--ui-selected); --color-primary-light-darker:var(--ui-border); --color-primary-container:var(--ui-selected); --color-on-primary-container:var(--ui-text); --color-brand-active:var(--ui-contrast); --color-brand-hover:var(--ui-text); --color-surface-lowest:var(--ui-surface); --color-surface-low:var(--ui-hover); --color-surface-mid:var(--ui-selected); --color-surface-high:var(--ui-border) }
@@ -151,7 +154,7 @@ iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review p
  .mobile-model>div>button>span:first-child:not(:last-of-type) { display:none }
  .workspace-grid { display:flex; padding:0 12px; gap:0 } .workspace-panel { width:100%; border-radius:11px }
  .workspace-panel[data-mobile-active='false'] { display:none } .workspace-panel[data-mobile-active='true'] { animation:surface-enter 200ms var(--motion-ease) }
- .model-popover { position:fixed; top:150px; right:12px; max-height:65dvh; overflow:auto }
+ .model-popover { position:fixed; top:150px; inset-inline-end:12px; max-height:65dvh; overflow:auto }
  .panel-caption { font-size:9px } .panel-heading { height:44px; padding:0 11px }
  .preset-strip { padding:7px 10px; gap:4px } .preset-strip>span { display:none } .preset-pill { padding:0 7px; font-size:9px }
  .panel-footnote { font-size:8px; min-height:26px }
@@ -182,6 +185,7 @@ iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review p
 .export-project { margin-left:5px }
 .selection-hint { display:flex; align-items:center; gap:6px; padding:10px 13px; font-size:10px; background:var(--ui-hover); border-bottom:1px solid var(--ui-border); animation:panel-enter 200ms var(--motion-ease) }
 .locks-list { padding:8px 12px; font-size:10px; border-bottom:1px solid var(--ui-border) }
+.export-notice { margin:6px 12px 0; font-size:11.5px; color:var(--ui-muted); }
 .preview-error { display:flex; align-items:flex-start; gap:8px; margin:8px 12px; font-size:11px }
 .preview-error>span { min-width:0; flex:1; overflow-wrap:anywhere }
 .preview-error>svg { flex-shrink:0 }
@@ -264,7 +268,7 @@ iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review p
 .preview-viewport-tools .ui-icon { display:flex; align-items:center; justify-content:center; gap:4px; min-width:32px; min-height:32px; border-radius:8px; }
 .preview-tool-text { font-size:10px; }
 .preview-more-wrap { position:relative; }
-.preview-more-menu { position:absolute; z-index:45; right:0; top:calc(100% + 8px); width:165px; border:1px solid var(--ui-border); border-radius:12px; padding:5px; background:var(--ui-surface); box-shadow:0 12px 32px #0002; }
+.preview-more-menu { position:absolute; z-index:45; inset-inline-end:0; top:calc(100% + 8px); width:190px; max-width:calc(100vw - 24px); max-height:min(60dvh, 320px); overflow-y:auto; border:1px solid var(--ui-border); border-radius:12px; padding:5px; background:var(--ui-surface); box-shadow:0 12px 32px #0002; }
 .preview-more-menu button { display:flex; width:100%; gap:10px; align-items:center; padding:11px; border-radius:8px; font-size:12px; text-align:start; }
 .preview-more-menu button:hover { background:var(--ui-hover); }
 .preview-more-menu button:disabled { opacity:.4; }
