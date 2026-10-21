@@ -115,7 +115,7 @@
  .studio-shell .studio-divider { display:none; }
  .studio-shell .workspace-panel[data-mobile-active='false'] { display:none; }
  .studio-shell .workspace-panel[data-mobile-active='true'] { display:flex; }
- .studio-shell[data-mobile-pane='instructions'] .workspace-grid { display:none; }
+ .studio-shell[data-mobile-pane='instructions'] .work-column { display:none; }
  .studio-shell .workspace-composer { display:none; }
  .studio-shell .workspace-composer[data-mobile-active='true'] { display:flex; flex-direction:column; flex:1; min-height:0; padding:20px 15px; overflow-y:auto; }
  .mobile-instructions-heading { display:block; padding:12px 0 24px; }
