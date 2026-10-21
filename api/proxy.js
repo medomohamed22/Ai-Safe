@@ -38,6 +38,9 @@ function json(status, message) {
 // limited per visitor IP so a shared demo key cannot be drained by one visitor.
 const DEMO_WINDOW_MS = 10 * 60 * 1000;
 const DEMO_MAX = 40;
+// Credit guardrail (item 9): a demo generation is also capped in output size,
+// so one visitor cannot burn the shared credit on a single huge completion.
+const DEMO_MAX_TOKENS = 8000;
 const demoHits = new Map();
 function demoSlot(ip) {
   const now = Date.now();
@@ -72,21 +75,36 @@ export default async function handler(req) {
   // Demo key injection: only for flagged demo requests to api.meta.ai, only
   // when the visitor sent no key of their own, and only when the deployment
   // owner configured META_MODEL_API_KEY. The key never reaches the browser.
+  let injectedDemo = false;
   if (req.headers.get('x-s2ui-demo') === '1' && target.hostname === 'api.meta.ai' && !headers.has('authorization')) {
     const demoKey = process.env.META_MODEL_API_KEY;
     if (!demoKey) return json(503, 'Demo mode is not enabled on this deployment. Add your own Meta Model API key in Settings.');
     const ip = (req.headers.get('x-forwarded-for') || 'unknown').split(',')[0].trim();
     if (!demoSlot(ip)) return json(429, 'Demo rate limit reached for now. Add your own Meta Model API key in Settings for unrestricted use.');
     headers.set('authorization', `Bearer ${demoKey}`);
+    injectedDemo = true;
   }
 
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+  let body = hasBody ? await req.arrayBuffer() : undefined;
+  // Demo-only clamp: shrink an oversized token budget before it goes upstream.
+  // Anything that is not plain JSON is forwarded byte for byte.
+  if (body && injectedDemo && (headers.get('content-type') || '').includes('json')) {
+    try {
+      const parsed = JSON.parse(new TextDecoder().decode(body));
+      let changed = false;
+      for (const field of ['max_tokens', 'max_output_tokens']) {
+        if (typeof parsed[field] === 'number' && parsed[field] > DEMO_MAX_TOKENS) { parsed[field] = DEMO_MAX_TOKENS; changed = true; }
+      }
+      if (changed) body = new TextEncoder().encode(JSON.stringify(parsed));
+    } catch { /* not JSON: forward untouched */ }
+  }
   let upstream;
   try {
     upstream = await fetch(target.toString(), {
       method: req.method,
       headers,
-      body: hasBody ? await req.arrayBuffer() : undefined,
+      body,
     });
   } catch (e) {
     return json(502, 'Upstream fetch failed: ' + (e && e.message ? e.message : String(e)));

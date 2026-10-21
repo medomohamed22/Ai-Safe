@@ -5,6 +5,9 @@ import type { ProviderConfig } from '../types';
 const PLACEHOLDER_RE = /https?:\/\/(?:picsum\.photos|placehold\.co|via\.placeholder\.com|dummyimage\.com|placeholder\.com)[^\s"'`)]*/g;
 
 export const MAX_GENERATED_IMAGES = 4;
+// Demo guardrail (item 9): the hosted demo generates fewer images per design,
+// so the shared credit lasts; a visitor's own key keeps the full quality.
+export const DEMO_MAX_GENERATED_IMAGES = 2;
 
 export interface ImageSlot {
   url: string;
@@ -89,7 +92,7 @@ async function shrinkDataUrl(dataUrl: string, maxSide = 896): Promise<string> {
 export async function enhanceCodeWithImages(code: string, provider: ProviderConfig, signal?: AbortSignal): Promise<string> {
   const model = imageModelFor(provider);
   if (!model) return code;
-  const slots = findImageSlots(code).slice(0, MAX_GENERATED_IMAGES);
+  const slots = findImageSlots(code).slice(0, provider.demo ? DEMO_MAX_GENERATED_IMAGES : MAX_GENERATED_IMAGES);
   if (!slots.length) return code;
   const replacements = new Map<string, string>();
   for (const slot of slots) {

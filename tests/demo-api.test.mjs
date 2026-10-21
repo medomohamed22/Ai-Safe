@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 // Mock the upstream fetch before importing the handlers under test.
 const calls = [];
 globalThis.fetch = async (url, init) => {
-  calls.push({ url: String(url), headers: new Headers(init?.headers) });
+  calls.push({ url: String(url), headers: new Headers(init?.headers), body: init?.body });
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
 };
 
 const proxy = (await import('../api/proxy.js')).default;
 const demo = (await import('../api/demo.js')).default;
 
-function proxyReq(target, headers = {}, ip) {
+function proxyReq(target, headers = {}, ip, body = '{}') {
   const h = new Headers(headers);
   if (ip) h.set('x-forwarded-for', ip);
-  return new Request(`http://local/api/proxy?url=${encodeURIComponent(target)}`, { method: 'POST', headers: h, body: '{}' });
+  return new Request(`http://local/api/proxy?url=${encodeURIComponent(target)}`, { method: 'POST', headers: h, body });
 }
 const CHAT = 'https://api.meta.ai/v1/chat/completions';
 const JSON_H = { 'x-s2ui-demo': '1', 'content-type': 'application/json' };
@@ -62,5 +62,21 @@ for (let i = 0; i < 40; i++) {
 res = await proxy(proxyReq(CHAT, JSON_H, '6.6.6.6'));
 assert.equal(res.status, 429);
 
+// Item 9 guardrail: oversized token budgets are clamped for demo requests only.
+async function sentJson(call) { const b = call.body; return JSON.parse(typeof b === 'string' ? b : new TextDecoder().decode(b)); }
+calls.length = 0;
+res = await proxy(proxyReq(CHAT, JSON_H, '7.7.7.7', JSON.stringify({ model: 'muse-spark-1.3', max_tokens: 64000 })));
+assert.equal(res.status, 200);
+assert.equal((await sentJson(calls[0])).max_tokens, 8000, 'demo chat budget clamped to 8000');
+calls.length = 0;
+res = await proxy(proxyReq(CHAT, JSON_H, '7.7.7.8', JSON.stringify({ max_tokens: 4000 })));
+assert.equal((await sentJson(calls[0])).max_tokens, 4000, 'a modest demo budget passes through unchanged');
+calls.length = 0;
+res = await proxy(proxyReq(CHAT, { ...JSON_H, authorization: 'Bearer <redacted>' }, '7.7.7.9', JSON.stringify({ max_tokens: 64000 })));
+assert.equal((await sentJson(calls[0])).max_tokens, 64000, "a visitor's own key is never clamped");
+calls.length = 0;
+res = await proxy(proxyReq('https://api.meta.ai/v1/responses', JSON_H, '7.7.7.10', JSON.stringify({ max_output_tokens: 32000 })));
+assert.equal((await sentJson(calls[0])).max_output_tokens, 8000, 'demo responses budget clamped too');
+
 delete process.env.META_MODEL_API_KEY;
-console.log('PASS: demo status endpoint, proxy demo-key injection rules (flag + api.meta.ai host + no visitor key), and the demo rate limit.');
+console.log('PASS: demo status endpoint, proxy demo-key injection rules (flag + api.meta.ai host + no visitor key), the demo rate limit, and the item-9 token-budget clamp.');
