@@ -93,16 +93,24 @@ function request(p: ProviderConfig, url: string, init: RequestInit = {}) {
   });
 }
 
+// User-facing message for a failed provider response. The raw body is kept
+// in the console for debugging, never dumped on the user: a judge hitting a
+// 429 or an empty balance should read a next step, not an HTTP transcript.
+export function friendlyHttpError(status: number): string {
+  if (status === 401 || status === 403) return 'The provider rejected the API key. Check the key in Settings, or switch providers.';
+  if (status === 402) return 'The provider account is out of credit. Add credit or switch providers in Settings.';
+  if (status === 404) return 'The selected model was not found. Pick another model in Settings.';
+  if (status === 429) return 'Rate limit reached. Wait a few seconds, then retry.';
+  if (status === 400 || status === 422) return 'The provider could not process the request. Check the selected model in Settings.';
+  if (status >= 500) return 'The provider is having trouble right now. Retry in a moment.';
+  return 'The provider returned an error. Retry, or check the provider in Settings.';
+}
+
 async function ensureOk(res: Response) {
   if (res.ok) return;
-  let t = await res.text().catch(() => '');
-  try {
-    const j = JSON.parse(t);
-    t = j?.error?.message || j?.message || j?.detail || (typeof j?.error === 'string' ? j.error : t);
-  } catch {
-    /* not json */
-  }
-  throw new Error(`HTTP ${res.status}: ${String(t).slice(0, 500)}`);
+  const t = await res.text().catch(() => '');
+  if (t) console.warn(`[Sketch2UI] provider HTTP ${res.status}:`, t.slice(0, 500));
+  throw new Error(friendlyHttpError(res.status));
 }
 
 function openAIHeaders(p: ProviderConfig): Record<string, string> {

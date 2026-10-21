@@ -901,5 +901,13 @@
   "Move down": "نقل لأسفل",
   "Start screen": "شاشة البداية",
   "Preview unavailable": "المعاينة غير متاحة",
-  "Sketch preview": "معاينة الرسمة"
+  "Sketch preview": "معاينة الرسمة",
+  "Retry": "إعادة المحاولة",
+  "The provider rejected the API key. Check the key in Settings, or switch providers.": "رفض المزود مفتاح API. تحقق من المفتاح في الإعدادات أو بدّل المزود.",
+  "The provider account is out of credit. Add credit or switch providers in Settings.": "رصيد حساب المزود نفد. أضف رصيدًا أو بدّل المزود من الإعدادات.",
+  "The selected model was not found. Pick another model in Settings.": "الموديل المحدد غير موجود. اختر موديلًا آخر من الإعدادات.",
+  "Rate limit reached. Wait a few seconds, then retry.": "تم الوصول إلى حد الطلبات. انتظر بضع ثوانٍ ثم أعد المحاولة.",
+  "The provider could not process the request. Check the selected model in Settings.": "تعذّر على المزود معالجة الطلب. تحقق من الموديل المحدد في الإعدادات.",
+  "The provider is having trouble right now. Retry in a moment.": "المزود يواجه مشكلة الآن. أعد المحاولة بعد قليل.",
+  "The provider returned an error. Retry, or check the provider in Settings.": "أرجع المزود خطأً. أعد المحاولة أو تحقق من المزود في الإعدادات."
 }
