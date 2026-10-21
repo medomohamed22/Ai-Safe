@@ -114,8 +114,28 @@ export function PreviewPane(p: Props) {
     : 1;
   const scale = fitMode === 'fit' ? Math.max(0.1, fitScale) : 1;
 
+  // Preview app storage (P1-01): the sandboxed document cannot keep
+  // localStorage, so the editor persists each screen's app data under its
+  // own key, seeds the document with it, and saves the snapshots the
+  // document posts back. Keyed per screen: one project's data never
+  // seeds another screen's preview.
+  const storageKey = (screenId: string) => `s2ui.previewstore.v1.${screenId}`;
+  const activeScreenRef = useRef(p.project.activeId);
+  useEffect(() => { activeScreenRef.current = p.project.activeId; }, [p.project.activeId]);
+  const readSeed = (screenId: string): Record<string, string> | null => {
+    try { const raw = localStorage.getItem(storageKey(screenId)); if (!raw) return null; const parsed = JSON.parse(raw); return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null; } catch { return null; }
+  };
+  const moreWrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showAdvanced) return;
+    const onPointer = (e: PointerEvent) => { if (moreWrapRef.current && !moreWrapRef.current.contains(e.target as Node)) setShowAdvanced(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShowAdvanced(false); moreWrapRef.current?.querySelector('button')?.focus(); } };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey); };
+  }, [showAdvanced]);
   const token = useMemo(() => crypto.randomUUID(), [p.code]);
-  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token }, p.backend) : ''), [p.code, token, p.backend, libraryRevision]);
+  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId) }, p.backend) : ''), [p.code, token, p.backend, libraryRevision, p.project.activeId]);
   const sendMode = (enabled: boolean) => iframeRef.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled }, '*');
 
   useEffect(() => { sendMode(editing && !p.generating && tab === 'preview'); }, [editing, p.generating, tab, token]);
@@ -134,6 +154,9 @@ export function PreviewPane(p: Props) {
       if (d?.source !== 's2ui-preview') return;
       if (d.type === 'error') setRuntimeError((prev) => prev ?? String(d.message));
       if (d.type === 'ready') sendMode(editingRef.current && !p.generating && tab === 'preview');
+      if (d.type === 'storage' && d.token === token && d.data && typeof d.data === 'object' && !Array.isArray(d.data)) {
+        try { const text = JSON.stringify(d.data); if (text.length <= 512000) localStorage.setItem(storageKey(activeScreenRef.current), text); } catch { /* quota or serialization: the in-document store keeps working */ }
+      }
       if (d.type === 'element-selected' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && d.id >= 0) {
         try { describeElement(p.code, d.id); setSelected(d.id); } catch { setSelected(null); }
       }
@@ -165,11 +188,17 @@ export function PreviewPane(p: Props) {
     } catch { setExportError('Clipboard is unavailable. Download the JSX file instead.'); }
   };
 
+  // Export feedback (P2-05): downloads used to be silent — the user could
+  // not tell whether a file was saved or which one. Every successful
+  // download names itself in a status line; failures keep the alert.
+  const [exportNotice, setExportNotice] = useState('');
+  useEffect(() => { if (!exportNotice) return; const t = window.setTimeout(() => setExportNotice(''), 4500); return () => window.clearTimeout(t); }, [exportNotice]);
+  const noteSaved = (name: string) => setExportNotice(`${tr('Saved')} ${name}`);
   const download = (name: string, content: string, type: string) => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([content], { type }));
     a.download = name;
-    a.click();
+    a.click(); noteSaved(name);
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
@@ -179,7 +208,7 @@ export function PreviewPane(p: Props) {
     try {
       const blob = await projectZip(p.code, p.backend, p.project);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'sketch2ui-project.zip'; a.click();
+      const a = document.createElement('a'); a.href = url; a.download = 'sketch2ui-project.zip'; a.click(); noteSaved('sketch2ui-project.zip');
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { setExportError((e as Error).message); }
     finally { setExporting(false); }
@@ -194,10 +223,10 @@ export function PreviewPane(p: Props) {
         <div className="segmented" aria-label={tr("Preview display")}><button onClick={() => setTab('preview')} aria-pressed={tab === 'preview'}><MonitorPlay size={13} />{tr("Preview")}</button><button onClick={() => setTab('code')} aria-pressed={tab === 'code'}><Code2 size={13} />{tr("Code")}</button></div>
         {tab === 'preview' && !!p.code && <div className="segmented device-switch" aria-label={tr("Preview device")}>{([['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const).map(([d, Icon]) => <button key={d} onClick={() => setDevice(d)} title={tr(d)} aria-label={tr(d)} aria-pressed={device === d}><Icon size={13} /></button>)}</div>}
         {tab === 'preview' && !!p.code && <div className="preview-viewport-tools">
-          <button className="ui-icon" onClick={() => setFitMode(mode => mode === 'fit' ? 'actual' : 'fit')} title={fitMode === 'fit' ? 'Show actual size with scrolling' : 'Fit the entire viewport'} aria-label={fitMode === 'fit' ? 'Actual size' : 'Fit to screen'} aria-pressed={fitMode === 'fit'}><Eye size={16}/><span className="preview-tool-text">{fitMode === 'fit' ? 'Fit' : '100%'}</span></button>
-          <button className="ui-icon" onClick={() => setFullScreen(v => !v)} title={fullScreen ? 'Exit fullscreen (Esc)' : 'Expand preview'} aria-label={fullScreen ? 'Exit fullscreen' : 'Expand preview'}>{fullScreen ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}</button>
+          <button className="ui-icon" onClick={() => setFitMode(mode => mode === 'fit' ? 'actual' : 'fit')} title={fitMode === 'fit' ? tr('Show actual size with scrolling') : tr('Fit the entire viewport')} aria-label={fitMode === 'fit' ? tr('Actual size') : tr('Fit to screen')} aria-pressed={fitMode === 'fit'}><Eye size={16}/><span className="preview-tool-text">{fitMode === 'fit' ? tr('Fit') : '100%'}</span></button>
+          <button className="ui-icon" onClick={() => setFullScreen(v => !v)} title={fullScreen ? tr('Exit fullscreen (Esc)') : tr('Expand preview')} aria-label={fullScreen ? tr('Exit fullscreen') : tr('Expand preview')}>{fullScreen ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}</button>
         </div>}
-        <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : `${device === 'desktop' ? 'Desktop' : device === 'tablet' ? 'Tablet' : 'Mobile'} · ${Math.round(scale * 100)}%`}</span>
+        <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : `${tr(device === 'desktop' ? 'Desktop' : device === 'tablet' ? 'Tablet' : 'Mobile')} · ${Math.round(scale * 100)}%`}</span>
       </div>
       {!!p.code && <div className="preview-actions" aria-label={tr("Preview actions")}>
         <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select" title={p.generating ? tr("Wait for the current generation to finish") : tab !== 'preview' ? tr("Switch to the Preview tab to select elements") : tr("Select element")}><MousePointer2 size={13} /><span>{tr("Select element")}</span></button>
@@ -216,8 +245,8 @@ export function PreviewPane(p: Props) {
             <button disabled={!p.code} onClick={() => download('index.html', buildPreviewHtml(p.code, undefined, p.backend), 'text/html')} aria-label={tr(".html")}><Code2 size={16} /><span>{tr("Standalone HTML")}</span></button>
           </div>
         </details>
-        <div className="preview-more-wrap">
-          <button className="ui-icon" onClick={() => setShowAdvanced(v => !v)} aria-expanded={showAdvanced} aria-label="More preview tools" title="More tools"><MoreHorizontal size={18}/></button>
+        <div className="preview-more-wrap" ref={moreWrapRef}>
+          <button className="ui-icon" onClick={() => setShowAdvanced(v => !v)} aria-expanded={showAdvanced} aria-label={tr("More preview tools")} title={tr("More tools")}><MoreHorizontal size={18}/></button>
           {showAdvanced && <div className="preview-more-menu">
             <button disabled={p.generating} onClick={() => {setShowTests(true);setShowAdvanced(false);}}><FlaskConical size={15}/>{tr('Test UI')}</button>
             <button disabled={p.generating || !Object.keys(exportFiles).length} onClick={() => {setShowShare(true);setShowAdvanced(false);}}><Share2 size={15}/>{tr('Share')}</button>
@@ -228,6 +257,7 @@ export function PreviewPane(p: Props) {
       {editing && tab === 'preview' && selected === null && <p className="selection-hint"><MousePointer2 size={13} />{tr("Select anything in the preview to edit its properties.")}</p>}
       {!!p.locks.length && <details className="locks-list"><summary>{tr("Locked elements (")}{p.locks.length}{tr(") — protected in saved JSX")}</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>{tr("Unlock")}</button></div>)}</details>}
       {exportError && <p role="alert" className="mx-3 my-2 text-xs">{tr(exportError)}</p>}
+      {exportNotice && <p role="status" className="export-notice">{exportNotice}</p>}
       {p.apiError && <div role="alert" className="preview-error"><AlertTriangle size={15} /><span>{tr(p.apiError)}</span>{p.onRetryError && <button className="preview-error-retry" onClick={p.onRetryError}><RotateCcw size={13} />{tr("Retry")}</button>}<button onClick={p.onDismissError} aria-label={tr("Dismiss error")}>✕</button></div>}
       {!!screenNavigation(p.project).length && <nav aria-label={tr("Screen navigation")} className="screen-navigation">{screenNavigation(p.project).map((link, i) => <button key={i} className="ui-button" onClick={() => p.onNavigate(link.id)}>{link.label}<ArrowUpRight size={12} /></button>)}</nav>}
       {showTests && createPortal(<TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />, document.body)}
