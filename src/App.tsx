@@ -335,6 +335,8 @@ function WorkspaceApp() {
   };
   const runRef = useRef(run);
   runRef.current = run;
+  const lastRunRef = useRef<{ instruction?: string; fresh?: boolean }>({});
+  const runTracked = (args: { instruction?: string; fresh?: boolean }) => { lastRunRef.current = args; runRef.current(args); };
   const loadPresetRef = useRef<(key: PresetKey) => void>(() => {});
   useEffect(() => {
     if (!api || home || !draft || enteredDraft.current) return;
@@ -350,7 +352,7 @@ function WorkspaceApp() {
     }
     if (draft.text) {
       setFocusPane('preview'); setMobilePane('preview');
-      runRef.current({instruction:draft.text});
+      runTracked({instruction:draft.text});
       if (hasModel) setPrompt('');
     }
   }, [api, home]);
@@ -472,7 +474,7 @@ function WorkspaceApp() {
     sigRef.current = sigOf(a.getSceneElements());
     persistScene(a.getSceneElements(), a.getFiles());
     // let the canvas paint before exporting
-    setTimeout(() => runRef.current({ fresh: true }), 150);
+    setTimeout(() => runTracked({ fresh: true }), 150);
   };
 
   loadPresetRef.current = loadPreset;
@@ -502,7 +504,7 @@ function WorkspaceApp() {
   const submitPrompt = () => {
     const text = prompt.trim();
     if (!text && !apiRef.current?.getSceneElements().length && !referenceRef.current) return;
-    runRef.current({ instruction: text });
+    runTracked({ instruction: text });
     setPrompt('');
   };
 
@@ -598,6 +600,7 @@ function WorkspaceApp() {
             onStop={stop}
             onFix={(err) => runRef.current({ fixError: err })}
             onDismissError={() => setApiError(null)}
+            onRetryError={() => { setApiError(null); runRef.current(lastRunRef.current); }}
             onOpenSettings={() => setShowSettings(true)}
             onCodeChange={code => { assertLockedElements(code, locksRef.current[project.activeId] || []); pushVersion(code); }}
             onElementRequest={(instruction) => runRef.current({ instruction })}
@@ -614,7 +617,7 @@ function WorkspaceApp() {
           <div className="prompt-row"><span className="composer-mark"><Sparkles size={18} strokeWidth={1.5} /></span>
             <input aria-label={tr("Describe your interface")} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submitPrompt(); }} disabled={generating} placeholder={code ? tr("What would you like to change?") : tr("Describe your idea, or let your sketch do the talking…")} />
             <span className="composer-shortcut"><kbd>{tr("Ctrl")}</kbd><kbd>↵</kbd></span>
-            <button onClick={() => { if (generating) stop(); else { runRef.current({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary send-button" aria-label={generating ? tr("Stop generation") : tr("Send")} title={generating ? tr("Stop generation") : tr("Generate interface (Ctrl + Enter)")}>{generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}<span>{generating ? tr("Stop") : code ? tr("Update interface") : tr("Generate interface")}</span><ArrowUp size={16} /></button>
+            <button onClick={() => { if (generating) stop(); else { runTracked({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary send-button" aria-label={generating ? tr("Stop generation") : tr("Send")} title={generating ? tr("Stop generation") : tr("Generate interface (Ctrl + Enter)")}>{generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}<span>{generating ? tr("Stop") : code ? tr("Update interface") : tr("Generate interface")}</span><ArrowUp size={16} /></button>
           </div>
           <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><div className="quick-prompts">{code && <span className="next-steps-label">{tr("Next steps")}</span>}{(code ? suggestNextSteps(code, liveProject.screens.length) : ['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']).map(q => <button key={q} disabled={generating} onClick={() => { setPrompt(tr(q)); document.querySelector<HTMLInputElement>('footer input')?.focus(); }} className="quick-prompt">{tr(q)}</button>)}</div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
         </div>

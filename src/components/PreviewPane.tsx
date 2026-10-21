@@ -16,6 +16,7 @@ import {
   Square,
   Tablet,
   Plus, Wand2, MousePointer2, Github, Share2, FlaskConical, FileCode2, Sparkles, ArrowUpRight, Rocket,
+  RotateCcw,
 } from 'lucide-react';
 import { materializeAssets } from '../lib/designAssets';
 import { materializeLibrary } from '../lib/componentLibrary';
@@ -51,6 +52,7 @@ interface Props {
   onStop: () => void;
   onFix: (error: string) => void;
   onDismissError: () => void;
+  onRetryError?: () => void;
   onOpenSettings: () => void;
   onCodeChange: (code: string) => void;
   onElementRequest: (instruction: string) => void;
@@ -226,7 +228,7 @@ export function PreviewPane(p: Props) {
       {editing && tab === 'preview' && selected === null && <p className="selection-hint"><MousePointer2 size={13} />{tr("Select anything in the preview to edit its properties.")}</p>}
       {!!p.locks.length && <details className="locks-list"><summary>{tr("Locked elements (")}{p.locks.length}{tr(") — protected in saved JSX")}</summary>{p.locks.map((snippet, i) => <div key={i} className="flex gap-2 py-1"><code className="min-w-0 flex-1 truncate">{snippet.slice(0, 120)}</code><button onClick={() => p.onToggleLock(snippet)}>{tr("Unlock")}</button></div>)}</details>}
       {exportError && <p role="alert" className="mx-3 my-2 text-xs">{tr(exportError)}</p>}
-      {p.apiError && <div role="alert" className="preview-error"><AlertTriangle size={15} /><span>{tr(p.apiError)}</span><button onClick={p.onDismissError} aria-label={tr("Dismiss error")}>✕</button></div>}
+      {p.apiError && <div role="alert" className="preview-error"><AlertTriangle size={15} /><span>{tr(p.apiError)}</span>{p.onRetryError && <button className="preview-error-retry" onClick={p.onRetryError}><RotateCcw size={13} />{tr("Retry")}</button>}<button onClick={p.onDismissError} aria-label={tr("Dismiss error")}>✕</button></div>}
       {!!screenNavigation(p.project).length && <nav aria-label={tr("Screen navigation")} className="screen-navigation">{screenNavigation(p.project).map((link, i) => <button key={i} className="ui-button" onClick={() => p.onNavigate(link.id)}>{link.label}<ArrowUpRight size={12} /></button>)}</nav>}
       {showTests && createPortal(<TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />, document.body)}
       {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}

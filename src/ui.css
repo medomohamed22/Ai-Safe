@@ -185,6 +185,7 @@ iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review p
 .preview-error { display:flex; align-items:flex-start; gap:8px; margin:8px 12px; font-size:11px }
 .preview-error>span { min-width:0; flex:1; overflow-wrap:anywhere }
 .preview-error>svg { flex-shrink:0 }
+.preview-error-retry { display:inline-flex; align-items:center; gap:5px; flex-shrink:0; min-height:28px; padding:3px 10px; border:1px solid var(--ui-line); border-radius:999px; font-size:11px; font-weight:500; color:var(--ui-text); background:var(--ui-surface); cursor:pointer }
 .screen-navigation { display:flex; flex-wrap:wrap; gap:6px; border-bottom:1px solid var(--ui-border); padding:7px 12px }
 .screen-navigation .ui-button { min-height:26px; font-size:10px }
 .preview-stage { position:relative; flex:1; min-height:0; overflow:auto; background-color:var(--ui-bg); background-image:radial-gradient(var(--ui-grid) .6px,transparent .6px); background-size:14px 14px }
