@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@excalidraw/excalidraw/index.css';
+// Excalidraw's stylesheet loads with its lazy chunk (see SketchCanvas).
 import './index.css';
 import App from './App';
 import {applyLanguage} from './lib/i18n';

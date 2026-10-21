@@ -158,6 +158,7 @@
  .studio-tools-sheet .sidebar-section-label { padding-top:14px; }
  .studio-shell .empty-state { overflow-y:auto; }
 }
+.canvas-loading { height:100%; display:flex; align-items:center; justify-content:center; color:var(--ui-muted); font-size:12px; }
 .drawing-surface { container-type:inline-size; }
 @container (max-width: 500px) {
  .drawing-surface .excalidraw .App-top-bar>div { width:100%; min-width:0; }
