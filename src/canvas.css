@@ -11,6 +11,9 @@
 .home-intro { max-width:860px; margin:0 auto; text-align:center; }
 .home-kicker { display:inline-flex; align-items:center; gap:8px; font-size:11px; color:var(--ui-muted); }
 .home-intro>.home-kicker { border:1px solid var(--ui-border); padding:9px 14px; border-radius:30px; }
+.demo-beacon { display:inline-flex; align-items:center; gap:8px; margin-top:16px; font-size:11px; color:var(--ui-muted); border:1px solid var(--ui-border); border-radius:999px; padding:6px 13px; }
+.demo-beacon.is-on { color:var(--ui-text); }
+.demo-beacon.is-on>.status-dot { background:var(--ui-text); }
 .home-intro h1 { margin:25px 0 16px; font-size:clamp(44px,4.7vw,72px); line-height:1.06; letter-spacing:-3.8px; font-weight:450; }
 .home-intro h1>span { color:var(--ui-muted); }
 .home-intro p { font-size:13px; color:var(--ui-muted); line-height:1.8; }
