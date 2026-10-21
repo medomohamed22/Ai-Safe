@@ -176,4 +176,18 @@
 .map-arrow { fill:var(--ui-muted); }
 .map-edge-label { fill:var(--ui-muted); font-size:12px; }
 .screen-map-hint { position:absolute; left:14px; bottom:12px; font-size:12px; color:var(--ui-muted); background:var(--ui-surface); border:1px solid var(--ui-line); border-radius:999px; padding:5px 12px; pointer-events:none; }
+.map-card-preview { position:relative; }
+.map-order { display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:19px; padding:0 4px; border:1px solid var(--ui-line); border-radius:999px; font-size:11px; font-weight:600; color:var(--ui-muted); flex-shrink:0; }
+.map-edge-hit { fill:none; stroke:transparent; stroke-width:16; cursor:pointer; }
+.map-edge.is-selected { stroke:var(--ui-text); stroke-width:2.6; }
+.map-card.is-link-source { border-color:var(--ui-text); box-shadow:0 0 0 2px var(--ui-text), 0 8px 24px rgb(0 0 0 / .10); }
+.screen-map-viewport.is-linking .map-card { cursor:pointer; }
+.map-sketch-img { width:100%; height:100%; object-fit:contain; display:block; background:#fff; }
+.map-preview-overlay { position:absolute; inset:0; background:var(--ui-bg); animation:map-fade 240ms var(--motion-ease); }
+.map-preview-note { position:absolute; left:8px; bottom:8px; font-size:10px; font-weight:500; color:var(--ui-muted); background:var(--ui-surface); border:1px solid var(--ui-line); border-radius:999px; padding:2px 8px; }
+@keyframes map-fade { from { opacity:0; } to { opacity:1; } }
+.map-linkbar { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:6; display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center; max-width:calc(100% - 24px); background:var(--ui-surface); border:1px solid var(--ui-line); border-radius:14px; padding:9px 10px; box-shadow:0 12px 32px rgb(0 0 0 / .14); animation:map-fade 240ms var(--motion-ease); }
+.map-linkbar-route { font-size:12px; font-weight:600; white-space:nowrap; }
+.map-linkbar input { border:1px solid var(--ui-line); background:var(--ui-bg); color:var(--ui-text); border-radius:8px; padding:7px 10px; font-size:12px; min-width:150px; min-height:34px; }
+.screen-map-tools { flex-wrap:wrap; justify-content:flex-end; }
 
