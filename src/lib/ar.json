@@ -956,5 +956,20 @@
   "Mobile": "هاتف",
   "Saved": "تم حفظ",
   "Backup downloaded: sketch2ui-project-backup.json": "تم تنزيل النسخة الاحتياطية: sketch2ui-project-backup.json",
-  "About app data: inside Sketch2UI previews, the editor keeps an app's localStorage per screen, so data survives design edits here. In shared and published links it lasts only while the page is open — it is not saved on a server. In an exported standalone HTML file or project, the browser's real localStorage applies.": "عن بيانات التطبيق: داخل معاينات Sketch2UI يحتفظ المحرر بـ localStorage لكل شاشة، فتبقى البيانات بعد تعديلات التصميم هنا. وفي روابط المشاركة والنشر تدوم البيانات فقط أثناء فتح الصفحة — لا تُحفظ على خادم. أما في ملف HTML مستقل أو مشروع مُصدَّر فينطبق localStorage الحقيقي للمتصفح."
+  "About app data: inside Sketch2UI previews, the editor keeps an app's localStorage per screen, so data survives design edits here. In shared and published links it lasts only while the page is open — it is not saved on a server. In an exported standalone HTML file or project, the browser's real localStorage applies.": "عن بيانات التطبيق: داخل معاينات Sketch2UI يحتفظ المحرر بـ localStorage لكل شاشة، فتبقى البيانات بعد تعديلات التصميم هنا. وفي روابط المشاركة والنشر تدوم البيانات فقط أثناء فتح الصفحة — لا تُحفظ على خادم. أما في ملف HTML مستقل أو مشروع مُصدَّر فينطبق localStorage الحقيقي للمتصفح.",
+  "Show only models suited to UI generation": "إظهار النماذج المناسبة لتوليد الواجهات فقط",
+  "{0} media or utility models hidden by the filter": "{0} نموذج وسائط أو أدوات مخفي بالمرشّح",
+  "media": "وسائط",
+  "Starts 3 separate generation requests": "يبدأ ٣ طلبات توليد منفصلة",
+  "Waiting for this design…": "بانتظار هذا التصميم…",
+  "Link length: {0} characters": "طول الرابط: {0} حرف",
+  "Very long links can be truncated by some chat and email apps. For a large app, export the project ZIP or use Export to GitHub instead.": "الروابط الطويلة جدًا قد تُقتطع في بعض تطبيقات المحادثة والبريد. للتطبيقات الكبيرة، صدّر ملف ZIP للمشروع أو استخدم التصدير إلى GitHub بدلًا من ذلك.",
+  "This app is too large for a publish link (60 KB encoded limit). Export the project ZIP or push it to GitHub instead.": "هذا التطبيق أكبر من أن يسعه رابط نشر (الحد ٦٠ كيلوبايت بعد الترميز). صدّر ملف ZIP للمشروع أو ارفعه إلى GitHub بدلًا من ذلك.",
+  "Build": "البناء",
+  "Responsive": "التجاوب",
+  "Accessibility": "إمكانية الوصول",
+  "Acceptance scenarios": "سيناريوهات القبول",
+  "Passed": "ناجح",
+  "Capture the generated page at 820px, compare normalized pixels with your reference, and ask AI for specific improvements. Pixel difference is not a design-quality score. Before you start: capturing needs the runner service — set it up under Service connection below (locally: npm run serve). Without it, capture is unavailable on this deployment and comparisons cannot run.": "التقط الصفحة المولّدة بعرض ٨٢٠ بكسل، وقارن البكسلات المُطبّعة بمرجعك، واطلب من الذكاء الاصطناعي تحسينات محددة. فرق البكسلات ليس درجة لجودة التصميم. قبل أن تبدأ: الالتقاط يحتاج خدمة التشغيل — جهّزها من «اتصال الخدمة» بالأسفل (محليًا: npm run serve). بدونها لا يتوفر الالتقاط في هذا النشر ولا يمكن إجراء المقارنات.",
+  "Generating…": "جارٍ التوليد…"
 }
