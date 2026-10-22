@@ -929,5 +929,11 @@
   "Generating the interface…": "جارٍ بناء الواجهة…",
   "Your new version is ready in the preview.": "نسختك الجديدة جاهزة في المعاينة.",
   "Generation stopped.": "توقف التوليد.",
-  "Fix the runtime error": "إصلاح خطأ التشغيل"
+  "Fix the runtime error": "إصلاح خطأ التشغيل",
+  "SETUP ERROR": "خطأ إعداد",
+  "BLOCKED": "محجوب",
+  "NOT TESTED": "غير مختبَر",
+  "Checking the build service…": "جارٍ فحص خدمة البناء…",
+  "Build service is available — the production bundle check will run.": "خدمة البناء متاحة — سيعمل فحص حزمة الإنتاج.",
+  "Build service is not available on this deployment — the bundle check will be marked blocked, not failed. Connect a service below or see the README.": "خدمة البناء غير متاحة في هذا النشر — سيُعلَّم فحص الحزمة كمحجوب لا كفشل. وصّل خدمة من الأسفل أو راجع README."
 }

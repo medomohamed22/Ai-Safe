@@ -114,8 +114,19 @@ export function PreviewPane(p: Props) {
     : 1;
   const scale = fitMode === 'fit' ? Math.max(0.1, fitScale) : 1;
 
+  // Preview app storage (P1-01): the sandboxed document cannot keep
+  // localStorage, so the editor persists each screen's app data under its
+  // own key, seeds the document with it, and saves the snapshots the
+  // document posts back. Keyed per screen: one project's data never
+  // seeds another screen's preview.
+  const storageKey = (screenId: string) => `s2ui.previewstore.v1.${screenId}`;
+  const activeScreenRef = useRef(p.project.activeId);
+  useEffect(() => { activeScreenRef.current = p.project.activeId; }, [p.project.activeId]);
+  const readSeed = (screenId: string): Record<string, string> | null => {
+    try { const raw = localStorage.getItem(storageKey(screenId)); if (!raw) return null; const parsed = JSON.parse(raw); return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null; } catch { return null; }
+  };
   const token = useMemo(() => crypto.randomUUID(), [p.code]);
-  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token }, p.backend) : ''), [p.code, token, p.backend, libraryRevision]);
+  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId) }, p.backend) : ''), [p.code, token, p.backend, libraryRevision, p.project.activeId]);
   const sendMode = (enabled: boolean) => iframeRef.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled }, '*');
 
   useEffect(() => { sendMode(editing && !p.generating && tab === 'preview'); }, [editing, p.generating, tab, token]);
@@ -134,6 +145,9 @@ export function PreviewPane(p: Props) {
       if (d?.source !== 's2ui-preview') return;
       if (d.type === 'error') setRuntimeError((prev) => prev ?? String(d.message));
       if (d.type === 'ready') sendMode(editingRef.current && !p.generating && tab === 'preview');
+      if (d.type === 'storage' && d.token === token && d.data && typeof d.data === 'object' && !Array.isArray(d.data)) {
+        try { const text = JSON.stringify(d.data); if (text.length <= 512000) localStorage.setItem(storageKey(activeScreenRef.current), text); } catch { /* quota or serialization: the in-document store keeps working */ }
+      }
       if (d.type === 'element-selected' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && d.id >= 0) {
         try { describeElement(p.code, d.id); setSelected(d.id); } catch { setSelected(null); }
       }

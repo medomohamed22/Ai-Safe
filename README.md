@@ -118,6 +118,14 @@ npm run dev
 
 Open http://localhost:5173 → ⚙️ Settings → add a provider → paste your key → **Fetch models** → pick a vision model.
 
+## Quality build service (optional Node service)
+
+Some checks need a real Node runtime and cannot run on a static deployment: the production bundle check in the Productivity studio's Quality tab, screenshots for visual compare, and bundling imported projects. They are served by `server.mjs` (routes `/api/quality`, `/api/screenshot`, `/api/project-bundle`).
+
+- **Editor only:** `npm run dev` serves the editor alone. On any deployment without the service, those checks report themselves as **blocked** — an environment limit — never as failures of your code. The Quality tab probes the service when it opens and shows its state up front.
+- **Full local stack:** `npm run build` then `npm run serve` serves the built app AND the service at http://127.0.0.1:5175 (`PORT` and `HOST` env vars override).
+- **Hosted editor (e.g. Vercel):** the static deployment has no Node service of its own. Run `server.mjs` on any Node host and point the editor at it from Productivity studio -> Service connection (service URL + optional token, kept in session storage only). When the service runs on a different origin, set `RUNNER_TOKEN` (a shared secret the editor sends as a Bearer token) and `APP_ORIGIN` (the editor's exact origin) on the service. Never commit secrets to the repository.
+
 ## Verify changes
 
 ```bash
