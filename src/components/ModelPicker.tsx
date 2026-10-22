@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Eye, Search, Settings2 } from 'lucide-react';
 import type { AppSettings } from '../types';
 import { modelPurpose } from '../lib/modelKinds';
+import { deadModels } from '../lib/providers';
 
 interface Props {
   settings: AppSettings;
@@ -36,10 +37,10 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
       .map((p) => {
         const searched = p.models.filter((m) => !s || m.id.toLowerCase().includes(s) || m.name.toLowerCase().includes(s));
         const models = suitableOnly ? searched.filter((m) => modelPurpose(m) === 'code') : searched;
-        return { provider: p, models, hidden: searched.length - models.length };
+        return { provider: p, models, hidden: searched.length - models.length, dead: new Set(deadModels(p.id)) };
       })
       .filter((g) => g.models.length || g.hidden > 0);
-  }, [settings.providers, q, suitableOnly]);
+  }, [settings.providers, q, suitableOnly, open]);
   const hiddenTotal = groups.reduce((n, g) => n + g.hidden, 0);
 
   const total = settings.providers.reduce((n, p) => n + p.models.length, 0);
@@ -87,7 +88,7 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
           ) : (
           <div className="max-h-[360px] overflow-y-auto py-1">
             {groups.length === 0 && <div className="px-4 py-6 text-center text-sm text-[var(--ui-muted)]">{tr("No models match “{0}”.", [q])}</div>}
-            {groups.map(({ provider, models, hidden }) => (
+            {groups.map(({ provider, models, hidden, dead }) => (
               <div key={provider.id}>
                 <div className="sticky top-0 bg-[var(--ui-surface)]/95 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--ui-muted)]">
                   {provider.name} · {models.length}
@@ -116,6 +117,7 @@ export function ModelPicker({ settings, onSelect, onOpenSettings }: Props) {
                         )}
                       </span>
                       {!suitableOnly && modelPurpose(m) === 'media' && <span className="model-media-chip">{tr("media")}</span>}
+                      {dead.has(m.id) && <span className="model-media-chip" title={tr("Not found on this provider earlier")}>{tr("not found")}</span>}
                       {m.vision && <Eye className="h-3.5 w-3.5 shrink-0 text-[var(--ui-text)]" aria-label={tr("vision")} />}
                     </button>
                   );

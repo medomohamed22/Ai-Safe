@@ -2,7 +2,7 @@ import { tr } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Download, ExternalLink, Eye, EyeOff, Loader2, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import type { AppSettings, ProviderConfig, ProviderType } from '../types';
-import { PROVIDER_PRESETS, createProvider, fetchModels, pickDefaultModel } from '../lib/providers';
+import { PROVIDER_PRESETS, createProvider, deadModels, fetchModels, pickDefaultModel } from '../lib/providers';
 import { clearAll } from '../lib/storage';
 import { DEMO_DISMISSED_KEY } from '../lib/demo';
 
@@ -260,7 +260,7 @@ function ProviderEditor({
       if (!models.length) setErr('Provider returned 0 models.');
       // auto-select a sensible default if nothing is active yet
       if (!settings.activeModelId || settings.activeProviderId === p.id && !models.some((m) => m.id === settings.activeModelId)) {
-        const def = pickDefaultModel(models);
+        const def = pickDefaultModel(models, deadModels(p.id));
         if (def) selectModel(def);
       }
     } catch (e: any) {

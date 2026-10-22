@@ -59,6 +59,7 @@ interface Props {
   onOpenSettings: () => void;
   onCodeChange: (code: string) => void;
   onElementRequest: (instruction: string) => void;
+  onElementAgent: (instruction: string, id: number) => void;
   segmentOverlay?: SegmentOverlayData | null;
   onCloseSegments?: () => void;
 }
@@ -79,6 +80,8 @@ export function PreviewPane(p: Props) {
   const [showGenerationDetails, setShowGenerationDetails] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [previewReady, setPreviewReady] = useState(false);
+  const [slowLoad, setSlowLoad] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
@@ -160,16 +163,28 @@ export function PreviewPane(p: Props) {
     setRuntimeError(null);
     setSelected(null);
     setDirectError('');
+    setPreviewReady(false);
+    setSlowLoad(false);
     if (p.code) setTab('preview');
   }, [p.code]);
+
+  // F3: the generated app loads its runtime from CDNs and compiles in the
+  // browser, which can take a while. Until the document posts 'ready', the
+  // stage shows a loading state instead of a blank white frame; after 15s
+  // it explains the wait and lets the user look anyway.
+  useEffect(() => {
+    if (!p.code || previewReady) return;
+    const t = setTimeout(() => setSlowLoad(true), 15000);
+    return () => clearTimeout(t);
+  }, [p.code, previewReady]);
 
   useEffect(() => {
     const h = (e: MessageEvent) => {
       if (e.source !== iframeRef.current?.contentWindow) return;
       const d = e.data;
       if (d?.source !== 's2ui-preview') return;
-      if (d.type === 'error') setRuntimeError((prev) => prev ?? String(d.message));
-      if (d.type === 'ready') sendMode(editingRef.current && !p.generating && tab === 'preview');
+      if (d.type === 'error') { setRuntimeError((prev) => prev ?? String(d.message)); setPreviewReady(true); }
+      if (d.type === 'ready') { setPreviewReady(true); sendMode(editingRef.current && !p.generating && tab === 'preview'); }
       if (d.type === 'storage' && d.token === token && d.data && typeof d.data === 'object' && !Array.isArray(d.data)) {
         try { const text = JSON.stringify(d.data); if (text.length <= 512000) localStorage.setItem(storageKey(activeScreenRef.current), text); } catch { /* quota or serialization: the in-document store keeps working */ }
       }
@@ -310,7 +325,7 @@ export function PreviewPane(p: Props) {
         </div>
       )}
       <div className="preview-workarea"><div className="preview-stage">
-        <div className="preview-tab-content" ref={stageRef} hidden={tab !== 'preview'}>{p.code ? <div className={`preview-viewport${fitMode === 'actual' ? ' is-actual' : ''}`}><div className="preview-size-placeholder" style={{ width: designWidth * scale, height: designHeight * scale }}><div className="preview-document" style={{ width: designWidth, height: designHeight, transform: `scale(${scale})` }} data-device={device}><iframe ref={iframeRef} title={tr("Live preview")} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div></div></div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>{tr("React / JSX")}</span></div><pre>{p.code || '// ' + tr('Your code will appear here')}</pre></div>
+        <div className="preview-tab-content" ref={stageRef} hidden={tab !== 'preview'}>{p.code ? <div className={`preview-viewport${fitMode === 'actual' ? ' is-actual' : ''}`}><div className="preview-size-placeholder" style={{ width: designWidth * scale, height: designHeight * scale }}><div className="preview-document" style={{ width: designWidth, height: designHeight, transform: `scale(${scale})` }} data-device={device}><iframe ref={iframeRef} title={tr("Live preview")} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div></div>{!previewReady && <div className="preview-loading" role="status"><Loader2 className="animate-spin" size={22} /><p>{tr("Building your app…")}</p>{slowLoad && <><p className="preview-loading-note">{tr("Still loading — the preview builds its runtime from a CDN, so a slow connection can take a while.")}</p><button className="ui-button" onClick={() => setPreviewReady(true)}>{tr("Show the preview anyway")}</button></>}</div>}</div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>{tr("React / JSX")}</span></div><pre>{p.code || '// ' + tr('Your code will appear here')}</pre></div>
         {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>{tr("Something needs a quick fix")}</strong><p>{tr(runtimeError)}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />{tr("Fix with AI")}</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label={tr("Dismiss runtime error")}>✕</button></div>}
         {p.generating && <div className="generation-overlay" role="status" aria-live="polite">
           <div className="generation-heading"><span className="generation-icon"><Sparkles size={20}/></span><div><strong>{tr("Bringing your idea to life")}</strong><p>{tr("Generating with ")}{p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11}/>{tr("Stop")}</button></div>
@@ -327,7 +342,7 @@ export function PreviewPane(p: Props) {
         </div>}
       </div>
       {directError && tab === 'preview' && <p role="alert" className="direct-error">{tr(directError)}</p>}
-      {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onClose={() => setSelected(null)} />}
+      {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onAgentRequest={p.onElementAgent} onClose={() => setSelected(null)} />}
       </div>
       <div className="panel-footnote preview-footnote"><span className="status-dot" />{tab === 'preview' ? tr("Interactive preview") : tr("Your generated source")}<span>{p.code ? tr("Ready to refine") : tr("Waiting for your first idea")}</span></div>
     </div>

@@ -1,4 +1,5 @@
 import { reserveRequest } from './usage';
+import { load, save } from './storage';
 import type { ModelInfo, ProviderConfig, ProviderType } from '../types';
 
 export const PROVIDER_PRESETS: Record<
@@ -110,7 +111,9 @@ async function ensureOk(res: Response) {
   if (res.ok) return;
   const t = await res.text().catch(() => '');
   if (t) console.warn(`[Sketch2UI] provider HTTP ${res.status}:`, t.slice(0, 500));
-  throw new Error(friendlyHttpError(res.status));
+  const err = new Error(friendlyHttpError(res.status)) as Error & { status?: number };
+  err.status = res.status;
+  throw err;
 }
 
 function openAIHeaders(p: ProviderConfig): Record<string, string> {
@@ -179,12 +182,35 @@ const PREFERRED = [
   'claude-sonnet',
 ];
 
-export function pickDefaultModel(models: ModelInfo[]): string | null {
+// Models a provider has answered 404 for (F2): a listed model is not always a
+// generatable one — e.g. Gemini lists gemini-2.5-flash for keys that cannot
+// call it. The mark is remembered per provider so the default pick skips it
+// and the picker warns on the row; a later successful run with the model
+// clears the mark again, so the list heals itself.
+export const DEAD_MODELS_KEY = 's2ui.dead-models.v1';
+export function deadModels(providerId: string): string[] {
+  const all = load<Record<string, string[]>>(DEAD_MODELS_KEY, {});
+  return all[providerId] || [];
+}
+export function markModelDead(providerId: string, model: string): void {
+  const all = load<Record<string, string[]>>(DEAD_MODELS_KEY, {});
+  const list = all[providerId] || [];
+  if (!list.includes(model)) { all[providerId] = [...list, model]; save(DEAD_MODELS_KEY, all); }
+}
+export function unmarkModelDead(providerId: string, model: string): void {
+  const all = load<Record<string, string[]>>(DEAD_MODELS_KEY, {});
+  const list = all[providerId] || [];
+  if (list.includes(model)) { all[providerId] = list.filter((m) => m !== model); save(DEAD_MODELS_KEY, all); }
+}
+
+export function pickDefaultModel(models: ModelInfo[], exclude: string[] = []): string | null {
+  const pool = models.filter((m) => !exclude.includes(m.id));
+  const list = pool.length ? pool : models;
   for (const pref of PREFERRED) {
-    const m = models.find((x) => x.id.toLowerCase().includes(pref) && !/preview|exp|lite|free/.test(x.id.toLowerCase()));
+    const m = list.find((x) => x.id.toLowerCase().includes(pref) && !/preview|exp|lite|free/.test(x.id.toLowerCase()));
     if (m) return m.id;
   }
-  return (models.find((m) => m.vision) || models[0])?.id ?? null;
+  return (list.find((m) => m.vision) || list[0])?.id ?? null;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -405,9 +431,26 @@ export async function generate(a: GenerateArgs): Promise<string> {
  if (a.signal.aborted) throw new DOMException('Aborted', 'AbortError');
  const finish = reserveRequest(a.model, a.provider.id || a.provider.type, a.temperature + '\n' + a.system + '\n' + a.userText, a.imageDataUrls ?? (a.imageDataUrl ? [a.imageDataUrl] : []));
  let output = ''; let actual: {input:number;output:number} | undefined;
+ const attempt = () => generateRaw({ ...a, onToken: text => { output = text; a.onToken(text); }, onUsage: u => { actual = u; a.onUsage?.(u); } });
  try {
-  const result = await generateRaw({ ...a, onToken: text => { output = text; a.onToken(text); }, onUsage: u => { actual = u; a.onUsage?.(u); } });
+  let result: string;
+  try { result = await attempt(); }
+  catch (e) {
+   const status = (e as { status?: number }).status;
+   // F5: one automatic retry for transient failures (rate limit, provider
+   // 5xx, network drop) — but only before any token streamed, because
+   // retrying mid-stream would duplicate the reply text.
+   const transient = status === 429 || (status !== undefined && status >= 500) || e instanceof TypeError;
+   if (!transient || output !== '' || a.signal.aborted) throw e;
+   await new Promise(r => setTimeout(r, 1200));
+   if (a.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+   result = await attempt();
+  }
   if (a.signal.aborted) throw new DOMException('Aborted','AbortError');
+  unmarkModelDead(a.provider.id || a.provider.type, a.model);
   finish('done', result, actual); return result;
- } catch(e) { finish(a.signal.aborted ? 'cancelled' : 'failed', output, actual); throw e; }
+ } catch(e) {
+  if ((e as { status?: number }).status === 404) markModelDead(a.provider.id || a.provider.type, a.model);
+  finish(a.signal.aborted ? 'cancelled' : 'failed', output, actual); throw e;
+ }
 }
