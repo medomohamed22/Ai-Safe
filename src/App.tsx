@@ -7,9 +7,10 @@ import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Se
 
 import type { AppSettings } from './types';
 import { KEYS, load, loadSettings, save } from './lib/storage';
-const draftKey = (screenId: string) => `s2ui.draft.v1.${screenId}`;
+const draftKey = (screenId: string, scope = 'default') => `s2ui.draft.v1.${scope}.${screenId}`;
 import { suggestNextSteps } from './lib/next-steps';
-import { libraryPrompt } from './lib/componentLibrary';
+import { components, libraryPrompt, saveComponents } from './lib/componentLibrary';
+import { usage } from './lib/usage';
 import { parsePlanAnswer, planKey, planPrompt, type BuildPlan } from './lib/plans';
 import { createDemoProvider, generate } from './lib/providers';
 import { enhanceCodeWithImages, findImageSlots, imageModelFor } from './lib/imageGen';
@@ -18,7 +19,7 @@ import { freshStages, setStage, snapshotStages, type StageEvent, type StageId } 
 import { sourceChecks } from './lib/quality';
 import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
-import { ELEMENT_AGENT_SYSTEM, applyElementReplacement, countChangedLines, elementAgentPrompt, elementContext, parseAgentReply } from './lib/elementAgent';
+import { ELEMENT_AGENT_INSERT_SYSTEM, ELEMENT_AGENT_SYSTEM, applyElementInsert, applyElementReplacement, countChangedLines, elementAgentPrompt, elementContext, elementInsertPrompt, parseAgentReply, type ElementContext } from './lib/elementAgent';
 import { PRESETS, type PresetKey } from './lib/presets';
 import { ModelPicker } from './components/ModelPicker';
 import { SettingsModal } from './components/SettingsModal';
@@ -37,13 +38,13 @@ import { ReferencePanel, type ReferenceImage } from './components/ReferencePanel
 import { AlternativesPanel, type DesignAlternative } from './components/AlternativesPanel';
 import { ReviewPage } from './components/ReviewPage';
 import { PublishedApp } from './components/PublishedApp';
-import { assertLockedElements, lockPrompt } from './lib/visualEdit';
+import { assertLockedElements, lockPrompt, sourceTree } from './lib/visualEdit';
 import { ThemeToggle, useTheme } from './components/ThemeProvider';
 import { useWorkspaceAutosave } from './lib/useWorkspaceAutosave';
 import { ProductivityPanel } from './components/ProductivityPanel';
 import { StudioSidebar } from './components/StudioSidebar';
 import { DesignHome } from './components/DesignHome';
-import { saveCurrentWorkspace, newWorkspace, openWorkspace, type WorkspaceRecord } from './lib/workspaces';
+import { ACTIVE_WORKSPACE, saveCurrentWorkspace, newWorkspace, openWorkspace, type WorkspaceRecord } from './lib/workspaces';
 import { createPortal } from 'react-dom';
 import { Menu, X, Maximize2, MonitorPlay, MessageSquare, PanelLeftOpen } from 'lucide-react';
 import { useDialogAccessibility } from './lib/useDialogAccessibility';
@@ -114,6 +115,10 @@ function WorkspaceApp() {
   const { theme } = useTheme();
   const initialProject = useMemo<ScreenProject>(() => load(KEYS.project, { activeId: 'home', links: [], screens: [{ id: 'home', name: 'Home', versions: load(KEYS.versions, []), vIndex: load(KEYS.vIndex, -1), scene: load(KEYS.scene, null) }] }), []);
   const initialScreen = initialProject.screens.find(s => s.id === initialProject.activeId) || initialProject.screens[0];
+  // Drafts are scoped to the workspace: every project's first screen is
+  // 'home', so an unscoped per-screen draft key leaks composer text (and
+  // would leak it back) across projects.
+  const workspaceScope = useMemo(() => load(ACTIVE_WORKSPACE, 'default'), []);
   const [project, setProject] = useState(initialProject);
   const [screenScene, setScreenScene] = useState<any>(initialScreen.scene);
   const [chat, setChat] = useState<ChatMessage[]>(initialScreen.chat ?? []);
@@ -146,6 +151,12 @@ function WorkspaceApp() {
   const [vIndex, setVIndex] = useState<number>(() => Math.min(initialScreen.vIndex, initialScreen.versions.length - 1));
   const [generating, setGenerating] = useState(false);
   const [stream, setStream] = useState('');
+  // Streaming preview (item 36): the latest streamed code that PARSES,
+  // shown live in the preview while the run finishes. Throttled so the
+  // preview rebuilds at most ~once a second, and a partial that does not
+  // parse yet simply keeps the last good frame.
+  const [partialCode, setPartialCode] = useState('');
+  const partialRef = useRef({ at: 0, code: '' });
   const [segmentOverlay, setSegmentOverlay] = useState<SegmentOverlayData | null>(null);
   // The visible production line: live stage state for the current run plus
   // the plan-approval gate (Plan-first). Stage marks never change what the
@@ -165,8 +176,8 @@ function WorkspaceApp() {
   const resetStages = () => { stagesRef.current = freshStages(); stageStartRef.current = {}; setRunStages(stagesRef.current); };
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [prompt, setPrompt] = useState(() => draft?.text || load(draftKey(initialScreen.id), ''));
-  useEffect(() => { const t = window.setTimeout(() => save(draftKey(project.activeId), prompt), 300); return () => window.clearTimeout(t); }, [prompt, project.activeId]);
+  const [prompt, setPrompt] = useState(() => draft?.text || load(draftKey(initialScreen.id, workspaceScope), ''));
+  useEffect(() => { const t = window.setTimeout(() => save(draftKey(project.activeId, workspaceScope), prompt), 300); return () => window.clearTimeout(t); }, [prompt, project.activeId, workspaceScope]);
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [backend, setBackend] = useState<BackendConfig>(() => load(KEYS.backend, DEFAULT_BACKEND));
   const [showBackend, setShowBackend] = useState(false);
@@ -384,6 +395,8 @@ function WorkspaceApp() {
     if (mobilePaneRef.current !== 'instructions') setMobilePane('preview');
     setGenerating(true);
     setStream('');
+    setPartialCode('');
+    partialRef.current = { at: 0, code: '' };
     setApiError(null);
     try {
       markStage('build', { status: 'active', model: s.activeModelId || undefined });
@@ -395,7 +408,20 @@ function WorkspaceApp() {
         imageDataUrls: [image, styleReference?.dataUrl].filter((value): value is string => !!value),
         temperature: s.temperature,
         signal: ctrl.signal,
-        onToken: (t) => setStream(t),
+        onToken: (t) => {
+          setStream(t);
+          const now = Date.now();
+          if (now - partialRef.current.at < 900) return;
+          partialRef.current.at = now;
+          try {
+            const candidate = extractCode(t);
+            if (candidate.length >= 30 && candidate !== partialRef.current.code) {
+              sourceTree(candidate); // throws while the JSX is still incomplete
+              partialRef.current.code = candidate;
+              setPartialCode(candidate);
+            }
+          } catch { /* partial code — keep the last good frame */ }
+        },
       });
       const c = extractCode(full);
       if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
@@ -412,7 +438,7 @@ function WorkspaceApp() {
         if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
         markStage('assets', { status: 'done', detail: !imgModel ? tr('No image model for this provider') : slotsBefore ? tr('{0} images generated', [Math.max(0, slotsBefore - findImageSlots(finalCode).length)]) : tr('No image slots in this design') });
       } else markStage('assets', { status: 'skipped', detail: tr('Auto-images off') });
-      if (opts.instruction && load(draftKey(screenId), '') === opts.instruction) save(draftKey(screenId), '');
+      if (opts.instruction && load(draftKey(screenId, workspaceScope), '') === opts.instruction) save(draftKey(screenId, workspaceScope), '');
       const checks = sourceChecks(finalCode);
       const passedChecks = checks.filter((x) => x.passed).length;
       markStage('review', { status: 'done', detail: tr('{0}/{1} source checks passed', [passedChecks, checks.length]) + (passedChecks < checks.length ? ' · ' + checks.filter((x) => !x.passed).map((x) => x.name).join(', ') : '') });
@@ -430,12 +456,13 @@ function WorkspaceApp() {
       // P1-05: a failed request keeps its context — the instruction returns
       // to the composer and the screen's draft so Retry (or an edit) does
       // not need retyping. The current design/version stays untouched.
-      if (opts.instruction?.trim()) { save(draftKey(screenId), opts.instruction); setPrompt(cur => (cur.trim() ? cur : opts.instruction!)); }
+      if (opts.instruction?.trim()) { save(draftKey(screenId, workspaceScope), opts.instruction); setPrompt(cur => (cur.trim() ? cur : opts.instruction!)); }
     } finally {
       if (inFlightRef.current === requestKey) inFlightRef.current = null;
       if (abortRef.current === ctrl) {
         abortRef.current = null;
         setGenerating(false);
+        setPartialCode('');
       }
     }
   };
@@ -458,12 +485,15 @@ function WorkspaceApp() {
   // splice is verified before it can become a version — the rest of the page
   // stays byte-identical. Escalations and failed verifications leave the
   // page untouched.
-  const runElementAgent = async (instruction: string, elementId: number) => {
+  const runElementAgent = async (instruction: string, ids: number[], mode: 'edit' | 'insert' = 'edit') => {
     const s = settingsRef.current;
     const provider = s.providers.find((p) => p.id === s.activeProviderId);
     if (!provider || !s.activeModelId) { setApiError('Choose a provider and a model first (Settings → add API key → Fetch models).'); return; }
     const current = codeRef.current;
-    if (!current || inFlightRef.current) return;
+    // Descending traversal order: edits run last-element-first, so the
+    // indices of elements still waiting stay valid in the evolving source.
+    const targets = [...new Set(ids)].sort((a, b) => b - a);
+    if (!current || !targets.length || inFlightRef.current) return;
     inFlightRef.current = 'element-agent';
     setPlanGate(null);
     beginChatRun(instruction);
@@ -475,34 +505,52 @@ function WorkspaceApp() {
     setApiError(null);
     try {
       markStage('understand', { status: 'active' });
-      const ctx = elementContext(current, elementId);
-      markStage('understand', { status: 'done', detail: tr('Read the <{0}> element and its context', [ctx.tag]) });
+      const locks = locksRef.current[projectRef.current.activeId] || [];
+      // Every context is read from the untouched source before any splice.
+      const contexts = targets.map((id) => elementContext(current, id));
+      markStage('understand', { status: 'done', detail: mode === 'insert' ? tr('Read the <{0}> container and its context', [contexts[0].tag]) : targets.length > 1 ? tr('Read {0} elements and their context', [targets.length]) : tr('Read the <{0}> element and its context', [contexts[0].tag]) });
       markStage('plan', { status: 'skipped', detail: tr('Surgical edit — no plan needed') });
       markStage('design', { status: 'skipped', detail: tr('Existing design kept') });
       markStage('build', { status: 'active', model: s.activeModelId || undefined });
-      const locks = locksRef.current[projectRef.current.activeId] || [];
-      const reply = await generate({ provider, model: s.activeModelId, system: ELEMENT_AGENT_SYSTEM, userText: elementAgentPrompt(ctx, instruction), temperature: 0.3, signal: ctrl.signal, onToken: () => {} });
-      const parsed = parseAgentReply(reply);
-      if (parsed.kind === 'escalate') {
-        markStage('build', { status: 'skipped', detail: tr('Needs a full-page edit') });
-        endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: 'This change reaches beyond the selected element, so the agent left the page unchanged. Use "Regenerate the whole page instead" in the element editor to apply it.' });
-        return;
+      const system = mode === 'insert' ? ELEMENT_AGENT_INSERT_SYSTEM : ELEMENT_AGENT_SYSTEM;
+      const promptFor = (ctx: ElementContext) => (mode === 'insert' ? elementInsertPrompt(ctx, instruction) : elementAgentPrompt(ctx, instruction));
+      const applyFor = (code: string, id: number, jsx: string) => (mode === 'insert' ? applyElementInsert(code, id, jsx, locks) : applyElementReplacement(code, id, jsx, locks));
+      let working = current;
+      let applied = 0;
+      const failures: string[] = [];
+      for (let i = 0; i < targets.length; i++) {
+        if (ctrl.signal.aborted) throw new Error('Aborted');
+        const id = targets[i];
+        const ctx = contexts[i];
+        const reply = await generate({ provider, model: s.activeModelId, system, userText: promptFor(ctx), temperature: 0.3, signal: ctrl.signal, onToken: () => {} });
+        const parsed = parseAgentReply(reply);
+        if (parsed.kind === 'escalate') {
+          if (targets.length === 1) {
+            markStage('build', { status: 'skipped', detail: tr('Needs a full-page edit') });
+            endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: mode === 'insert' ? 'This addition reaches beyond the selected container, so the agent left the page unchanged. Describe it as a change to the whole page instead.' : 'This change reaches beyond the selected element, so the agent left the page unchanged. Use "Regenerate the whole page instead" in the element editor to apply it.' });
+            return;
+          }
+          failures.push(parsed.reason);
+          continue;
+        }
+        try {
+          working = applyFor(working, id, parsed.jsx);
+          applied++;
+        } catch (verifyError) {
+          markStage('review', { status: 'active', model: s.activeModelId || undefined });
+          const repair = await generate({ provider, model: s.activeModelId, system, userText: promptFor(ctx) + `\n\n## Your previous attempt failed verification\n${(verifyError as Error).message}\nPrevious attempt:\n\`\`\`jsx\n${parsed.jsx}\n\`\`\`\n${mode === 'insert' ? 'Return a corrected new element only.' : 'Return a corrected replacement element only.'}`, temperature: 0.2, signal: ctrl.signal, onToken: () => {} });
+          const reparsed = parseAgentReply(repair);
+          if (reparsed.kind === 'escalate') { failures.push(reparsed.reason); continue; }
+          try { working = applyFor(working, id, reparsed.jsx); applied++; }
+          catch (e2) { failures.push((e2 as Error).message); }
+        }
       }
-      let next: string;
-      try {
-        next = applyElementReplacement(current, elementId, parsed.jsx, locks);
-      } catch (verifyError) {
-        markStage('review', { status: 'active', model: s.activeModelId || undefined });
-        const repair = await generate({ provider, model: s.activeModelId, system: ELEMENT_AGENT_SYSTEM, userText: elementAgentPrompt(ctx, instruction) + `\n\n## Your previous attempt failed verification\n${(verifyError as Error).message}\nPrevious attempt:\n\`\`\`jsx\n${parsed.jsx}\n\`\`\`\nReturn a corrected replacement element only.`, temperature: 0.2, signal: ctrl.signal, onToken: () => {} });
-        const reparsed = parseAgentReply(repair);
-        if (reparsed.kind === 'escalate') throw new Error('The agent could not contain this change to the selected element. Your page was not changed.');
-        next = applyElementReplacement(current, elementId, reparsed.jsx, locks);
-      }
-      markStage('build', { status: 'done', detail: tr('Only the selected element changed') });
+      if (!applied) throw new Error(failures[0] || 'The agent could not apply this change safely. Your page was not changed.');
+      markStage('build', { status: 'done', detail: mode === 'insert' ? tr('Added one new element inside <{0}>', [contexts[0].tag]) : targets.length > 1 ? tr('Edited {0} of {1} elements', [applied, targets.length]) : tr('Only the selected element changed') });
       markStage('assets', { status: 'skipped', detail: tr('No new assets needed') });
-      markStage('review', { status: 'done', detail: tr('Source checks passed') });
-      pushVersion(next);
-      markStage('ship', { status: 'done', detail: tr('{0} lines changed', [countChangedLines(current, next)]) });
+      markStage('review', { status: 'done', detail: failures.length ? tr('Source checks passed; {0} skipped', [failures.length]) : tr('Source checks passed') });
+      pushVersion(working);
+      markStage('ship', { status: 'done', detail: tr('{0} lines changed', [countChangedLines(current, working)]) });
       endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built', stages: snapshotStages(stagesRef.current) });
     } catch (e) {
       if (ctrl.signal.aborted) return; // stop() already closed the chat run
@@ -516,6 +564,25 @@ function WorkspaceApp() {
       if (abortRef.current === ctrl) { abortRef.current = null; setGenerating(false); }
     }
   };
+  // Save the selected element into the shared component library (item 37),
+  // wrapped as a standalone component the library can validate and reuse.
+  const saveElementToLibrary = (snippet: string, tag: string): string => {
+    const base = 'Saved' + tag.charAt(0).toUpperCase() + tag.slice(1);
+    const existing = components();
+    let name = base; let n = 2;
+    while (existing.some((c) => c.name === name)) name = base + n++;
+    saveComponents([...existing, { name, description: 'Saved from the element editor', code: `export default function ${name}() {\n  return (\n    ${snippet}\n  );\n}` }]);
+    return name;
+  };
+  const composerEstimate = useMemo(() => {
+    if (generating || !settings.activeModelId) return '';
+    const estTotal = Math.ceil(prompt.length / 4) + (screenScene ? 1536 : 0) + 16384;
+    const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
+    const recent = usage().filter((r) => r.provider === settings.activeProviderId && r.model === settings.activeModelId && r.status === 'done' && r.duration > 0).slice(-3);
+    if (!recent.length) return tr('~{0} tokens', [fmt(estTotal)]);
+    const secs = Math.max(1, Math.round(recent.reduce((a, r) => a + r.duration, 0) / recent.length / 1000));
+    return tr('~{0} tokens · ~{1} sec', [fmt(estTotal), secs]);
+  }, [generating, prompt, screenScene, settings.activeProviderId, settings.activeModelId, versions.length]);
   const loadPresetRef = useRef<(key: PresetKey) => void>(() => {});
   useEffect(() => {
     if (!api || home || !draft || enteredDraft.current) return;
@@ -614,7 +681,7 @@ function WorkspaceApp() {
     if (!screen) return;
     stop(); window.clearTimeout(debounceRef.current); window.clearTimeout(saveSceneRef.current);
     setProject({ ...nextProject, activeId: id }); setVersions(screen.versions); setVIndex(screen.vIndex); setScreenScene(screen.scene);
-    setApiError(null); setStream(''); setPrompt(load(draftKey(id), '')); setChat(screen.chat ?? []); setPlanGate(null); resetStages();
+    setApiError(null); setStream(''); setPrompt(load(draftKey(id, workspaceScope), '')); setChat(screen.chat ?? []); setPlanGate(null); resetStages();
     sigRef.current = sigOf(screen.scene?.elements || []);
     apiRef.current?.resetScene();
     if (screen.scene?.files) apiRef.current?.addFiles(Object.values(screen.scene.files));
@@ -747,7 +814,7 @@ function WorkspaceApp() {
             <span className="composer-shortcut"><kbd>{tr("Ctrl")}</kbd><kbd>↵</kbd></span>
             <button onClick={() => { if (generating) stop(); else { runTracked({ instruction: prompt.trim() || undefined }); setPrompt(''); } }} className="ui-primary send-button" aria-label={generating ? tr("Stop generation") : tr("Send")} title={generating ? tr("Stop generation") : tr("Generate interface (Ctrl + Enter)")}>{generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}<span>{generating ? tr("Stop") : code ? tr("Update interface") : tr("Generate interface")}</span><ArrowUp size={16} /></button>
           </div>
-          <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
+          <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div>{composerEstimate && <span className="composer-estimate">{composerEstimate}</span>}<span className="composer-note">{tr("Ctrl + Enter")}</span></div>
         </div>
         <div className="workspace-status"><span>{generating ? <>{tr("Bringing your idea to life…")} <Elapsed /></> : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
       </footer>
@@ -816,7 +883,10 @@ function WorkspaceApp() {
             onOpenSettings={() => setShowSettings(true)}
             onCodeChange={code => { assertLockedElements(code, locksRef.current[project.activeId] || []); pushVersion(code); }}
             onElementRequest={(instruction) => { beginChatRun(instruction); showPreviewStage(); runRef.current({ instruction }); }}
-            onElementAgent={(instruction, id) => { void runElementAgent(instruction, id); }}
+            onElementAgent={(instruction, ids, mode) => { void runElementAgent(instruction, ids, mode); }}
+            onSaveToLibrary={saveElementToLibrary}
+            versions={versions}
+            streamCode={partialCode}
             brand={brand}
             segmentOverlay={segmentOverlay}
             onCloseSegments={() => setSegmentOverlay(null)}

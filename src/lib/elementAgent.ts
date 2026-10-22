@@ -73,6 +73,28 @@ export function elementAgentPrompt(ctx: ElementContext, instruction: string): st
   ].filter(Boolean).join('\n');
 }
 
+export const ELEMENT_AGENT_INSERT_SYSTEM = [
+  'You are a surgical code editor inside Sketch2UI, a sketch-to-UI studio.',
+  'You add exactly ONE new JSX element inside an existing container element of a React + Tailwind app. The rest of the file is never shown to the user as changed, so the new element must be complete and self-contained.',
+  'Rules:',
+  '- Reply with ONLY the new JSX element: one single JSX element, no explanations, no markdown fences, no surrounding code, and do NOT repeat the container or its existing children.',
+  '- Match the design language of the container\'s existing children: the same spacing, radius, typography, and color habits.',
+  '- You may add inline handlers and use state, setters, props, and imports that already exist in the provided context. Do NOT invent new imports, new top-level state, or identifiers that are not in the context.',
+  '- If the addition cannot live as a child of this container (it needs new page-level state, a new component, a route, or edits elsewhere), reply with ONLY this JSON: {"escalate": "<one short reason>"}',
+].join('\n');
+
+export function elementInsertPrompt(ctx: ElementContext, instruction: string): string {
+  const container = ctx.snippet.length > 2400 ? ctx.snippet.slice(0, 2400) + '\n/* …container continues… */' : ctx.snippet;
+  return [
+    '## Container element — the new element goes INSIDE this one, as its last child. Return only the new element',
+    '```jsx',
+    container,
+    '```',
+    ctx.head ? `\n## Component head — imports and declarations above the element (context only)\n\`\`\`jsx\n${ctx.head}\n\`\`\`` : '',
+    `\n## What to add\n${instruction}`,
+  ].filter(Boolean).join('\n');
+}
+
 export type AgentReply = { kind: 'edit'; jsx: string } | { kind: 'escalate'; reason: string };
 
 export function parseAgentReply(text: string): AgentReply {
@@ -92,8 +114,7 @@ export function parseAgentReply(text: string): AgentReply {
   throw new Error('The agent did not return a usable edit. Your page was not changed.');
 }
 
-export function applyElementReplacement(code: string, id: number, jsx: string, locks: string[] = []): string {
-  const ctx = elementContext(code, id);
+function assertSingleElement(jsx: string): void {
   let frag;
   try {
     frag = parse(`<>${jsx}</>`, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
@@ -104,11 +125,40 @@ export function applyElementReplacement(code: string, id: number, jsx: string, l
   const expr = stmt && t.isExpressionStatement(stmt) ? stmt.expression : null;
   const children = expr && t.isJSXFragment(expr) ? expr.children.filter((c) => !(t.isJSXText(c) && !c.value.trim())) : [];
   if (children.length !== 1 || !t.isJSXElement(children[0])) throw new Error('The edit must be exactly one JSX element. Your page was not changed.');
-  const next = code.slice(0, ctx.start) + jsx.trim() + code.slice(ctx.end);
+}
+
+function verifySpliced(next: string, locks: string[]): void {
   sourceTree(next); // a splice that breaks the file is a failed edit, never a saved one
   assertLockedElements(next, locks);
   const failed = sourceChecks(next).filter((c) => !c.passed);
   if (failed.length) throw new Error(`The edit failed verification (${failed.map((c) => c.name).join(', ')}). Your page was not changed.`);
+}
+
+export function applyElementReplacement(code: string, id: number, jsx: string, locks: string[] = []): string {
+  const ctx = elementContext(code, id);
+  assertSingleElement(jsx);
+  const next = code.slice(0, ctx.start) + jsx.trim() + code.slice(ctx.end);
+  verifySpliced(next, locks);
+  return next;
+}
+
+// Insert a NEW element as the last child of the selected container, with
+// the same verification contract as a replacement: one element, re-parsed
+// file, locked elements intact, source checks green. A self-closing or
+// childless-by-syntax element cannot be a container — say so plainly.
+export function applyElementInsert(code: string, parentId: number, jsx: string, locks: string[] = []): string {
+  assertSingleElement(jsx);
+  const node = elements(sourceTree(code))[parentId];
+  if (!node || !t.isJSXElement(node) || node.openingElement.selfClosing || !node.closingElement || node.closingElement.start == null) {
+    throw new Error('This element cannot contain children. Select its parent container and add the element there.');
+  }
+  const insertAt = node.closingElement.start;
+  const before = code.slice(0, insertAt);
+  const lineStart = before.lastIndexOf('\n') + 1;
+  const closingIndent = before.slice(lineStart);
+  const insertion = /^\s*$/.test(closingIndent) ? `  ${jsx.trim()}\n${closingIndent}` : jsx.trim();
+  const next = before + insertion + code.slice(insertAt);
+  verifySpliced(next, locks);
   return next;
 }
 

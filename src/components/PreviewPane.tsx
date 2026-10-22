@@ -16,11 +16,12 @@ import {
   Square,
   Tablet,
   Plus, Wand2, MousePointer2, Github, Share2, FlaskConical, FileCode2, Sparkles, ArrowUpRight, Rocket, SlidersHorizontal,
-  RotateCcw,
+  RotateCcw, Columns2,
 } from 'lucide-react';
 import { materializeAssets } from '../lib/designAssets';
 import { materializeLibrary } from '../lib/componentLibrary';
 import { buildPreviewHtml } from '../lib/preview';
+import { diffLines } from '../lib/sourceDiff';
 import { VisualEditor } from './VisualEditor';
 import { applyElementEdit, applyElementMove, describeElement, type ElementEdit } from '../lib/visualEdit';
 import { projectFiles, projectZip } from '../lib/projectExport';
@@ -59,7 +60,10 @@ interface Props {
   onOpenSettings: () => void;
   onCodeChange: (code: string) => void;
   onElementRequest: (instruction: string) => void;
-  onElementAgent: (instruction: string, id: number) => void;
+  onElementAgent: (instruction: string, ids: number[], mode: 'edit' | 'insert') => void;
+  onSaveToLibrary: (snippet: string, tag: string) => string;
+  versions: string[];
+  streamCode?: string;
   segmentOverlay?: SegmentOverlayData | null;
   onCloseSegments?: () => void;
 }
@@ -85,12 +89,14 @@ export function PreviewPane(p: Props) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [directError, setDirectError] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [showTests, setShowTests] = useState(false);
   const [showGitHub, setShowGitHub] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [compare, setCompare] = useState<{ a: number; b: number } | null>(null);
   const [showPublish, setShowPublish] = useState(false);
   const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const exportFiles = useMemo(() => { try { return projectFiles(p.code, p.backend, p.project); } catch { return {}; } }, [p.code, p.backend, p.project, libraryRevision]);
@@ -153,8 +159,9 @@ export function PreviewPane(p: Props) {
     return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey); };
   }, [showTweaks]);
   const themeFont = tweaks.font || (p.brand.enabled ? p.brand.font : '');
-  const token = useMemo(() => crypto.randomUUID(), [p.code]);
-  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId), theme: { font: themeFont || undefined, compact: tweaks.compact } }, p.backend) : ''), [p.code, token, p.backend, libraryRevision, p.project.activeId, themeFont, tweaks.compact]);
+  const displayCode = p.generating && p.streamCode ? p.streamCode : p.code;
+  const token = useMemo(() => crypto.randomUUID(), [displayCode]);
+  const html = useMemo(() => (displayCode ? buildPreviewHtml(displayCode, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId), theme: { font: themeFont || undefined, compact: tweaks.compact } }, p.backend) : ''), [displayCode, token, p.backend, libraryRevision, p.project.activeId, themeFont, tweaks.compact]);
   const sendMode = (enabled: boolean) => iframeRef.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled }, '*');
 
   useEffect(() => { sendMode(editing && !p.generating && tab === 'preview'); }, [editing, p.generating, tab, token]);
@@ -162,6 +169,7 @@ export function PreviewPane(p: Props) {
   useEffect(() => {
     setRuntimeError(null);
     setSelected(null);
+    setSelectedIds([]);
     setDirectError('');
     setPreviewReady(false);
     setSlowLoad(false);
@@ -189,7 +197,13 @@ export function PreviewPane(p: Props) {
         try { const text = JSON.stringify(d.data); if (text.length <= 512000) localStorage.setItem(storageKey(activeScreenRef.current), text); } catch { /* quota or serialization: the in-document store keeps working */ }
       }
       if (d.type === 'element-selected' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && d.id >= 0) {
-        try { describeElement(p.code, d.id); setSelected(d.id); } catch { setSelected(null); }
+        try {
+          describeElement(p.code, d.id);
+          if (d.multi && Array.isArray(d.ids)) {
+            const ok = [...new Set(d.ids.filter((x: unknown) => { if (!Number.isInteger(x)) return false; try { describeElement(p.code, x as number); return true; } catch { return false; } }) as number[])];
+            setSelected(d.id); setSelectedIds(ok.length ? ok : [d.id]);
+          } else { setSelected(d.id); setSelectedIds([d.id]); }
+        } catch { setSelected(null); setSelectedIds([]); }
       }
       if (d.type === 'element-resized' && d.token === token && editingRef.current && !p.generating && Number.isInteger(d.id) && d.id >= 0) {
         const edit: ElementEdit = {};
@@ -260,7 +274,7 @@ export function PreviewPane(p: Props) {
         <span className="preview-view-label">{tab === 'code' ? 'App.jsx' : `${tr(device === 'desktop' ? 'Desktop' : device === 'tablet' ? 'Tablet' : 'Mobile')} · ${Math.round(scale * 100)}%`}</span>
       </div>
       {!!p.code && <div className="preview-actions" aria-label={tr("Preview actions")}>
-        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); }} className="ui-button element-select" title={p.generating ? tr("Wait for the current generation to finish") : tab !== 'preview' ? tr("Switch to the Preview tab to select elements") : tr("Select element")}><MousePointer2 size={13} /><span>{tr("Select element")}</span></button>
+        <button disabled={!p.code || p.generating || tab !== 'preview'} aria-pressed={editing} onClick={() => { setEditing(!editing); setSelected(null); setSelectedIds([]); }} className="ui-button element-select" title={p.generating ? tr("Wait for the current generation to finish") : tab !== 'preview' ? tr("Switch to the Preview tab to select elements") : tr("Select element")}><MousePointer2 size={13} /><span>{tr("Select element")}</span></button>
 
         <span className="actions-spacer" />
 
@@ -282,6 +296,7 @@ export function PreviewPane(p: Props) {
             <button disabled={p.generating} onClick={() => {setShowTests(true);setShowAdvanced(false);}}><FlaskConical size={15}/>{tr('Test UI')}</button>
             <button disabled={p.generating || !Object.keys(exportFiles).length} onClick={() => {setShowShare(true);setShowAdvanced(false);}}><Share2 size={15}/>{tr('Share')}</button>
             <button disabled={p.generating || !p.code} onClick={() => {setShowPublish(true);setShowAdvanced(false);}}><Rocket size={15}/>{tr('Publish')}</button>
+            {p.versions.length >= 2 && <button disabled={p.generating} onClick={() => {setCompare({ a: Math.max(0, p.versionIndex - 1), b: p.versionIndex });setShowAdvanced(false);}}><Columns2 size={15}/>{tr('Compare versions')}</button>}
           </div>}
         </div>
         <div className="preview-tweaks-wrap" ref={tweaksWrapRef}>
@@ -306,6 +321,7 @@ export function PreviewPane(p: Props) {
       {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}
       {showPublish && createPortal(<PublishPanel project={p.project} backend={p.backend} onClose={() => setShowPublish(false)} />, document.body)}
       {showShare && createPortal(<SharePanel project={p.project} backend={p.backend} onNavigate={p.onNavigate} onRequest={p.onElementRequest} onClose={() => setShowShare(false)} />, document.body)}
+      {compare && createPortal(<CompareVersions versions={p.versions} initial={compare} onClose={() => setCompare(null)} />, document.body)}
       {p.segmentOverlay && (
         <div style={{ margin: '8px 12px', border: '1px solid var(--ui-border)', borderRadius: 12, padding: 10, background: 'var(--ui-surface)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -325,9 +341,9 @@ export function PreviewPane(p: Props) {
         </div>
       )}
       <div className="preview-workarea"><div className="preview-stage">
-        <div className="preview-tab-content" ref={stageRef} hidden={tab !== 'preview'}>{p.code ? <div className={`preview-viewport${fitMode === 'actual' ? ' is-actual' : ''}`}><div className="preview-size-placeholder" style={{ width: designWidth * scale, height: designHeight * scale }}><div className="preview-document" style={{ width: designWidth, height: designHeight, transform: `scale(${scale})` }} data-device={device}><iframe ref={iframeRef} title={tr("Live preview")} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div></div>{!previewReady && <div className="preview-loading" role="status"><Loader2 className="animate-spin" size={22} /><p>{tr("Building your app…")}</p>{slowLoad && <><p className="preview-loading-note">{tr("Still loading — the preview builds its runtime from a CDN, so a slow connection can take a while.")}</p><button className="ui-button" onClick={() => setPreviewReady(true)}>{tr("Show the preview anyway")}</button></>}</div>}</div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>{tr("React / JSX")}</span></div><pre>{p.code || '// ' + tr('Your code will appear here')}</pre></div>
+        <div className="preview-tab-content" ref={stageRef} hidden={tab !== 'preview'}>{displayCode ? <div className={`preview-viewport${fitMode === 'actual' ? ' is-actual' : ''}`}><div className="preview-size-placeholder" style={{ width: designWidth * scale, height: designHeight * scale }}><div className="preview-document" style={{ width: designWidth, height: designHeight, transform: `scale(${scale})` }} data-device={device}><iframe ref={iframeRef} title={tr("Live preview")} srcDoc={html} sandbox="allow-scripts allow-forms allow-modals allow-popups" className="preview-frame" /></div></div>{!previewReady && <div className="preview-loading" role="status"><Loader2 className="animate-spin" size={22} /><p>{tr("Building your app…")}</p>{slowLoad && <><p className="preview-loading-note">{tr("Still loading — the preview builds its runtime from a CDN, so a slow connection can take a while.")}</p><button className="ui-button" onClick={() => setPreviewReady(true)}>{tr("Show the preview anyway")}</button></>}</div>}{p.generating && p.streamCode && <div className="stream-live" role="status">{tr("Live building…")}</div>}</div> : <EmptyState hasModel={p.hasModel} onOpenSettings={p.onOpenSettings} />}</div><div className="code-surface" hidden={tab !== 'code'}><div className="code-file-label"><FileCode2 size={13} />App.jsx<span>{tr("React / JSX")}</span></div><pre>{p.code || '// ' + tr('Your code will appear here')}</pre></div>
         {runtimeError && !p.generating && tab === 'preview' && <div className="runtime-banner"><AlertTriangle size={17} /><div><strong>{tr("Something needs a quick fix")}</strong><p>{tr(runtimeError)}</p></div><button onClick={() => p.onFix(runtimeError)} className="ui-primary"><Wand2 size={13} />{tr("Fix with AI")}</button><button onClick={() => setRuntimeError(null)} className="ui-icon" aria-label={tr("Dismiss runtime error")}>✕</button></div>}
-        {p.generating && <div className="generation-overlay" role="status" aria-live="polite">
+        {p.generating && !p.streamCode && <div className="generation-overlay" role="status" aria-live="polite">
           <div className="generation-heading"><span className="generation-icon"><Sparkles size={20}/></span><div><strong>{tr("Bringing your idea to life")}</strong><p>{tr("Generating with ")}{p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11}/>{tr("Stop")}</button></div>
           <div className="generation-center">
             <div className="generation-art" aria-hidden="true"><div className="generation-art-sketch"><span/><span/><span/></div><Sparkles className="generation-art-spark" size={24}/><div className="generation-art-page"><span/><span/><span/><span/></div></div>
@@ -342,7 +358,7 @@ export function PreviewPane(p: Props) {
         </div>}
       </div>
       {directError && tab === 'preview' && <p role="alert" className="direct-error">{tr(directError)}</p>}
-      {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selected} code={p.code} id={selected} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onAgentRequest={p.onElementAgent} onClose={() => setSelected(null)} />}
+      {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selectedIds.join(',')} code={p.code} id={selected} ids={selectedIds.length ? selectedIds : [selected]} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onAgentRequest={p.onElementAgent} onSaveToLibrary={p.onSaveToLibrary} onClose={() => { setSelected(null); setSelectedIds([]); }} />}
       </div>
       <div className="panel-footnote preview-footnote"><span className="status-dot" />{tab === 'preview' ? tr("Interactive preview") : tr("Your generated source")}<span>{p.code ? tr("Ready to refine") : tr("Waiting for your first idea")}</span></div>
     </div>
@@ -357,3 +373,51 @@ function EmptyState({ hasModel, onOpenSettings }: { hasModel: boolean; onOpenSet
     {!hasModel ? <button onClick={onOpenSettings} className="ui-primary empty-setup" aria-label={tr("Open Settings")}><Plus size={13} />{tr("Connect your first model")}<ArrowUpRight size={13} /></button> : <p className="model-ready"><Check size={13} />{tr("Your model is connected. You're ready to create.")}</p>}
   </div></div>;
 }
+
+// Version comparison (item 34): two saved versions side by side — rendered
+// previews plus a line diff (sourceDiff) windowed to the changed regions.
+// This is what makes the Element Agent's "only this changed" claim visible:
+// pick the versions around an agent edit and the diff shows exactly it.
+function CompareVersions({ versions, initial, onClose }: { versions: string[]; initial: { a: number; b: number }; onClose: () => void }) {
+  const [a, setA] = useState(initial.a);
+  const [b, setB] = useState(initial.b);
+  const docA = useMemo(() => buildPreviewHtml(versions[a] ?? ''), [versions, a]);
+  const docB = useMemo(() => buildPreviewHtml(versions[b] ?? ''), [versions, b]);
+  const rows = useMemo(() => diffLines(versions[a] ?? '', versions[b] ?? ''), [versions, a, b]);
+  const added = rows.filter(r => r.kind === 'add').length;
+  const removed = rows.filter(r => r.kind === 'remove').length;
+  const shown = useMemo(() => {
+    const keep = new Set<number>();
+    rows.forEach((r, i) => { if (r.kind !== 'same') for (let k = Math.max(0, i - 2); k <= Math.min(rows.length - 1, i + 2); k++) keep.add(k); });
+    const out: ({ kind: 'same' | 'add' | 'remove'; text: string } | 'gap')[] = [];
+    let last = -1;
+    rows.forEach((r, i) => { if (!keep.has(i)) return; if (last >= 0 && i > last + 1) out.push('gap'); out.push(r); last = i; });
+    return out;
+  }, [rows]);
+  const options = versions.map((_, i) => <option key={i} value={i}>{tr('Version {0}', [i + 1])}</option>);
+  return <div role="dialog" aria-modal="true" aria-label={tr('Compare versions')} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <section className="max-h-[92vh] w-full max-w-5xl space-y-3 overflow-auto rounded-xl border border-[var(--ui-border)] bg-[var(--ui-surface)] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-bold">{tr('Compare versions')}</h2>
+        <button onClick={onClose} className="ui-button">{tr('Close')}</button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <select aria-label={tr('Earlier version')} className="ui-input" value={a} onChange={e => setA(Number(e.target.value))}>{options}</select>
+        <span aria-hidden="true">→</span>
+        <select aria-label={tr('Later version')} className="ui-input" value={b} onChange={e => setB(Number(e.target.value))}>{options}</select>
+        <span className="text-[var(--ui-muted)]">{tr('{0} lines changed', [added + removed])} · <span className="diff-add-text">+{added}</span> <span className="diff-remove-text">−{removed}</span></span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {[{ v: a, doc: docA }, { v: b, doc: docB }].map(({ v, doc }) => <figure key={v + ':' + doc.length} className="overflow-hidden rounded-xl border border-[var(--ui-border)]">
+          <figcaption className="border-b border-[var(--ui-border)] px-3 py-2 text-xs">{tr('Version {0}', [v + 1])}</figcaption>
+          <iframe title={tr('Version {0}', [v + 1])} srcDoc={doc} sandbox="allow-scripts allow-forms" className="h-[36vh] w-full bg-[var(--ui-surface)]" />
+        </figure>)}
+      </div>
+      <details>
+        <summary className="cursor-pointer text-sm">{tr('Code changes')}</summary>
+        {added + removed === 0 ? <p className="py-3 text-sm text-[var(--ui-muted)]">{tr('These versions are identical.')}</p> : <div className="compare-diff" dir="ltr">{shown.map((r, i) => r === 'gap' ? <div key={i} className="diff-gap">⋯</div> : <div key={i} className={r.kind === 'add' ? 'diff-add' : r.kind === 'remove' ? 'diff-remove' : ''}>{r.kind === 'add' ? '+ ' : r.kind === 'remove' ? '− ' : '  '}{r.text}</div>)}</div>}
+      </details>
+    </section>
+  </div>;
+}
+
