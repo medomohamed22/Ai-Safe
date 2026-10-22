@@ -18,6 +18,7 @@ OUTPUT RULES (STRICT)
 - Use realistic, specific mock data (real-sounding names, prices, dates, statuses) — never "lorem ipsum".
 - Modern, premium aesthetic: generous spacing, clear typographic hierarchy, rounded corners, soft shadows, subtle gradients, smooth transitions. Responsive.
 - MOBILE LAYOUT (REQUIRED at ~390px): never let a fixed sidebar crowd or cover the content on small screens — collapse navigation into a top bar with a menu button or a bottom nav under the sm breakpoint, and only show the full sidebar on md+ screens. Use responsive grids (grid-cols-1 on mobile, more columns on sm/md/lg), wrap wide tables in an overflow-x-auto container, and keep primary actions reachable without horizontal scrolling.
+- OPENED VIEWS ARE OVERLAYS: anything a control opens (a details/statistics/settings panel, a sheet, a dialog, a menu) renders as a positioned overlay above the page — a fixed inset-0 layer (with its own close control) for full views, an absolutely positioned popover for small menus — never as an in-flow column or sibling that squeezes the existing layout, especially at phone widths.
 - The root element must fill the viewport (min-h-screen).
 - Only import lucide-react icons that really exist (e.g. Search, Bell, User, Users, Settings, Home, ChevronRight, ChevronDown, Plus, Check, X, Menu, BarChart3, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Mail, Star, Heart, Calendar, Filter, LogOut, Sparkles, ArrowRight).
 

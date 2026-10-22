@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-const { elementContext, parseAgentReply, applyElementReplacement, applyElementInsert, applyAgentEdit, countChangedLines } = await import('../src/lib/elementAgent.ts');
+const { elementContext, parseAgentReply, applyElementReplacement, applyElementInsert, applyAgentEdit, countChangedLines, ELEMENT_AGENT_SYSTEM } = await import('../src/lib/elementAgent.ts');
+const { SYSTEM_PROMPT } = await import('../src/lib/prompts.ts');
 const { describeElement } = await import('../src/lib/visualEdit.ts');
 
 const code = `import { useState } from 'react';
@@ -111,4 +112,9 @@ assert.throws(() => applyAgentEdit(code, 2, { jsx: '<button>x</button>', addStat
 
 // A fragment root is a valid single root (element + its own sibling).
 assert.ok(applyElementReplacement(code, 2, '<><button>Menu</button><div>Panel</div></>').includes('<div>Panel</div>'));
+// Opened views are overlays, in both prompts: an in-flow panel sibling is
+// what squeezed mohamed's tasks page into a broken half-column.
+assert.ok(ELEMENT_AGENT_SYSTEM.includes('fixed inset-0 z-50'), 'the agent is taught the overlay pattern for opened panels');
+assert.ok(ELEMENT_AGENT_SYSTEM.includes('NEVER be a normal-flow sibling'), 'the agent hard rule forbids in-flow opened content');
+assert.ok(SYSTEM_PROMPT.includes('OPENED VIEWS ARE OVERLAYS'), 'the generation prompt carries the same rule');
 console.log('PASS element-agent: exact-range read with context, byte-identical splice outside the element, verification refuses garbage/multi-element/locked edits, reply parsing handles fences, raw JSX and escalations, insert mode lands a verified last child and refuses childless containers, descending-order multi-edits keep indices valid, v3 behavior edits inject verified state (+hook import) and refuse undefined names, name collisions and malformed state.');
