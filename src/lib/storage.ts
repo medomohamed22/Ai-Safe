@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoSegment: true,
   debounceMs: 2000,
   temperature: 0.2,
+  planFirst: false,
 };
 
 export function loadSettings(): AppSettings {

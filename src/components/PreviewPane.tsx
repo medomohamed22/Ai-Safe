@@ -15,7 +15,7 @@ import {
   Smartphone,
   Square,
   Tablet,
-  Plus, Wand2, MousePointer2, Github, Share2, FlaskConical, FileCode2, Sparkles, ArrowUpRight, Rocket,
+  Plus, Wand2, MousePointer2, Github, Share2, FlaskConical, FileCode2, Sparkles, ArrowUpRight, Rocket, SlidersHorizontal,
   RotateCcw,
 } from 'lucide-react';
 import { materializeAssets } from '../lib/designAssets';
@@ -32,6 +32,8 @@ import { screenNavigation, type ScreenProject } from '../lib/screens';
 import { GitHubPanel } from './GitHubPanel';
 import { SharePanel } from './SharePanel';
 import { PublishPanel } from './PublishPanel';
+import type { Brand } from '../lib/brand';
+import { load, save } from '../lib/storage';
 
 interface Props {
   locks: string[];
@@ -39,6 +41,7 @@ interface Props {
   project: ScreenProject;
   onNavigate: (id: string) => void;
   backend: BackendConfig;
+  brand: Brand;
   code: string;
   generating: boolean;
   stream: string;
@@ -134,8 +137,21 @@ export function PreviewPane(p: Props) {
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey); };
   }, [showAdvanced]);
+  const [showTweaks, setShowTweaks] = useState(false);
+  const tweaksWrapRef = useRef<HTMLDivElement>(null);
+  const [tweaks, setTweaks] = useState<{ font: string; compact: boolean }>(() => load('s2ui.tweaks.v1', { font: '', compact: false }));
+  useEffect(() => { save('s2ui.tweaks.v1', tweaks); }, [tweaks]);
+  useEffect(() => {
+    if (!showTweaks) return;
+    const onPointer = (e: PointerEvent) => { if (tweaksWrapRef.current && !tweaksWrapRef.current.contains(e.target as Node)) setShowTweaks(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShowTweaks(false); tweaksWrapRef.current?.querySelector('button')?.focus(); } };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey); };
+  }, [showTweaks]);
+  const themeFont = tweaks.font || (p.brand.enabled ? p.brand.font : '');
   const token = useMemo(() => crypto.randomUUID(), [p.code]);
-  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId) }, p.backend) : ''), [p.code, token, p.backend, libraryRevision, p.project.activeId]);
+  const html = useMemo(() => (p.code ? buildPreviewHtml(p.code, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId), theme: { font: themeFont || undefined, compact: tweaks.compact } }, p.backend) : ''), [p.code, token, p.backend, libraryRevision, p.project.activeId, themeFont, tweaks.compact]);
   const sendMode = (enabled: boolean) => iframeRef.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled }, '*');
 
   useEffect(() => { sendMode(editing && !p.generating && tab === 'preview'); }, [editing, p.generating, tab, token]);
@@ -251,6 +267,17 @@ export function PreviewPane(p: Props) {
             <button disabled={p.generating} onClick={() => {setShowTests(true);setShowAdvanced(false);}}><FlaskConical size={15}/>{tr('Test UI')}</button>
             <button disabled={p.generating || !Object.keys(exportFiles).length} onClick={() => {setShowShare(true);setShowAdvanced(false);}}><Share2 size={15}/>{tr('Share')}</button>
             <button disabled={p.generating || !p.code} onClick={() => {setShowPublish(true);setShowAdvanced(false);}}><Rocket size={15}/>{tr('Publish')}</button>
+          </div>}
+        </div>
+        <div className="preview-tweaks-wrap" ref={tweaksWrapRef}>
+          <button className="ui-icon" onClick={() => setShowTweaks(v => !v)} aria-expanded={showTweaks} aria-label={tr("Tweaks")} title={tr("Tweaks")}><SlidersHorizontal size={18}/></button>
+          {showTweaks && <div className="preview-more-menu preview-tweaks-menu">
+            <label>{tr("Preview font")}<select aria-label={tr("Preview font")} value={tweaks.font} onChange={e => setTweaks(t => ({ ...t, font: e.target.value }))}>
+              <option value="">{tr("Design default")}</option>
+              {['system-ui', 'Arial', 'Tahoma', 'Georgia', 'monospace'].map(f => <option key={f} value={f}>{f}</option>)}
+            </select></label>
+            <label className="tweak-check"><input type="checkbox" checked={tweaks.compact} onChange={e => setTweaks(t => ({ ...t, compact: e.target.checked }))} />{tr("Compact density")}</label>
+            <p className="tweak-note">{tr("Font and density apply to the preview instantly. Colors and radius live in the design system and apply on the next generation.")}</p>
           </div>}
         </div>
       </div>}
