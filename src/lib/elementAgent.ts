@@ -52,18 +52,27 @@ export function elementContext(code: string, id: number): ElementContext {
 
 export const ELEMENT_AGENT_SYSTEM = [
   'You are a surgical code editor inside Sketch2UI, a sketch-to-UI studio.',
-  'You edit exactly ONE JSX element in an existing React + Tailwind app. The rest of the file is never shown to the user as changed, so your replacement must be complete and self-contained for that element.',
+  'You edit exactly ONE JSX element in an existing React + Tailwind app. Everything outside that element stays byte-identical, except for ONE state declaration the system can add to the element\'s component for you (see B).',
+  'Reply protocol — choose ONE form, with no explanations and no markdown fences:',
+  'A) Visual or content change: reply with ONLY the replacement JSX. One root element, or a fragment <>...</> when the element needs a sibling of its own (its popup, its backdrop).',
+  'B) The change needs new local state (open/closed, toggles, selected tab, counters): reply with ONLY this JSON: {"replace": "<the replacement JSX>", "addState": "const [open, setOpen] = useState(false);"}',
+  '   - addState is exactly ONE const declaration using useState or useRef. It is inserted into the component that contains the element, and a missing React hook import is added for you. Use fresh state names that do not appear in the context.',
+  '   - The replacement may use the new state names.',
+  'Behavior patterns — follow them; they are how behavior is added correctly here:',
+  '   - Dropdown / menu / popover: wrap the element in a relatively positioned container and render the menu INSIDE the replacement, conditional on the new state. Example: {"replace": "<div className=\"relative\"><button onClick={() => setOpen(!open)} aria-expanded={open}>Menu</button>{open && (<div className=\"absolute right-0 top-full z-50\">...</div>)}</div>", "addState": "const [open, setOpen] = useState(false);"}',
+  '   - Modal / dialog: the element plus its conditional sibling inside one fragment, driven by one boolean state.',
+  '   - Toggle / show-hide: one boolean state plus conditional rendering or a conditional class.',
   'Rules:',
-  '- Reply with ONLY the replacement JSX for the element: one single JSX element, no explanations, no markdown fences, no surrounding code.',
   '- Preserve the element\'s existing behavior, handlers, and children unless the requested change says otherwise.',
-  '- You may add inline handlers and use state, setters, props, and imports that already exist in the provided context. Do NOT invent new imports, new top-level state, or identifiers that are not in the context.',
-  '- Keep the same root tag unless the change clearly requires a different one.',
-  '- If the change cannot be contained inside this element (it needs new page-level state, a new component, a route, or edits to other elements), reply with ONLY this JSON: {"escalate": "<one short reason>"}',
+  '- Use ONLY identifiers that exist in the provided context, your addState names, or names the replacement itself declares. The edit is machine-checked for undefined names and rejected if any slip in.',
+  '- Do NOT invent imports or top-level code, and do not reference state you did not declare via addState.',
+  '- Keep the same root tag unless the change clearly requires a wrapper or a different tag.',
+  '- If the change cannot be contained this way (a new route, a new shared component, page-level layout), reply with ONLY this JSON: {"escalate": "<one short reason>"}',
 ].join('\n');
 
 export function elementAgentPrompt(ctx: ElementContext, instruction: string): string {
   return [
-    '## Element to edit — return a replacement for this JSX, and only this JSX',
+    '## Element to edit — reply per your protocol: the replacement JSX, or the JSON form when the change needs new state',
     '```jsx',
     ctx.snippet,
     '```',
@@ -75,12 +84,15 @@ export function elementAgentPrompt(ctx: ElementContext, instruction: string): st
 
 export const ELEMENT_AGENT_INSERT_SYSTEM = [
   'You are a surgical code editor inside Sketch2UI, a sketch-to-UI studio.',
-  'You add exactly ONE new JSX element inside an existing container element of a React + Tailwind app. The rest of the file is never shown to the user as changed, so the new element must be complete and self-contained.',
+  'You add exactly ONE new JSX element inside an existing container element of a React + Tailwind app. Everything else stays byte-identical, except for ONE state declaration the system can add to the component for you (see B).',
+  'Reply protocol — choose ONE form, with no explanations and no markdown fences:',
+  'A) Plain addition: reply with ONLY the new JSX (one root element, or a fragment <>...</> when the addition is a small group). Do NOT repeat the container or its existing children.',
+  'B) The addition needs its own local state (an interactive widget: accordion, tabs, toggle, counter): reply with ONLY this JSON: {"replace": "<the new JSX>", "addState": "const [open, setOpen] = useState(false);"} — addState is exactly ONE const declaration using useState or useRef, inserted into the component for you with any missing React hook import added; use fresh names.',
   'Rules:',
-  '- Reply with ONLY the new JSX element: one single JSX element, no explanations, no markdown fences, no surrounding code, and do NOT repeat the container or its existing children.',
   '- Match the design language of the container\'s existing children: the same spacing, radius, typography, and color habits.',
-  '- You may add inline handlers and use state, setters, props, and imports that already exist in the provided context. Do NOT invent new imports, new top-level state, or identifiers that are not in the context.',
-  '- If the addition cannot live as a child of this container (it needs new page-level state, a new component, a route, or edits elsewhere), reply with ONLY this JSON: {"escalate": "<one short reason>"}',
+  '- Use ONLY identifiers that exist in the provided context, your addState names, or names the new element itself declares. The edit is machine-checked for undefined names.',
+  '- Do NOT invent imports or top-level code.',
+  '- If the addition cannot live as a child of this container (a new route, a new shared component, page-level structure), reply with ONLY this JSON: {"escalate": "<one short reason>"}',
 ].join('\n');
 
 export function elementInsertPrompt(ctx: ElementContext, instruction: string): string {
@@ -95,7 +107,7 @@ export function elementInsertPrompt(ctx: ElementContext, instruction: string): s
   ].filter(Boolean).join('\n');
 }
 
-export type AgentReply = { kind: 'edit'; jsx: string } | { kind: 'escalate'; reason: string };
+export type AgentReply = { kind: 'edit'; jsx: string; addState?: string } | { kind: 'escalate'; reason: string };
 
 export function parseAgentReply(text: string): AgentReply {
   const trimmed = text.trim();
@@ -105,7 +117,9 @@ export function parseAgentReply(text: string): AgentReply {
     try {
       const j = JSON.parse(body);
       if (typeof j?.escalate === 'string' && j.escalate) return { kind: 'escalate', reason: j.escalate };
-      if (typeof j?.jsx === 'string' && j.jsx.trim()) return { kind: 'edit', jsx: j.jsx.trim() };
+      const addState = typeof j?.addState === 'string' && j.addState.trim() ? j.addState.trim() : undefined;
+      if (typeof j?.replace === 'string' && j.replace.trim()) return { kind: 'edit', jsx: j.replace.trim(), addState };
+      if (typeof j?.jsx === 'string' && j.jsx.trim()) return { kind: 'edit', jsx: j.jsx.trim(), addState };
     } catch { /* not JSON after all — fall through to the JSX slice */ }
   }
   const start = body.indexOf('<');
@@ -114,7 +128,7 @@ export function parseAgentReply(text: string): AgentReply {
   throw new Error('The agent did not return a usable edit. Your page was not changed.');
 }
 
-function assertSingleElement(jsx: string): void {
+function assertSingleRoot(jsx: string): void {
   let frag;
   try {
     frag = parse(`<>${jsx}</>`, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
@@ -124,7 +138,7 @@ function assertSingleElement(jsx: string): void {
   const stmt = frag.program.body[0];
   const expr = stmt && t.isExpressionStatement(stmt) ? stmt.expression : null;
   const children = expr && t.isJSXFragment(expr) ? expr.children.filter((c) => !(t.isJSXText(c) && !c.value.trim())) : [];
-  if (children.length !== 1 || !t.isJSXElement(children[0])) throw new Error('The edit must be exactly one JSX element. Your page was not changed.');
+  if (children.length !== 1 || !(t.isJSXElement(children[0]) || t.isJSXFragment(children[0]))) throw new Error('The edit must be exactly one JSX element (a fragment wrapping it is fine). Your page was not changed.');
 }
 
 function verifySpliced(next: string, locks: string[]): void {
@@ -134,32 +148,203 @@ function verifySpliced(next: string, locks: string[]): void {
   if (failed.length) throw new Error(`The edit failed verification (${failed.map((c) => c.name).join(', ')}). Your page was not changed.`);
 }
 
-export function applyElementReplacement(code: string, id: number, jsx: string, locks: string[] = []): string {
+// --- v3: behavior edits -------------------------------------------------
+// A behavior change ("make this button open a menu") cannot live inside
+// the element alone: it needs state in the host component and often a
+// wrapper + a conditional sibling. The agent therefore returns the
+// replacement plus ONE state declaration (addState); the system inserts
+// that declaration into the host component, adds a missing React hook
+// import mechanically, and machine-checks every name the replacement
+// references — an edit naming undeclared state used to save silently and
+// explode only at runtime in the preview.
+
+type AstNode = any;
+
+function walkNodes(node: AstNode, fn: (n: AstNode, parent: AstNode, key: string) => void, parent: AstNode = null, key = ''): void {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) { node.forEach((c) => walkNodes(c, fn, parent, key)); return; }
+  if (typeof node.type === 'string') fn(node, parent, key);
+  for (const [k, v] of Object.entries(node)) {
+    if (k === 'loc' || k === 'start' || k === 'end' || k === '__clone') continue;
+    walkNodes(v, fn, node, k);
+  }
+}
+
+function patternNodes(pattern: AstNode, out: Set<AstNode>): void {
+  walkNodes(pattern, (n) => { if (n.type === 'Identifier') out.add(n); });
+}
+
+function patternNames(pattern: AstNode, out: Set<string>): void {
+  const nodes = new Set<AstNode>();
+  patternNodes(pattern, nodes);
+  nodes.forEach((n) => out.add(n.name));
+}
+
+// Names visible to the element: module imports + top-level declarations +
+// everything declared inside the host component (its params, hooks, vars).
+function collectDeclaredNames(ast: ReturnType<typeof sourceTree>, host: AstNode): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of ast.program.body) {
+    if (t.isImportDeclaration(stmt)) stmt.specifiers.forEach((sp) => names.add(sp.local.name));
+    if (t.isVariableDeclaration(stmt)) stmt.declarations.forEach((d) => patternNames(d.id, names));
+    if ((t.isFunctionDeclaration(stmt) || t.isClassDeclaration(stmt)) && stmt.id) names.add(stmt.id.name);
+    const decl = (t.isExportNamedDeclaration(stmt) || t.isExportDefaultDeclaration(stmt)) ? stmt.declaration : null;
+    if (decl && t.isVariableDeclaration(decl)) decl.declarations.forEach((d) => patternNames(d.id, names));
+    if (decl && (t.isFunctionDeclaration(decl) || t.isClassDeclaration(decl)) && decl.id) names.add(decl.id.name);
+  }
+  if (host) walkNodes(host, (n) => {
+    if (t.isVariableDeclarator(n)) patternNames(n.id, names);
+    if (t.isFunctionDeclaration(n) || t.isFunctionExpression(n) || t.isArrowFunctionExpression(n)) { if ((n as any).id) names.add((n as any).id.name); n.params.forEach((p: AstNode) => patternNames(p, names)); }
+    if (t.isClassDeclaration(n) && n.id) names.add(n.id.name);
+  });
+  return names;
+}
+
+const GLOBAL_NAMES = new Set(['React', 'console', 'Math', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Promise', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'fetch', 'alert', 'window', 'document', 'localStorage', 'sessionStorage', 'URL', 'encodeURIComponent', 'decodeURIComponent', 'parseInt', 'parseFloat', 'isNaN']);
+
+// Identifiers the replacement USES but does not itself declare.
+function freeReferences(program: AstNode): Set<string> {
+  const bound = new Set<AstNode>();
+  walkNodes(program, (n) => {
+    if (t.isVariableDeclarator(n)) patternNodes(n.id, bound);
+    if (t.isFunctionDeclaration(n) || t.isFunctionExpression(n) || t.isArrowFunctionExpression(n)) { if ((n as any).id) bound.add((n as any).id); n.params.forEach((p: AstNode) => patternNodes(p, bound)); }
+    if (t.isClassDeclaration(n) && n.id) bound.add(n.id);
+    if (t.isImportSpecifier(n) || t.isImportDefaultSpecifier(n) || t.isImportNamespaceSpecifier(n)) bound.add(n.local);
+  });
+  const boundNames = new Set<string>();
+  bound.forEach((n) => boundNames.add(n.name));
+  const refs = new Set<string>();
+  walkNodes(program, (n, parent, key) => {
+    if (n.type === 'Identifier') {
+      if (bound.has(n)) return;
+      if (parent && parent.type === 'MemberExpression' && key === 'property' && !parent.computed) return;
+      if (parent && parent.type === 'ObjectProperty' && key === 'key' && !parent.computed) return;
+      if (parent && parent.type === 'ObjectMethod' && key === 'key' && !parent.computed) return;
+      refs.add(n.name);
+    }
+    if (n.type === 'JSXIdentifier' && parent) {
+      const tagName = (parent.type === 'JSXOpeningElement' || parent.type === 'JSXClosingElement') && key === 'name';
+      const memberRoot = parent.type === 'JSXMemberExpression' && key === 'object';
+      if ((tagName || memberRoot) && /^[A-Z]/.test(n.name)) refs.add(n.name);
+    }
+  });
+  return new Set([...refs].filter((r) => !boundNames.has(r)));
+}
+
+function parseAddState(addState: string): { names: string[]; hooks: string[]; text: string } {
+  let prog;
+  try {
+    prog = parse(addState, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+  } catch {
+    throw new Error('The added state is not valid code. Your page was not changed.');
+  }
+  const body = prog.program.body;
+  if (body.length !== 1 || !t.isVariableDeclaration(body[0]) || body[0].kind !== 'const') throw new Error('Added state must be exactly one const declaration using useState or useRef. Your page was not changed.');
+  const names = new Set<string>();
+  const hooks = new Set<string>();
+  for (const d of body[0].declarations) {
+    patternNames(d.id, names);
+    if (!t.isCallExpression(d.init) || !t.isIdentifier(d.init.callee) || !['useState', 'useRef'].includes(d.init.callee.name)) throw new Error('Added state must be exactly one const declaration using useState or useRef. Your page was not changed.');
+    hooks.add(d.init.callee.name);
+  }
+  return { names: [...names], hooks: [...hooks], text: addState.trim() };
+}
+
+function ensureReactHook(code: string, hook: string): string {
+  const ast = sourceTree(code);
+  const imp = ast.program.body.find((n): n is t.ImportDeclaration => t.isImportDeclaration(n) && n.source.value === 'react');
+  if (!imp || imp.start == null || imp.end == null) return `import { ${hook} } from 'react';\n` + code;
+  if (imp.specifiers.some((sp) => t.isImportSpecifier(sp) && sp.imported.type === 'Identifier' && sp.imported.name === hook)) return code;
+  const named = imp.specifiers.filter(t.isImportSpecifier);
+  if (named.length) { const last = named[named.length - 1]; return code.slice(0, last.end!) + `, ${hook}` + code.slice(last.end!); }
+  const def = imp.specifiers.find(t.isImportDefaultSpecifier);
+  if (def && def.end != null) return code.slice(0, def.end) + `, { ${hook} }` + code.slice(def.end);
+  return code.slice(0, imp.end) + `\nimport { ${hook} } from 'react';` + code.slice(imp.end);
+}
+
+function hostFunction(host: AstNode): AstNode {
+  let fn: AstNode = host;
+  if (fn && (t.isExportDefaultDeclaration(fn) || t.isExportNamedDeclaration(fn))) fn = fn.declaration;
+  if (fn && t.isVariableDeclaration(fn)) fn = fn.declarations[0]?.init;
+  if (fn && (t.isFunctionDeclaration(fn) || t.isFunctionExpression(fn) || t.isArrowFunctionExpression(fn)) && t.isBlockStatement(fn.body)) return fn;
+  return null;
+}
+
+export interface AgentEdit {
+  jsx: string;
+  addState?: string;
+}
+
+// The agent edit engine (v3). mode 'edit' replaces the element at id;
+// mode 'insert' adds the reply as the element's last child. Verification:
+// single root, no undefined names, valid addState with fresh names, the
+// spliced file re-parses, locked elements intact, source checks green.
+export function applyAgentEdit(code: string, id: number, edit: AgentEdit, locks: string[] = [], mode: 'edit' | 'insert' = 'edit'): string {
   const ctx = elementContext(code, id);
-  assertSingleElement(jsx);
-  const next = code.slice(0, ctx.start) + jsx.trim() + code.slice(ctx.end);
+  assertSingleRoot(edit.jsx);
+  const ast = sourceTree(code);
+  const node = elements(ast)[id];
+  const host = ast.program.body.find((n) => n.start != null && n.end != null && n.start <= ctx.start && n.end >= ctx.end);
+  const declared = collectDeclaredNames(ast, host);
+  const state = edit.addState ? parseAddState(edit.addState) : null;
+  if (state) for (const name of state.names) {
+    if (declared.has(name)) throw new Error(`The state name "${name}" already exists in this component. Your page was not changed.`);
+  }
+  const frag = parse(`<>${edit.jsx}</>`, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+  const allowed = new Set([...declared, ...(state ? state.names : [])]);
+  const missing = [...freeReferences(frag)].filter((n) => !allowed.has(n) && !GLOBAL_NAMES.has(n)).sort();
+  if (missing.length) throw new Error(`The edit uses names that do not exist here: ${missing.join(', ')}. Declare state via addState or use names from the context. Your page was not changed.`);
+  let next: string;
+  if (mode === 'insert') {
+    if (!node || !t.isJSXElement(node) || node.openingElement.selfClosing || !node.closingElement || node.closingElement.start == null) {
+      throw new Error('This element cannot contain children. Select its parent container and add the element there.');
+    }
+    const insertAt = node.closingElement.start;
+    const before = code.slice(0, insertAt);
+    const lineStart = before.lastIndexOf('\n') + 1;
+    const closingIndent = before.slice(lineStart);
+    const insertion = /^\s*$/.test(closingIndent) ? `  ${edit.jsx.trim()}\n${closingIndent}` : edit.jsx.trim();
+    next = before + insertion + code.slice(insertAt);
+  } else {
+    next = code.slice(0, ctx.start) + edit.jsx.trim() + code.slice(ctx.end);
+  }
+  if (state) {
+    for (const hook of state.hooks) next = ensureReactHook(next, hook);
+    const needle = edit.jsx.trim().slice(0, 60);
+    const pos = next.indexOf(needle);
+    const ast2 = sourceTree(next);
+    const host2 = ast2.program.body.find((n) => n.start != null && n.end != null && pos >= 0 && n.start <= pos && n.end >= pos)
+      || ast2.program.body.find((n) => n.start != null && n.end != null && n.start <= ctx.start && n.end >= ctx.end);
+    const fn = hostFunction(host2);
+    if (!fn) throw new Error('Could not find the component to hold the new state. Your page was not changed.');
+    const body = fn.body as t.BlockStatement;
+    let anchor = body.start! + 1;
+    for (const stmt of body.body) {
+      if (t.isVariableDeclaration(stmt) && stmt.declarations.some((d) => t.isCallExpression(d.init) && t.isIdentifier(d.init.callee) && /^(useState|useRef|useMemo|useCallback)$/.test(d.init.callee.name))) anchor = stmt.end!;
+    }
+    let indent = '  ';
+    const firstStmt = body.body[0];
+    if (firstStmt && firstStmt.start != null) {
+      const ls = next.lastIndexOf('\n', firstStmt.start) + 1;
+      const ind = next.slice(ls, firstStmt.start);
+      if (/^\s*$/.test(ind)) indent = ind;
+    }
+    next = next.slice(0, anchor) + `\n${indent}${state.text}` + next.slice(anchor);
+  }
   verifySpliced(next, locks);
   return next;
 }
 
+export function applyElementReplacement(code: string, id: number, jsx: string, locks: string[] = []): string {
+  return applyAgentEdit(code, id, { jsx }, locks, 'edit');
+}
+
 // Insert a NEW element as the last child of the selected container, with
-// the same verification contract as a replacement: one element, re-parsed
-// file, locked elements intact, source checks green. A self-closing or
-// childless-by-syntax element cannot be a container — say so plainly.
+// the same verification contract as a replacement: one root node, no
+// undefined names, re-parsed file, locked elements intact, source checks
+// green. A self-closing element cannot be a container — say so plainly.
 export function applyElementInsert(code: string, parentId: number, jsx: string, locks: string[] = []): string {
-  assertSingleElement(jsx);
-  const node = elements(sourceTree(code))[parentId];
-  if (!node || !t.isJSXElement(node) || node.openingElement.selfClosing || !node.closingElement || node.closingElement.start == null) {
-    throw new Error('This element cannot contain children. Select its parent container and add the element there.');
-  }
-  const insertAt = node.closingElement.start;
-  const before = code.slice(0, insertAt);
-  const lineStart = before.lastIndexOf('\n') + 1;
-  const closingIndent = before.slice(lineStart);
-  const insertion = /^\s*$/.test(closingIndent) ? `  ${jsx.trim()}\n${closingIndent}` : jsx.trim();
-  const next = before + insertion + code.slice(insertAt);
-  verifySpliced(next, locks);
-  return next;
+  return applyAgentEdit(code, parentId, { jsx }, locks, 'insert');
 }
 
 export function countChangedLines(a: string, b: string): number {
