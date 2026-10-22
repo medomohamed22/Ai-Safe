@@ -1,4 +1,5 @@
-export interface Screen { id: string; name: string; versions: string[]; vIndex: number; scene: any }
+export interface ChatMessage { id: string; role: 'user' | 'ai'; text?: string; kind?: 'sketch' | 'fix' | 'built' | 'error' | 'stopped' }
+export interface Screen { id: string; name: string; versions: string[]; vIndex: number; scene: any; chat?: ChatMessage[] }
 export interface ScreenLink { from: string; to: string; label: string }
 export interface ScreenProject { activeId: string; screens: Screen[]; links: ScreenLink[]; mapPositions?: Record<string, { x: number; y: number }> }
 export function screenCode(screen: Screen) { return screen.versions[screen.vIndex] || ''; }
