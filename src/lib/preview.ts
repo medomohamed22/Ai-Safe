@@ -46,7 +46,7 @@ export function buildPreviewHtml(code: string, editor?: { token: string; tests?:
 <script type="importmap">${safeJson({ imports: IMPORT_MAP })}</script>
 <style>
   html, body { margin: 0; min-height: 100%; }
-  body { font-family: ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }${themeFont ? `\n  body, button, input, textarea, select { font-family: ${themeFont}, ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, sans-serif; }` : ''}${editor?.theme?.compact ? `\n  html { font-size: 15px; }` : ''}
+  body { font-family: ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }${themeFont ? `\n  body, body * { font-family: ${themeFont}, ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, sans-serif !important; }` : ''}${editor?.theme?.compact ? `\n  html { font-size: 15px; }` : ''}
   #__s2ui_err { display:none; position:fixed; inset:auto 12px 12px 12px; background:#1f0f12; color:#fecaca; border:1px solid #7f1d1d; border-radius:10px; padding:12px 14px; font:12px/1.5 ui-monospace, monospace; white-space:pre-wrap; max-height:40vh; overflow:auto; z-index:2147483647; }
 </style>
 </head>
@@ -112,6 +112,7 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
     var token = ${safeJson(editor.token)};
     var editing = false;
     var selectedEl = null;
+    var multiEls = [];
     var drag = null;
     var suppressClick = false;
     var overlay = document.createElement('div');
@@ -137,19 +138,37 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
       handles.s.style.left = (r.left + r.width / 2) + 'px'; handles.s.style.top = r.bottom + 'px';
       handles.se.style.left = r.right + 'px'; handles.se.style.top = r.bottom + 'px';
     }
-    function selectEl(el) {
+    function markSelected() {
       document.querySelectorAll('[data-s2ui-selected]').forEach(function (item) { item.removeAttribute('data-s2ui-selected'); });
+      multiEls.forEach(function (el) { if (el.isConnected) el.setAttribute('data-s2ui-selected', ''); });
+      if (selectedEl) selectedEl.setAttribute('data-s2ui-selected', '');
+    }
+    function selectEl(el) {
       selectedEl = el;
-      if (el) el.setAttribute('data-s2ui-selected', '');
+      markSelected();
       placeHandles();
     }
     function postSelected(el) {
       parent.postMessage({ source: 's2ui-preview', type: 'element-selected', token: token, id: Number(el.getAttribute('data-s2ui-id')) }, '*');
     }
+    function handleSelect(el, ev) {
+      if (ev && ev.shiftKey) {
+        if (el === selectedEl) { /* already the primary selection */ }
+        else if (multiEls.indexOf(el) >= 0) multiEls = multiEls.filter(function (x) { return x !== el; });
+        else { if (selectedEl) multiEls.push(selectedEl); selectedEl = el; }
+        markSelected(); placeHandles();
+        var ids = (selectedEl ? [Number(selectedEl.getAttribute('data-s2ui-id'))] : []).concat(multiEls.map(function (x) { return Number(x.getAttribute('data-s2ui-id')); }));
+        parent.postMessage({ source: 's2ui-preview', type: 'element-selected', token: token, id: Number(el.getAttribute('data-s2ui-id')), multi: true, ids: ids }, '*');
+        return;
+      }
+      multiEls = [];
+      selectEl(el);
+      postSelected(el);
+    }
     window.addEventListener('message', function (e) {
       if (e.source !== parent || !e.data || e.data.token !== token || e.data.type !== 'edit-mode') return;
       editing = !!e.data.enabled;
-      if (!editing) { if (drag) endDrag(false); selectEl(null); }
+      if (!editing) { if (drag) endDrag(false); multiEls = []; selectEl(null); }
       else placeHandles();
     });
     window.addEventListener('resize', placeHandles);
@@ -248,15 +267,14 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
             if (nearR) { startResize('e', e); return; }
             if (nearB) { startResize('s', e); return; }
           }
-          selectEl(el); postSelected(el); startMove(el, e);
+          handleSelect(el, e); if (!e.shiftKey) startMove(el, e);
         }
         return;
       }
       if (e.type !== 'click') return;
       if (suppressClick) { suppressClick = false; return; }
       if (!el) return;
-      selectEl(el);
-      postSelected(el);
+      handleSelect(el, e);
     }
     ['click', 'dblclick', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'submit', 'keydown', 'input', 'change'].forEach(function (name) { window.addEventListener(name, intercept, true); });
   })();

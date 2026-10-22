@@ -20,11 +20,11 @@ const assert = require('node:assert/strict');
   await page.keyboard.press('Enter');
   await page.getByRole('alert').filter({ hasText: 'having trouble' }).waitFor({ timeout: 20000 });
   assert.equal(await box.inputValue(), 'لوحة مهام أسبوعية', 'the failed instruction returns to the composer');
-  const draftAfterFail = await page.evaluate(() => { const p = JSON.parse(localStorage.getItem('s2ui.project.v1')); return localStorage.getItem(`s2ui.draft.v1.${p.activeId}`); });
+  const draftAfterFail = await page.evaluate(() => { const p = JSON.parse(localStorage.getItem('s2ui.project.v1')); const k = Object.keys(localStorage).find(k => k.startsWith('s2ui.draft.v1.') && k.endsWith(`.${p.activeId}`)); return k ? localStorage.getItem(k) : null; });
   assert.equal(JSON.parse(draftAfterFail), 'لوحة مهام أسبوعية', 'the failed instruction is stored as the screen draft');
   await page.getByRole('alert').getByRole('button', { name: 'Retry', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('.preview-error'), null, { timeout: 20000 });
-  const draftAfterSuccess = await page.evaluate(() => { const p = JSON.parse(localStorage.getItem('s2ui.project.v1')); return localStorage.getItem(`s2ui.draft.v1.${p.activeId}`); });
+  const draftAfterSuccess = await page.evaluate(() => { const p = JSON.parse(localStorage.getItem('s2ui.project.v1')); const k = Object.keys(localStorage).find(k => k.startsWith('s2ui.draft.v1.') && k.endsWith(`.${p.activeId}`)); return k ? localStorage.getItem(k) : null; });
   assert.equal(JSON.parse(draftAfterSuccess), '', 'a successful retry consumes the stored draft');
 
   // Plan brief persistence across productivity sections.

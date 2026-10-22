@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-const { elementContext, parseAgentReply, applyElementReplacement, countChangedLines } = await import('../src/lib/elementAgent.ts');
+const { elementContext, parseAgentReply, applyElementReplacement, applyElementInsert, countChangedLines } = await import('../src/lib/elementAgent.ts');
 const { describeElement } = await import('../src/lib/visualEdit.ts');
 
 const code = `import { useState } from 'react';
@@ -52,4 +52,27 @@ assert.deepEqual(parseAgentReply('<button>Hi</button>'), { kind: 'edit', jsx: '<
 assert.deepEqual(parseAgentReply('{"escalate": "needs page-level state"}'), { kind: 'escalate', reason: 'needs page-level state' });
 assert.throws(() => parseAgentReply('I cannot do that.'), /not return a usable edit/);
 assert.throws(() => elementContext(code, 99), /no longer available/);
-console.log('PASS element-agent: exact-range read with context, byte-identical splice outside the element, verification refuses garbage/multi-element/locked edits, reply parsing handles fences, raw JSX and escalations.');
+
+// Insert mode (item 33): a new element lands as the container's last child,
+// on its own line, with everything else byte-identical.
+const withCard = applyElementInsert(code, 0, '<span className="badge">New</span>');
+assert.ok(withCard.includes('<p>Footer text</p>\n      <span className="badge">New</span>\n    </div>'));
+assert.ok(withCard.startsWith(code.slice(0, code.indexOf('<p>Footer'))));
+assert.throws(() => applyElementInsert(code, 0, '<p>a</p><p>b</p>'), /exactly one JSX element/);
+assert.throws(() => applyElementInsert(code, 0, '<span onClick={() => setCount(}>x</span>'), /not valid JSX|failed verification/);
+
+// A self-closing element cannot contain children — the error points at the parent instead.
+const imgCode = code.replace('<p>Footer text</p>', '<img src="a.png" alt="" />');
+assert.throws(() => applyElementInsert(imgCode, 3, '<span>x</span>'), /cannot contain children/);
+
+// Multi-element runs (item 33): the app edits last-element-first so the
+// waiting indices stay valid — simulate its exact loop on the evolving
+// source and prove both outer elements change while the middle is untouched.
+let working = code;
+for (const id of [3, 1]) { // descending: p first, then h1
+  working = applyElementReplacement(working, id, id === 3 ? '<p className="foot">Footer text</p>' : '<h1 className="big">Counter</h1>');
+}
+assert.ok(working.includes('<h1 className="big">Counter</h1>'));
+assert.ok(working.includes('<p className="foot">Footer text</p>'));
+assert.ok(working.includes('<button onClick={() => setCount(count + 1)}>Count: {count}</button>'));
+console.log('PASS element-agent: exact-range read with context, byte-identical splice outside the element, verification refuses garbage/multi-element/locked edits, reply parsing handles fences, raw JSX and escalations, insert mode lands a verified last child and refuses childless containers, descending-order multi-edits keep indices valid.');
