@@ -268,9 +268,15 @@ iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review p
 .preview-viewport-tools .ui-icon { display:flex; align-items:center; justify-content:center; gap:4px; min-width:32px; min-height:32px; border-radius:8px; }
 .preview-tool-text { font-size:10px; }
 .preview-more-wrap { position:relative; }
+.preview-tweaks-wrap { position:relative; }
 .preview-more-menu { position:absolute; z-index:45; inset-inline-end:0; top:calc(100% + 8px); width:190px; max-width:calc(100vw - 24px); max-height:min(60dvh, 320px); overflow-y:auto; border:1px solid var(--ui-border); border-radius:12px; padding:5px; background:var(--ui-surface); box-shadow:0 12px 32px #0002; }
 .preview-more-menu button { display:flex; width:100%; gap:10px; align-items:center; padding:11px; border-radius:8px; font-size:12px; text-align:start; }
 .preview-more-menu button:hover { background:var(--ui-hover); }
+.preview-tweaks-menu { width:230px; padding:10px; display:flex; flex-direction:column; gap:8px; }
+.preview-tweaks-menu label { display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--ui-muted); }
+.preview-tweaks-menu select { background:var(--ui-bg); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:8px; padding:6px; font-size:12px; }
+.preview-tweaks-menu .tweak-check { flex-direction:row; align-items:center; gap:7px; color:var(--ui-text); font-size:12px; }
+.preview-tweaks-menu .tweak-note { margin:0; font-size:11px; line-height:1.5; color:var(--ui-muted); }
 .preview-more-menu button:disabled { opacity:.4; }
 .preview-actions { flex-wrap:nowrap; }
 .preview-actions .actions-spacer { flex:1; }

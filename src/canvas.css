@@ -229,6 +229,16 @@
 .chat-starters { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
 .chat-suggestions { border-top:1px dashed var(--ui-border); padding-top:10px; margin-top:2px; }
 .chat-suggestions>div { display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+.chat-stages-summary { margin-top:8px; border-top:1px dashed var(--ui-border); padding-top:6px; }
+.stage-label { font-weight:500; color:var(--ui-text); }
+.stage-model { font-size:10px; padding:1px 6px; border:1px solid var(--ui-border); border-radius:99px; color:var(--ui-muted); white-space:nowrap; }
+.stage-detail { opacity:.85; }
+.chat-step.stage-skipped { opacity:.6; }
+.chat-step-icon.error { color:#d33; }
+.plan-gate-summary { display:block; margin-top:6px; }
+.plan-gate-reqs { margin:8px 0 0; padding-inline-start:18px; font-size:12px; line-height:1.65; }
+.plan-gate-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.plan-gate-actions .ui-primary, .plan-gate-actions .ui-button { min-height:34px; font-size:12px; padding:0 12px; display:inline-flex; align-items:center; }
 .canvas-studio .chat-column .workspace-composer { width:100%; margin:0; padding:12px 14px 6px; border-top:1px solid var(--ui-border); flex-shrink:0; }
 @media(min-width:901px) and (max-width:1200px) { .chat-column { flex-basis:292px; } }
 @media(max-width:900px) {

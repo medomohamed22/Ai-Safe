@@ -10,10 +10,12 @@ import { KEYS, load, loadSettings, save } from './lib/storage';
 const draftKey = (screenId: string) => `s2ui.draft.v1.${screenId}`;
 import { suggestNextSteps } from './lib/next-steps';
 import { libraryPrompt } from './lib/componentLibrary';
-import { planKey, planPrompt } from './lib/plans';
+import { parsePlanAnswer, planKey, planPrompt, type BuildPlan } from './lib/plans';
 import { createDemoProvider, generate } from './lib/providers';
-import { enhanceCodeWithImages } from './lib/imageGen';
+import { enhanceCodeWithImages, findImageSlots, imageModelFor } from './lib/imageGen';
 import { formatElementMap, segmentSketch, type SegmentOverlayData } from './lib/segment';
+import { freshStages, setStage, snapshotStages, type StageEvent, type StageId } from './lib/pipeline';
+import { sourceChecks } from './lib/quality';
 import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
 import { PRESETS, type PresetKey } from './lib/presets';
@@ -144,6 +146,22 @@ function WorkspaceApp() {
   const [generating, setGenerating] = useState(false);
   const [stream, setStream] = useState('');
   const [segmentOverlay, setSegmentOverlay] = useState<SegmentOverlayData | null>(null);
+  // The visible production line: live stage state for the current run plus
+  // the plan-approval gate (Plan-first). Stage marks never change what the
+  // run sends — they only name and time the steps that already happen.
+  const [runStages, setRunStages] = useState<StageEvent[]>([]);
+  const stagesRef = useRef<StageEvent[]>([]);
+  const stageStartRef = useRef<Partial<Record<StageId, number>>>({});
+  const [planGate, setPlanGate] = useState<{ plan: BuildPlan; args: RunOpts } | null>(null);
+  const planBypassRef = useRef(false);
+  const [productivityStart, setProductivityStart] = useState<string | undefined>(undefined);
+  const markStage = (id: StageId, patch: Partial<StageEvent>) => {
+    if (patch.status === 'active') stageStartRef.current[id] = performance.now();
+    if ((patch.status === 'done' || patch.status === 'error' || patch.status === 'skipped') && stageStartRef.current[id]) patch = { ...patch, ms: Math.round(performance.now() - stageStartRef.current[id]!) };
+    stagesRef.current = setStage(stagesRef.current, id, patch);
+    setRunStages(stagesRef.current);
+  };
+  const resetStages = () => { stagesRef.current = freshStages(); stageStartRef.current = {}; setRunStages(stagesRef.current); };
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [prompt, setPrompt] = useState(() => draft?.text || load(draftKey(initialScreen.id), ''));
@@ -296,6 +314,39 @@ function WorkspaceApp() {
       return;
     }
 
+    // Plan-first gate (Settings): the run pauses before building while the
+    // screen's plan is an unapproved draft — or, with no plan at all, one is
+    // drafted from the instruction first and then gated. A failed draft
+    // never blocks the build; approving or skipping resumes this same run.
+    const bypassPlan = planBypassRef.current; planBypassRef.current = false;
+    let stagesStarted = false;
+    if (s.planFirst && !opts.fixError && !bypassPlan) {
+      const existingPlan = load<BuildPlan | null>(planKey(screenId), null);
+      if (existingPlan && !existingPlan.approved) { setPlanGate({ plan: existingPlan, args: opts }); return; }
+      if (!existingPlan && (opts.instruction?.trim() || current)) {
+        resetStages(); stagesStarted = true;
+        markStage('plan', { status: 'active', model: s.activeModelId || undefined });
+        const pctrl = new AbortController(); abortRef.current = pctrl;
+        setGenerating(true);
+        try {
+          const brief = opts.instruction?.trim() || 'Improve the current interface based on the sketch.';
+          const answer = await generate({ provider, model: s.activeModelId, system: 'Return only JSON: {summary:string,requirements:[{text:string}]}. Each requirement must be specific and testable. Include user flows, responsive behavior, empty/loading/error states and API assumptions. No code.', userText: `Write an implementation plan for: ${brief}\nExisting source:\n${current}`, temperature: s.temperature, signal: pctrl.signal, onToken: () => {} });
+          if (pctrl.signal.aborted || projectRef.current.activeId !== screenId) return;
+          const drafted = parsePlanAnswer(answer);
+          save(planKey(screenId), drafted);
+          markStage('plan', { status: 'done', detail: tr('{0} requirements', [drafted.requirements.length]) });
+          setPlanGate({ plan: drafted, args: opts });
+          return;
+        } catch {
+          if (pctrl.signal.aborted) return;
+          markStage('plan', { status: 'error', detail: tr('Plan draft failed — building without one') });
+        } finally {
+          if (abortRef.current === pctrl) abortRef.current = null;
+          setGenerating(false);
+        }
+      }
+    }
+
     // Duplicate guard (P1-05): an identical request already in flight is
     // not sent twice (double click, eager retry). A different request
     // still supersedes the running one, as before.
@@ -306,15 +357,27 @@ function WorkspaceApp() {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    if (!stagesStarted) { resetStages(); stagesStarted = true; }
+    markStage('design', brandRef.current.enabled ? { status: 'done', detail: brandRef.current.name || tr('Saved brand') } : { status: 'skipped', detail: tr('No saved brand') });
+    if (stagesRef.current.find((x) => x.id === 'plan')?.status === 'todo') {
+      const planNow = load<BuildPlan | null>(planKey(screenId), null);
+      if (planNow?.approved) markStage('plan', { status: 'done', detail: tr('{0} requirements approved', [planNow.requirements.length]) });
+      else markStage('plan', { status: 'skipped', detail: bypassPlan ? tr('Continued without a plan') : planNow ? tr('Draft plan not approved') : tr('No plan for this screen') });
+    }
+
     // Segmentation pre-pass: SAM 3.1 on Meta (vision fallback) -> element map for the prompt + overlay.
     let segmentMap = '';
     if (image && s.autoSegment && !opts.fixError) {
+      markStage('understand', { status: 'active' });
       const seg = await segmentSketch(provider, s.activeModelId, image, ctrl.signal);
       if (ctrl.signal.aborted || projectRef.current.activeId !== screenId) { if (inFlightRef.current === requestKey) inFlightRef.current = null; return; }
       if (seg && seg.boxes.length) {
         segmentMap = formatElementMap(seg.boxes, seg.source);
         setSegmentOverlay({ image, boxes: seg.boxes, source: seg.source });
-      }
+        markStage('understand', { status: 'done', model: seg.source === 'sam-3.1' ? 'SAM 3.1' : s.activeModelId || undefined, detail: tr('{0} elements found', [seg.boxes.length]) + (seg.source === 'vision' ? ' · ' + tr('vision fallback') : '') });
+      } else markStage('understand', { status: 'skipped', detail: tr('No elements detected') });
+    } else {
+      markStage('understand', { status: 'skipped', detail: opts.fixError ? tr('Error fix run') : !image ? tr('No sketch') : tr('Segmentation off') });
     }
 
     if (mobilePaneRef.current !== 'instructions') setMobilePane('preview');
@@ -322,6 +385,7 @@ function WorkspaceApp() {
     setStream('');
     setApiError(null);
     try {
+      markStage('build', { status: 'active', model: s.activeModelId || undefined });
       const full = await generate({
         provider,
         model: s.activeModelId,
@@ -335,19 +399,29 @@ function WorkspaceApp() {
       const c = extractCode(full);
       if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
       if (!c || c.length < 30) throw new Error('The model did not return any code. Try a stronger vision model.');
+      markStage('build', { status: 'done', detail: tr('{0} characters of code', [c.length.toLocaleString()]) });
       assertLockedElements(c, locksRef.current[screenId] || []);
       let finalCode = c;
       if (s.autoImages) {
         // Replace placeholder images with AI-generated ones (graceful: failures keep the placeholder).
+        const imgModel = imageModelFor(provider);
+        markStage('assets', { status: 'active', model: imgModel || undefined });
+        const slotsBefore = findImageSlots(c).length;
         finalCode = await enhanceCodeWithImages(c, provider, ctrl.signal);
         if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
-      }
+        markStage('assets', { status: 'done', detail: !imgModel ? tr('No image model for this provider') : slotsBefore ? tr('{0} images generated', [Math.max(0, slotsBefore - findImageSlots(finalCode).length)]) : tr('No image slots in this design') });
+      } else markStage('assets', { status: 'skipped', detail: tr('Auto-images off') });
       if (opts.instruction && load(draftKey(screenId), '') === opts.instruction) save(draftKey(screenId), '');
-      if (reviewEnabled) { setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else pushVersion(finalCode);
-      endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built' });
+      const checks = sourceChecks(finalCode);
+      const passedChecks = checks.filter((x) => x.passed).length;
+      markStage('review', { status: 'done', detail: tr('{0}/{1} source checks passed', [passedChecks, checks.length]) + (passedChecks < checks.length ? ' · ' + checks.filter((x) => !x.passed).map((x) => x.name).join(', ') : '') });
+      if (reviewEnabled) { markStage('ship', { status: 'skipped', detail: tr('Held for your review') }); setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else { pushVersion(finalCode); markStage('ship', { status: 'done', detail: tr('New version saved') }); }
+      endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built', stages: snapshotStages(stagesRef.current) });
       if (!reviewEnabled && autoQuality) setShowProductivity(true);
     } catch (e: any) {
       if (ctrl.signal.aborted) return;
+      const activeStage = stagesRef.current.find((x) => x.status === 'active');
+      if (activeStage) markStage(activeStage.id, { status: 'error' });
       const msg = e?.message || String(e);
       setApiError(msg);
       endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: msg });
@@ -366,7 +440,10 @@ function WorkspaceApp() {
   const runRef = useRef(run);
   runRef.current = run;
   const lastRunRef = useRef<{ instruction?: string; fresh?: boolean }>({});
-  const runTracked = (args: { instruction?: string; fresh?: boolean }) => { lastRunRef.current = args; beginChatRun(args.instruction); showPreviewStage(); runRef.current(args); };
+  const runTracked = (args: { instruction?: string; fresh?: boolean }) => { lastRunRef.current = args; setPlanGate(null); beginChatRun(args.instruction); showPreviewStage(); runRef.current(args); };
+  const approvePlanAndBuild = () => { if (!planGate) return; save(planKey(projectRef.current.activeId), { ...planGate.plan, approved: true }); const args = planGate.args; setPlanGate(null); planBypassRef.current = true; runRef.current(args); };
+  const skipPlanAndBuild = () => { if (!planGate) return; const args = planGate.args; setPlanGate(null); planBypassRef.current = true; runRef.current(args); };
+  const editPlan = () => { setPlanGate(null); setProductivityStart('Plan'); setShowProductivity(true); };
   const chatRunRef = useRef<{ screenId: string } | null>(null);
   const beginChatRun = (text?: string, kind?: 'fix') => {
     const msg: ChatMessage = kind === 'fix' ? { id: crypto.randomUUID(), role: 'user', kind: 'fix' } : text?.trim() ? { id: crypto.randomUUID(), role: 'user', text: text.trim() } : { id: crypto.randomUUID(), role: 'user', kind: 'sketch' };
@@ -426,6 +503,8 @@ function WorkspaceApp() {
 
   const stop = () => {
     abortRef.current?.abort();
+    const activeStage = stagesRef.current.find((x) => x.status === 'active');
+    if (activeStage) markStage(activeStage.id, { status: 'skipped', detail: tr('Stopped') });
     endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'stopped' });
     abortRef.current = null;
     setGenerating(false);
@@ -470,7 +549,7 @@ function WorkspaceApp() {
     if (!screen) return;
     stop(); window.clearTimeout(debounceRef.current); window.clearTimeout(saveSceneRef.current);
     setProject({ ...nextProject, activeId: id }); setVersions(screen.versions); setVIndex(screen.vIndex); setScreenScene(screen.scene);
-    setApiError(null); setStream(''); setPrompt(load(draftKey(id), '')); setChat(screen.chat ?? []);
+    setApiError(null); setStream(''); setPrompt(load(draftKey(id), '')); setChat(screen.chat ?? []); setPlanGate(null); resetStages();
     sigRef.current = sigOf(screen.scene?.elements || []);
     apiRef.current?.resetScene();
     if (screen.scene?.files) apiRef.current?.addFiles(Object.values(screen.scene.files));
@@ -593,7 +672,7 @@ function WorkspaceApp() {
           <div className="studio-split">
             <section className="chat-column" data-mobile-active={mobilePane === 'instructions'} aria-label={tr("AI conversation")}>
               <div className="chat-head"><span className="studio-eyebrow">{tr("YOUR CREATIVE PARTNER")}</span><strong>{tr("What shall we make?")}</strong><p className="chat-head-sub">{tr("Describe a new interface or refine the current screen.")}</p></div>
-              <ChatThread messages={chat} generating={generating} stream={stream} segmentReady={!!segmentOverlay} hasCode={!!code} suggestions={code ? suggestNextSteps(code, liveProject.screens.length) : []} starters={['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']} onSendSuggestion={(text) => runTracked({ instruction: text })} onRetry={() => { setApiError(null); chatRunRef.current = { screenId: project.activeId }; showPreviewStage(); runRef.current(lastRunRef.current); }} />
+              <ChatThread messages={chat} generating={generating} stream={stream} segmentReady={!!segmentOverlay} hasCode={!!code} suggestions={code ? suggestNextSteps(code, liveProject.screens.length) : []} starters={['A clean dashboard', 'A portfolio homepage', 'A mobile shopping app']} stages={runStages} planGate={planGate} onApprovePlan={approvePlanAndBuild} onSkipPlan={skipPlanAndBuild} onEditPlan={editPlan} onSendSuggestion={(text) => runTracked({ instruction: text })} onRetry={() => { setApiError(null); chatRunRef.current = { screenId: project.activeId }; showPreviewStage(); runRef.current(lastRunRef.current); }} />
 <footer className="workspace-composer" data-mobile-active={mobilePane === 'instructions'}>
         
         <div className="composer-model"><ModelPicker settings={settings} onSelect={(pid, mid) => setSettings(s => ({ ...s, activeProviderId: pid, activeModelId: mid }))} onOpenSettings={() => setShowSettings(true)} /></div>
@@ -672,6 +751,7 @@ function WorkspaceApp() {
             onOpenSettings={() => setShowSettings(true)}
             onCodeChange={code => { assertLockedElements(code, locksRef.current[project.activeId] || []); pushVersion(code); }}
             onElementRequest={(instruction) => { beginChatRun(instruction); showPreviewStage(); runRef.current({ instruction }); }}
+            brand={brand}
             segmentOverlay={segmentOverlay}
             onCloseSegments={() => setSegmentOverlay(null)}
           />
@@ -690,7 +770,7 @@ function WorkspaceApp() {
         <button aria-label={tr("Show chat workspace")} aria-pressed={mobilePane === 'instructions'} onClick={() => setMobilePane('instructions')}><MessageSquare size={20} /><span>{tr("Chat")}</span>{generating && <i />}</button>
       </nav>
       {toolsOpen && createPortal(<div role="dialog" aria-modal="true" aria-label={tr("Workspace tools")} className="studio-tools-overlay items-center"><section className="studio-tools-sheet"><div className="sheet-heading"><strong>{tr("Workspace tools")}</strong><button className="ui-icon" data-dialog-close onClick={() => setToolsOpen(false)} aria-label={tr("Close workspace tools")}><X size={20} /></button></div>{sidebar}</section></div>, document.body)}
-      {showProductivity && <ProductivityPanel reviewEnabled={reviewEnabled} onReviewEnabled={setReviewEnabled} review={pendingChange} onRejectReview={() => setPendingChange(null)} onAcceptReview={(next,base) => { if (codeRef.current !== base || pendingChange && pendingChange.scope !== project.activeId) throw new Error('Source or screen changed. Reject this stale review and regenerate.'); assertLockedElements(next,locksRef.current[project.activeId]||[]); pushVersion(next); setPendingChange(null); }} getSketch={exportSketch} model={settings.activeModelId || ''} reference={reference?.dataUrl} scope={project.activeId} autoQuality={autoQuality} onAutoQuality={setAutoQuality} code={code} backend={backend} onClose={() => { productivityAbort.current?.abort(); setShowProductivity(false); }} onAdopt={next => { assertLockedElements(next, locksRef.current[project.activeId] || []); pushVersion(next); }} ask={async (userText, system, images) => {
+      {showProductivity && <ProductivityPanel startSection={productivityStart} reviewEnabled={reviewEnabled} onReviewEnabled={setReviewEnabled} review={pendingChange} onRejectReview={() => setPendingChange(null)} onAcceptReview={(next,base) => { if (codeRef.current !== base || pendingChange && pendingChange.scope !== project.activeId) throw new Error('Source or screen changed. Reject this stale review and regenerate.'); assertLockedElements(next,locksRef.current[project.activeId]||[]); pushVersion(next); setPendingChange(null); }} getSketch={exportSketch} model={settings.activeModelId || ''} reference={reference?.dataUrl} scope={project.activeId} autoQuality={autoQuality} onAutoQuality={setAutoQuality} code={code} backend={backend} onClose={() => { productivityAbort.current?.abort(); setShowProductivity(false); setProductivityStart(undefined); }} onAdopt={next => { assertLockedElements(next, locksRef.current[project.activeId] || []); pushVersion(next); }} ask={async (userText, system, images) => {
         const s = settingsRef.current; const provider = s.providers.find(p => p.id === s.activeProviderId);
         if (!provider || !s.activeModelId) throw new Error('Connect a provider and model in Settings first.');
         productivityAbort.current?.abort(); const ctrl = new AbortController(); productivityAbort.current = ctrl;

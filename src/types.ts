@@ -29,4 +29,5 @@ export interface AppSettings {
   autoSegment: boolean;
   debounceMs: number;
   temperature: number;
+  planFirst: boolean;
 }

@@ -3,6 +3,9 @@ import { materializeLibrary } from './componentLibrary';
 import JSZip from 'jszip';
 import { backendBootstrap, DEFAULT_BACKEND, type BackendConfig } from './backend';
 import { screenFiles, type ScreenProject } from './screens';
+import { DEFAULT_BRAND } from './brand';
+import { designSystemMarkdown } from './designSystem';
+import { KEYS, load } from './storage';
 
 function detectExtraDependencies(sources: string[]): Record<string, string> {
   const extra: Record<string, string> = {};
@@ -75,6 +78,59 @@ export function backendHandoff(backend: BackendConfig, project?: ScreenProject):
   return lines.join('\n');
 }
 
+// Handoff document: how the project was built — the pipeline, the screens
+// and versions, and the build conversation's decisions — so a developer (or
+// another coding agent) can continue from the export, not just from code.
+export function handoffDocument(project?: ScreenProject): string {
+  const lines: string[] = [];
+  lines.push('# Handoff — how this project was built');
+  lines.push('');
+  lines.push('Sketch2UI builds through a visible pipeline: the sketch is segmented into elements (SAM 3.1 on the Meta Model API, with an honest vision fallback), the approved plan and the saved design system guide generation, real images are generated for image slots, and the result passes local source checks before it is saved as a new version.');
+  lines.push('');
+  lines.push('## Screens');
+  lines.push('');
+  if (project && project.screens.length) {
+    for (const s of project.screens) lines.push(`- ${s.name} (\`${s.id}\`) — ${s.versions.length} version${s.versions.length === 1 ? '' : 's'}${s.versions.length ? '' : ' (not generated yet)'}`);
+    lines.push('');
+    if (project.links.length) {
+      lines.push('## Navigation');
+      lines.push('');
+      for (const l of project.links) {
+        const from = project.screens.find((x) => x.id === l.from)?.name || l.from;
+        const to = project.screens.find((x) => x.id === l.to)?.name || l.to;
+        lines.push(`- ${from} → ${to} ("${l.label}")`);
+      }
+      lines.push('');
+    }
+    lines.push('## Build conversation (decisions)');
+    lines.push('');
+    let any = false;
+    for (const s of project.screens) {
+      const chat = s.chat ?? [];
+      const asks = chat.filter((m) => m.role === 'user');
+      const built = chat.filter((m) => m.role === 'ai' && m.kind === 'built').length;
+      if (!asks.length && !built) continue;
+      any = true;
+      lines.push(`### ${s.name}`);
+      lines.push('');
+      for (const m of asks) lines.push(`- ${m.kind === 'fix' ? 'Fix the runtime error' : m.kind === 'sketch' ? 'Generate from sketch' : m.text ?? ''}`);
+      if (built) lines.push(`- → ${built} version${built === 1 ? '' : 's'} built from these requests`);
+      lines.push('');
+    }
+    if (!any) { lines.push('No build conversation was recorded for this project.'); lines.push(''); }
+  } else {
+    lines.push('Single-screen app: the source is `src/App.jsx`.');
+    lines.push('');
+  }
+  lines.push('## Continue from here');
+  lines.push('');
+  lines.push('1. Read BACKEND.md for the data contract, and DESIGN.md (when present) for the design tokens.');
+  lines.push('2. Run `npm install && npm run dev` and exercise every screen.');
+  lines.push('3. To keep designing, reopen the project in Sketch2UI — every screen keeps its version history and build conversation.');
+  lines.push('');
+  return lines.join('\n');
+}
+
 export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACKEND, project?: ScreenProject): Record<string, string> {
   const extraScreens = project && project.screens.length > 1 ? screenFiles(project) : {};
   const jsxSources = [code, ...Object.values(extraScreens)].map(s => materializeAssets(materializeLibrary(s)));
@@ -98,8 +154,11 @@ export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACK
     'postcss.config.js': 'export default {plugins:{tailwindcss:{},autoprefixer:{}}};\n',
     '.gitignore': 'node_modules/\ndist/\n.env\n.env.*\n!.env.example\n.vercel/\n',
     'vercel.json': JSON.stringify({ framework: 'vite', buildCommand: 'npm run build', outputDirectory: 'dist', rewrites: [{ source: '/((?!api/).*)', destination: '/index.html' }] }, null, 2),
-    'README.md': '# Sketch2UI exported project\n\nRun `npm install`, then `npm run dev`. Build with `npm run build`. Commit the generated package-lock.json after installation.\n\nUpload these contents to GitHub; import in Vercel as Vite with build `npm run build`, output `dist`.\n\n## Backend handoff\n\nApp.jsx preserves the generated source and its service adapters. Start with BACKEND.md — it lists the configured endpoints (or the proposed contract), the screens, and the connection checklist. Review the API base URL and backend authentication/CORS before real API use. Demo data is not a production database. No backend or API secrets are included in this export.\n\nReview generated dependencies and external image URLs before production use.\n',
+    'README.md': '# Sketch2UI exported project\n\nRun `npm install`, then `npm run dev`. Build with `npm run build`. Commit the generated package-lock.json after installation.\n\nUpload these contents to GitHub; import in Vercel as Vite with build `npm run build`, output `dist`.\n\n## Backend handoff\n\nApp.jsx preserves the generated source and its service adapters. Start with BACKEND.md — it lists the configured endpoints (or the proposed contract), the screens, and the connection checklist. DESIGN.md (included when a brand identity was saved) carries the design system, and HANDOFF.md summarizes how the project was built: screens, versions, and the decisions in the build conversation. Review the API base URL and backend authentication/CORS before real API use. Demo data is not a production database. No backend or API secrets are included in this export.\n\nReview generated dependencies and external image URLs before production use.\n',
   };
+  const brand = load(KEYS.brand, DEFAULT_BRAND);
+  if (brand.enabled) files['DESIGN.md'] = designSystemMarkdown(brand);
+  files['HANDOFF.md'] = handoffDocument(project);
   for (const name of Object.keys(files)) if (name.endsWith('.jsx')) files[name] = materializeAssets(materializeLibrary(files[name]));
   return files;
 }

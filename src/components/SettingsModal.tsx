@@ -119,6 +119,15 @@ export function SettingsModal({ settings, setSettings, onClose }: Props) {
                   className="h-4 w-4 accent-[var(--ui-contrast)]"
                 />
               </label>
+              <label className="flex items-center justify-between gap-2 py-1 text-sm">
+                <span>{tr("Plan first (approve a plan before building)")}</span>
+                <input
+                  type="checkbox"
+                  checked={settings.planFirst}
+                  onChange={(e) => setSettings((s) => ({ ...s, planFirst: e.target.checked }))}
+                  className="h-4 w-4 accent-[var(--ui-contrast)]"
+                />
+              </label>
               <label className="block py-1 text-sm">
                 <div className="flex justify-between">
                   <span>{tr("Debounce")}</span>
