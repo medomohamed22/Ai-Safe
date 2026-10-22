@@ -175,7 +175,7 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
     window.addEventListener('scroll', placeHandles, true);
     function startResize(kind, e) {
       var r = selectedEl.getBoundingClientRect();
-      drag = { mode: 'resize', kind: kind, x: e.clientX, y: e.clientY, w: r.width, h: r.height, ow: selectedEl.style.width, oh: selectedEl.style.height };
+      drag = { mode: 'resize', kind: kind, x: e.clientX, y: e.clientY, w: r.width, h: r.height, ow: selectedEl.style.width, oh: selectedEl.style.height, active: false, th: e.pointerType === 'touch' ? 12 : 8 };
     }
     function startMove(el, e) {
       var parentEl = el.parentElement;
@@ -187,19 +187,20 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
         var tops = sibs.map(function (s) { return rects[s.getAttribute('data-s2ui-id')].top; });
         if (Math.max.apply(null, tops) - Math.min.apply(null, tops) < 8) axis = 'x';
       }
-      drag = { mode: 'move', el: el, x: e.clientX, y: e.clientY, active: false, sibs: sibs, rects: rects, axis: axis, target: null, ot: el.style.transform, oo: el.style.opacity, op: el.style.position, oz: el.style.zIndex };
+      drag = { mode: 'move', el: el, x: e.clientX, y: e.clientY, active: false, sibs: sibs, rects: rects, axis: axis, target: null, ot: el.style.transform, oo: el.style.opacity, op: el.style.position, oz: el.style.zIndex, th: e.pointerType === 'touch' ? 12 : 8 };
     }
     function dragMove(e) {
       if (!drag) return;
       if (drag.mode === 'resize') {
         var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (!drag.active) { if (Math.abs(dx) + Math.abs(dy) <= drag.th) return; drag.active = true; }
         if (drag.kind === 'e' || drag.kind === 'se') { drag.nw = Math.max(24, Math.round(drag.w + dx)); selectedEl.style.width = drag.nw + 'px'; }
         if (drag.kind === 's' || drag.kind === 'se') { drag.nh = Math.max(24, Math.round(drag.h + dy)); selectedEl.style.height = drag.nh + 'px'; }
         placeHandles();
         return;
       }
       var mx = e.clientX - drag.x, my = e.clientY - drag.y;
-      if (!drag.active && Math.abs(mx) + Math.abs(my) > 6) { drag.active = true; drag.el.style.position = 'relative'; drag.el.style.opacity = '.75'; drag.el.style.zIndex = '40'; }
+      if (!drag.active && Math.abs(mx) + Math.abs(my) > drag.th) { drag.active = true; drag.el.style.position = 'relative'; drag.el.style.opacity = '.75'; drag.el.style.zIndex = '40'; }
       if (!drag.active) return;
       drag.el.style.transform = 'translate(' + mx + 'px,' + my + 'px)';
       var p = drag.axis === 'y' ? e.clientY : e.clientX;
@@ -225,7 +226,7 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
       dropLine.style.display = 'none';
       if (d.mode === 'resize') {
         if (selectedEl) { selectedEl.style.width = d.ow; selectedEl.style.height = d.oh; }
-        if (commit && selectedEl && (d.nw !== undefined || d.nh !== undefined)) {
+        if (commit && d.active && selectedEl && (d.nw !== undefined || d.nh !== undefined)) {
           var msg = { source: 's2ui-preview', type: 'element-resized', token: token, id: Number(selectedEl.getAttribute('data-s2ui-id')) };
           if (d.nw !== undefined) msg.width = d.nw;
           if (d.nh !== undefined) msg.height = d.nh;
@@ -248,6 +249,7 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
     window.addEventListener('pointermove', dragMove, true);
     window.addEventListener('pointerup', function () { endDrag(true); }, true);
     window.addEventListener('pointercancel', function () { endDrag(false); }, true);
+    window.addEventListener('keydown', function (e) { if (drag && e.key === 'Escape') endDrag(false); }, true);
     function intercept(e) {
       if (!editing) return;
       e.preventDefault(); e.stopImmediatePropagation();
@@ -257,17 +259,9 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
       if (e.type === 'pointerdown') {
         suppressClick = false;
         if (el) {
-          if (el === selectedEl) {
-            var r = el.getBoundingClientRect();
-            var bandX = Math.min(12, Math.max(4, r.width / 4));
-            var bandY = Math.min(12, Math.max(4, r.height / 4));
-            var nearR = Math.abs(e.clientX - r.right) <= bandX && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6;
-            var nearB = Math.abs(e.clientY - r.bottom) <= bandY && e.clientX >= r.left - 6 && e.clientX <= r.right + 6;
-            if (nearR && nearB) { startResize('se', e); return; }
-            if (nearR) { startResize('e', e); return; }
-            if (nearB) { startResize('s', e); return; }
-          }
-          handleSelect(el, e); if (!e.shiftKey) startMove(el, e);
+          var wasSelected = el === selectedEl;
+          handleSelect(el, e);
+          if (!e.shiftKey && wasSelected) startMove(el, e);
         }
         return;
       }

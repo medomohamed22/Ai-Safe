@@ -19,7 +19,7 @@ import { freshStages, setStage, snapshotStages, type StageEvent, type StageId } 
 import { sourceChecks } from './lib/quality';
 import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
-import { ELEMENT_AGENT_INSERT_SYSTEM, ELEMENT_AGENT_SYSTEM, applyElementInsert, applyElementReplacement, countChangedLines, elementAgentPrompt, elementContext, elementInsertPrompt, parseAgentReply, type ElementContext } from './lib/elementAgent';
+import { ELEMENT_AGENT_INSERT_SYSTEM, ELEMENT_AGENT_SYSTEM, applyAgentEdit, countChangedLines, elementAgentPrompt, elementContext, elementInsertPrompt, parseAgentReply, type ElementContext } from './lib/elementAgent';
 import { PRESETS, type PresetKey } from './lib/presets';
 import { ModelPicker } from './components/ModelPicker';
 import { SettingsModal } from './components/SettingsModal';
@@ -514,9 +514,10 @@ function WorkspaceApp() {
       markStage('build', { status: 'active', model: s.activeModelId || undefined });
       const system = mode === 'insert' ? ELEMENT_AGENT_INSERT_SYSTEM : ELEMENT_AGENT_SYSTEM;
       const promptFor = (ctx: ElementContext) => (mode === 'insert' ? elementInsertPrompt(ctx, instruction) : elementAgentPrompt(ctx, instruction));
-      const applyFor = (code: string, id: number, jsx: string) => (mode === 'insert' ? applyElementInsert(code, id, jsx, locks) : applyElementReplacement(code, id, jsx, locks));
+      const applyFor = (code: string, id: number, edit: { jsx: string; addState?: string }) => applyAgentEdit(code, id, edit, locks, mode);
       let working = current;
       let applied = 0;
+      let stateAdded = false;
       const failures: string[] = [];
       for (let i = 0; i < targets.length; i++) {
         if (ctrl.signal.aborted) throw new Error('Aborted');
@@ -534,19 +535,20 @@ function WorkspaceApp() {
           continue;
         }
         try {
-          working = applyFor(working, id, parsed.jsx);
+          working = applyFor(working, id, parsed);
           applied++;
+          if (parsed.addState) stateAdded = true;
         } catch (verifyError) {
           markStage('review', { status: 'active', model: s.activeModelId || undefined });
-          const repair = await generate({ provider, model: s.activeModelId, system, userText: promptFor(ctx) + `\n\n## Your previous attempt failed verification\n${(verifyError as Error).message}\nPrevious attempt:\n\`\`\`jsx\n${parsed.jsx}\n\`\`\`\n${mode === 'insert' ? 'Return a corrected new element only.' : 'Return a corrected replacement element only.'}`, temperature: 0.2, signal: ctrl.signal, onToken: () => {} });
+          const repair = await generate({ provider, model: s.activeModelId, system, userText: promptFor(ctx) + `\n\n## Your previous attempt failed verification\n${(verifyError as Error).message}\nPrevious attempt:\n\`\`\`jsx\n${parsed.jsx}\n\`\`\`\n${mode === 'insert' ? 'Return a corrected new element, or the JSON form with addState if it needs state.' : 'Return a corrected replacement, or the JSON form with addState if it needs state.'}`, temperature: 0.2, signal: ctrl.signal, onToken: () => {} });
           const reparsed = parseAgentReply(repair);
           if (reparsed.kind === 'escalate') { failures.push(reparsed.reason); continue; }
-          try { working = applyFor(working, id, reparsed.jsx); applied++; }
+          try { working = applyFor(working, id, reparsed); applied++; if (reparsed.addState) stateAdded = true; }
           catch (e2) { failures.push((e2 as Error).message); }
         }
       }
       if (!applied) throw new Error(failures[0] || 'The agent could not apply this change safely. Your page was not changed.');
-      markStage('build', { status: 'done', detail: mode === 'insert' ? tr('Added one new element inside <{0}>', [contexts[0].tag]) : targets.length > 1 ? tr('Edited {0} of {1} elements', [applied, targets.length]) : tr('Only the selected element changed') });
+      markStage('build', { status: 'done', detail: stateAdded ? tr('Element changed; state added to its component') : mode === 'insert' ? tr('Added one new element inside <{0}>', [contexts[0].tag]) : targets.length > 1 ? tr('Edited {0} of {1} elements', [applied, targets.length]) : tr('Only the selected element changed') });
       markStage('assets', { status: 'skipped', detail: tr('No new assets needed') });
       markStage('review', { status: 'done', detail: failures.length ? tr('Source checks passed; {0} skipped', [failures.length]) : tr('Source checks passed') });
       pushVersion(working);

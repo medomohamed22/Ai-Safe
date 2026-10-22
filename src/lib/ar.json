@@ -1085,5 +1085,6 @@
   "Version {0}": "الإصدار {0}",
   "{0} elements selected": "{0} عناصر محددة",
   "~{0} tokens": "~{0} رمز",
-  "~{0} tokens · ~{1} sec": "~{0} رمز · ~{1} ثانية"
+  "~{0} tokens · ~{1} sec": "~{0} رمز · ~{1} ثانية",
+  "Element changed; state added to its component": "تغيّر العنصر؛ وأُضيفت حالة إلى مكوّنه"
 }

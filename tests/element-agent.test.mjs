@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-const { elementContext, parseAgentReply, applyElementReplacement, applyElementInsert, countChangedLines } = await import('../src/lib/elementAgent.ts');
+const { elementContext, parseAgentReply, applyElementReplacement, applyElementInsert, applyAgentEdit, countChangedLines } = await import('../src/lib/elementAgent.ts');
 const { describeElement } = await import('../src/lib/visualEdit.ts');
 
 const code = `import { useState } from 'react';
@@ -75,4 +75,40 @@ for (const id of [3, 1]) { // descending: p first, then h1
 assert.ok(working.includes('<h1 className="big">Counter</h1>'));
 assert.ok(working.includes('<p className="foot">Footer text</p>'));
 assert.ok(working.includes('<button onClick={() => setCount(count + 1)}>Count: {count}</button>'));
-console.log('PASS element-agent: exact-range read with context, byte-identical splice outside the element, verification refuses garbage/multi-element/locked edits, reply parsing handles fences, raw JSX and escalations, insert mode lands a verified last child and refuses childless containers, descending-order multi-edits keep indices valid.');
+// --- v3: behavior edits -------------------------------------------------
+// The reply protocol: JSON with replace + addState for behavior changes.
+assert.deepEqual(
+  parseAgentReply('{"replace": "<button>Menu</button>", "addState": "const [open, setOpen] = useState(false);"}'),
+  { kind: 'edit', jsx: '<button>Menu</button>', addState: 'const [open, setOpen] = useState(false);' },
+);
+
+// "Make it open a menu": wrapper + conditional menu + state injected into
+// the host component after its existing hook, everything else untouched.
+const menuJsx = '<div className="relative"><button onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}>Count: {count}</button>{menuOpen && (<div className="menu"><a href="#">Profile</a></div>)}</div>';
+const withMenu = applyAgentEdit(code, 2, { jsx: menuJsx, addState: 'const [menuOpen, setMenuOpen] = useState(false);' });
+assert.ok(withMenu.includes('const [count, setCount] = useState(0);\n  const [menuOpen, setMenuOpen] = useState(false);'), 'state lands after the existing hook');
+assert.ok(withMenu.includes('menuOpen && (<div className="menu">'), 'the conditional menu is in place');
+assert.ok(withMenu.includes('<h1>Counter</h1>'), 'the rest of the page stayed untouched');
+assert.equal((withMenu.match(/import \{ useState \} from 'react'/g) || []).length, 1, 'the existing hook import is not duplicated');
+
+// On a hookless page the system adds the React hook import itself.
+const bare = 'export default function App() {\n  return (\n    <button>Open menu</button>\n  );\n}\n';
+const bareMenu = applyAgentEdit(bare, 0, { jsx: menuJsx.replace('Count: {count}', 'Open menu').replace('onClick={() => setMenuOpen(!menuOpen)}', 'onClick={() => setMenuOpen(!menuOpen)}'), addState: 'const [menuOpen, setMenuOpen] = useState(false);' });
+assert.ok(bareMenu.startsWith("import { useState } from 'react';"), 'hook import added at the top');
+assert.ok(bareMenu.includes('const [menuOpen, setMenuOpen] = useState(false);\n  return ('), 'state lands inside the component before the return');
+
+// The old silent breakage is now refused: names that do not exist here.
+assert.throws(() => applyElementReplacement(code, 2, '<button onClick={() => setOpen(!open)}>Count: {count}</button>'), /names that do not exist here: open, setOpen/);
+assert.throws(() => applyElementReplacement(code, 2, '<button><ChevronDown size={16} /></button>'), /names that do not exist here: ChevronDown/);
+
+// Names the replacement declares itself (event params) are fine.
+assert.ok(applyElementReplacement(code, 2, '<button onClick={(e) => { e.preventDefault(); setCount(count + 1); }}>Count: {count}</button>').includes('e.preventDefault()'));
+
+// addState discipline: fresh names only, exactly one hook declaration.
+assert.throws(() => applyAgentEdit(code, 2, { jsx: '<button>x</button>', addState: 'const [count, setCount] = useState(0);' }), /already exists/);
+assert.throws(() => applyAgentEdit(code, 2, { jsx: '<button>x</button>', addState: 'let open = false;' }), /exactly one const declaration/);
+assert.throws(() => applyAgentEdit(code, 2, { jsx: '<button>x</button>', addState: 'const [a, setA] = useState(false); const [b, setB] = useState(false);' }), /not valid code|exactly one const/);
+
+// A fragment root is a valid single root (element + its own sibling).
+assert.ok(applyElementReplacement(code, 2, '<><button>Menu</button><div>Panel</div></>').includes('<div>Panel</div>'));
+console.log('PASS element-agent: exact-range read with context, byte-identical splice outside the element, verification refuses garbage/multi-element/locked edits, reply parsing handles fences, raw JSX and escalations, insert mode lands a verified last child and refuses childless containers, descending-order multi-edits keep indices valid, v3 behavior edits inject verified state (+hook import) and refuse undefined names, name collisions and malformed state.');
