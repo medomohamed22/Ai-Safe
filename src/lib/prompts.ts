@@ -25,6 +25,7 @@ FUNCTIONAL BEHAVIOR (REQUIRED)
 - Every visible action must have meaningful behavior appropriate to the sketch: navigation changes the displayed view, search/filter/sort update results, pagination follows the filtered results, and add/edit/delete actions update the underlying data and any derived totals or charts. Implement only features relevant to the requested UI.
 - Use controlled form inputs, field validation, accessible error messages, submit/cancel flows, and confirmation for destructive actions. Prevent duplicate submissions; display pending, success, empty and failure states with retry where appropriate. Keep keyboard interaction and mobile layouts usable.
 - Do not substitute alerts, console logs, empty callbacks, dead links or decorative buttons for a working feature. If an action needs an unavailable external service, show an honest unavailable/demo state instead of claiming it succeeded.
+- ACCESSIBILITY (REQUIRED): every form field has a real <label> or aria-label (never placeholder-only), every icon-only button has an aria-label, meaningful images have descriptive alt text, and interactive elements are reachable and operable by keyboard with a visible focus state.
 - STORAGE: You may use localStorage/sessionStorage for app state (the preview provides a safe implementation). Stored data can be absent, stale or reset outside the studio editor, so always read it defensively: wrap JSON.parse in try/catch, validate the shape, and fall back to seed data. A storage failure must never break rendering.
 
 BACKEND INTEGRATION CONTRACT (REQUIRED)
