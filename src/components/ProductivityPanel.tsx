@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildPreviewHtml } from '../lib/preview';
 import { load } from '../lib/storage';
 import { planKey, type BuildPlan } from '../lib/plans';
-import { sourceChecks } from '../lib/quality';
+import { sourceChecks, QUALITY_GROUPS, qualityGroupOf } from '../lib/quality';
 import { parseScenarios, resultStatus, STATUS_LABELS, type Scenario, type ScenarioResult } from '../lib/interactionTests';
 import type { BackendConfig } from '../lib/backend';
 export interface ProductivityProps {
@@ -109,7 +109,7 @@ function QualityPanel(p: ProductivityProps) {
   <label>{tr("Acceptance goals")}<textarea aria-label={tr("Quality acceptance goals")} placeholder={tr("Example: adding a task shows it in the list; deleting it removes it.")} value={goals} onChange={e => setGoals(e.target.value)} disabled={busy} /></label>
   <label className="check-option"><input type="checkbox" checked={repair} onChange={e => setRepair(e.target.checked)} disabled={busy} />{tr("Try up to two AI repairs. Original stays unchanged until adoption.")}</label>
   <div className="productivity-actions"><button className="ui-primary" disabled={busy || !candidate} onClick={run}>{busy ? tr("Checking…") : tr("Run automatic checks")}</button>{candidate !== p.code && <button className="ui-button" disabled={busy || !rows.length || rows.some(r => resultStatus(r) === 'failed')} onClick={() => { try { p.onAdopt(candidate); } catch (e) { setError((e as Error).message); } }}>{tr("Adopt checked repair")}</button>}</div>
-  {error && <p role="alert">{tr(error)}</p>}{rows.length > 0 && <p className="quality-summary">{(["passed", "failed", "setup-error", "blocked", "untested"] as const).map(st => { const n = rows.filter(r => resultStatus(r) === st).length; return n ? <span key={st}>{tr(STATUS_LABELS[st])} {n}</span> : null; }).filter(Boolean)}</p>}<ul aria-label={tr("Quality results")}>{rows.map((r, i) => <li key={i}><b>{tr(STATUS_LABELS[resultStatus(r)])} — {tr(r.name)}</b><span>{tr(r.detail)}</span></li>)}</ul>
+  {error && <p role="alert">{tr(error)}</p>}{rows.length > 0 && <p className="quality-summary">{(["passed", "failed", "setup-error", "blocked", "untested"] as const).map(st => { const n = rows.filter(r => resultStatus(r) === st).length; return n ? <span key={st}>{tr(STATUS_LABELS[st])} {n}</span> : null; }).filter(Boolean)}</p>}{QUALITY_GROUPS.map(g => { const gr = rows.filter(r => qualityGroupOf(r.name) === g); if (!gr.length) return null; const ok = gr.filter(r => resultStatus(r) === 'passed').length; return <div key={g} className="quality-group"><h4>{tr(g)} — {ok}/{gr.length} {tr("Passed")}</h4><ul aria-label={tr(g)}>{gr.map((r, i) => <li key={i}><b>{tr(STATUS_LABELS[resultStatus(r)])} — {tr(r.name)}</b><span>{tr(r.detail)}</span></li>)}</ul></div>; })}
   {frameJob && <div className="quality-frame-scroll"><iframe ref={frame} key={frameJob.token} title={tr("Quality preview")} srcDoc={html} sandbox="allow-scripts" style={{ width: frameJob.width, height: 520 }} /></div>}
  </div>;
 }

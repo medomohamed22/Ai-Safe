@@ -21,6 +21,7 @@ import { ModelPicker } from './components/ModelPicker';
 import { SettingsModal } from './components/SettingsModal';
 import { PreviewPane } from './components/PreviewPane';
 import { ChatThread } from './components/ChatThread';
+import { Elapsed } from './components/Elapsed';
 import { BackendPanel } from './components/BackendPanel';
 import { backendPrompt, DEFAULT_BACKEND, type BackendConfig } from './lib/backend';
 import { ScreensPanel } from './components/ScreensPanel';
@@ -474,6 +475,10 @@ function WorkspaceApp() {
     apiRef.current?.resetScene();
     if (screen.scene?.files) apiRef.current?.addFiles(Object.values(screen.scene.files));
     apiRef.current?.updateScene({ elements: screen.scene?.elements || [] });
+    // Fit the newly shown sketch into view (P3-06): without this the canvas
+    // keeps the previous screen's pan/zoom and a sketch can open off-screen.
+    const els = (screen.scene?.elements || []).filter((e: any) => !e.isDeleted);
+    if (els.length) apiRef.current?.scrollToContent(els, { fitToContent: true });
   };
   const addScreen = (name: string) => {
     const screen = { id: crypto.randomUUID(), name, versions: [], vIndex: -1, scene: null, chat: [] as ChatMessage[] };
@@ -600,7 +605,7 @@ function WorkspaceApp() {
           </div>
           <div className="composer-bottom"><div className="composer-attachments"><button className="ui-icon" aria-label={tr("Attach design reference")} title={tr("Attach design reference")} onClick={()=>setShowReference(true)}><Plus size={17}/></button><button className="ui-icon" aria-label={tr("Edit design identity")} title={tr("Design identity")} onClick={()=>setShowBrand(true)}><Palette size={16}/></button></div><span className="composer-note">{tr("Ctrl + Enter")}</span></div>
         </div>
-        <div className="workspace-status"><span>{generating ? tr("Bringing your idea to life…") : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
+        <div className="workspace-status"><span>{generating ? <>{tr("Bringing your idea to life…")} <Elapsed /></> : tr("A little sketch. A lot of possibility.")}</span><div>{code ? <span>{versions.length}{tr(" saved version")}{versions.length === 1 || language === 'ar' ? '' : 's'}</span> : <span>{tr("Ready when you are")}</span>}<span className="status-dot" /><span>{tr("Sketch → build → refine")}</span></div></div>
       </footer>
             </section>
             <div className="work-column">

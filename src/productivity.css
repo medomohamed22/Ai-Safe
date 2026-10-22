@@ -41,3 +41,6 @@
 .diff-remove { color:var(--ui-muted); text-decoration:line-through; }
 @media(max-width:600px){.comparison-previews{grid-template-columns:1fr;}}
 @media(max-width:900px) { .productivity-overlay { padding:14px; } .productivity-shell h2 { font-size:21px; } .productivity-page textarea,.productivity-page input { font-size:16px; } }
+
+.quality-group { margin-top: 14px; }
+.quality-group h4 { margin: 0 0 6px; font-size: 13px; letter-spacing: .01em; }

@@ -7,6 +7,20 @@ export function sourceChecks(code: string): ScenarioResult[] {
   return [{ name: 'JSX syntax', passed: true, status: 'passed', detail: 'Parsed successfully; this is not a production bundle check.' }, { name: 'React entry point', passed: hasDefault, status: hasDefault ? 'passed' : 'failed', detail: hasDefault ? 'Default export found' : 'Missing default component export' }];
  } catch (e) { return [{ name: 'JSX syntax', passed: false, status: 'failed', detail: (e as Error).message }]; }
 }
+// Quality results grouped for action (P3-04): build, runtime, responsive,
+// accessibility, and the user's own acceptance scenarios. Runtime rows are
+// prefixed with the viewport width ("390px · Content clipping"), so the
+// width is stripped before classifying; anything unrecognized is an
+// acceptance-scenario row by construction (scenario names are free text).
+export const QUALITY_GROUPS = ['Build', 'Runtime', 'Responsive', 'Accessibility', 'Acceptance scenarios'] as const;
+export function qualityGroupOf(name: string): string {
+ const base = name.replace(/^\d+px · /, '');
+ if (['JSX syntax', 'React entry point', 'Production JavaScript bundle'].includes(base)) return 'Build';
+ if (['Rendered content', 'Runtime errors', 'Runtime', 'Cancelled'].includes(base)) return 'Runtime';
+ if (['Horizontal overflow', 'Content clipping', 'Fixed overlay coverage', 'Off-viewport actions'].includes(base)) return 'Responsive';
+ if (['Button names', 'Form labels', 'Image alternatives'].includes(base)) return 'Accessibility';
+ return 'Acceptance scenarios';
+}
 export function auditDocument(): ScenarioResult[] {
  const root = document.querySelector('#root');
  const rows: ScenarioResult[] = [];

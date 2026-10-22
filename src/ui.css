@@ -114,6 +114,9 @@ input[type='color'] { border-radius:7px; overflow:hidden; padding:3px; backgroun
 details[open]>:not(summary) { animation:panel-enter var(--motion-normal) var(--motion-ease) }
 .model-slot { min-width:0 }
 .model-slot>div>button { font-size:10px; max-width:230px; border-radius:8px; min-height:34px }
+.model-filter { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:12px; color:var(--ui-muted); border-bottom:1px solid var(--ui-border); cursor:pointer; }
+.model-hidden-note { padding:4px 12px 6px; font-size:11px; color:var(--ui-muted); }
+.model-media-chip { font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; padding:1px 5px; border:1px solid var(--ui-border); border-radius:99px; color:var(--ui-muted); }
 .model-popover { width:min(420px,calc(100vw - 24px)); animation:menu-enter var(--motion-normal) var(--motion-ease) }
 iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review preview'],iframe[title^='Alternative '] { background:#fff; color-scheme:light }
 .sketch-panel .excalidraw,.sketch-panel .excalidraw.theme--dark { --color-primary:var(--ui-contrast); --color-primary-darker:var(--ui-text); --color-primary-darkest:var(--ui-text); --color-primary-light:var(--ui-selected); --color-primary-light-darker:var(--ui-border); --color-primary-container:var(--ui-selected); --color-on-primary-container:var(--ui-text); --color-brand-active:var(--ui-contrast); --color-brand-hover:var(--ui-text); --color-surface-lowest:var(--ui-surface); --color-surface-low:var(--ui-hover); --color-surface-mid:var(--ui-selected); --color-surface-high:var(--ui-border) }
