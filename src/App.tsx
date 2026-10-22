@@ -7,6 +7,7 @@ import { Eraser, FilePlus2, Globe, LayoutDashboard, Loader2, RefreshCw, Send, Se
 
 import type { AppSettings } from './types';
 import { KEYS, load, loadSettings, save } from './lib/storage';
+const draftKey = (screenId: string) => `s2ui.draft.v1.${screenId}`;
 import { suggestNextSteps } from './lib/next-steps';
 import { libraryPrompt } from './lib/componentLibrary';
 import { planKey, planPrompt } from './lib/plans';
@@ -144,7 +145,8 @@ function WorkspaceApp() {
   const [segmentOverlay, setSegmentOverlay] = useState<SegmentOverlayData | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [prompt, setPrompt] = useState(draft?.text || '');
+  const [prompt, setPrompt] = useState(() => draft?.text || load(draftKey(initialScreen.id), ''));
+  useEffect(() => { const t = window.setTimeout(() => save(draftKey(project.activeId), prompt), 300); return () => window.clearTimeout(t); }, [prompt, project.activeId]);
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [backend, setBackend] = useState<BackendConfig>(() => load(KEYS.backend, DEFAULT_BACKEND));
   const [showBackend, setShowBackend] = useState(false);
@@ -271,6 +273,7 @@ function WorkspaceApp() {
   };
 
   // ------------------------------------------------------------------ generation
+  const inFlightRef = useRef<string | null>(null);
   const run = async (opts: RunOpts = {}) => {
     const screenId = projectRef.current.activeId;
     const s = settingsRef.current;
@@ -292,6 +295,12 @@ function WorkspaceApp() {
       return;
     }
 
+    // Duplicate guard (P1-05): an identical request already in flight is
+    // not sent twice (double click, eager retry). A different request
+    // still supersedes the running one, as before.
+    const requestKey = [screenId, opts.instruction?.trim() || '', opts.fresh ? 'fresh' : '', opts.fixError ? 'fix' : '', sigRef.current].join('|');
+    if (inFlightRef.current === requestKey) return;
+    inFlightRef.current = requestKey;
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -300,7 +309,7 @@ function WorkspaceApp() {
     let segmentMap = '';
     if (image && s.autoSegment && !opts.fixError) {
       const seg = await segmentSketch(provider, s.activeModelId, image, ctrl.signal);
-      if (ctrl.signal.aborted || projectRef.current.activeId !== screenId) return;
+      if (ctrl.signal.aborted || projectRef.current.activeId !== screenId) { if (inFlightRef.current === requestKey) inFlightRef.current = null; return; }
       if (seg && seg.boxes.length) {
         segmentMap = formatElementMap(seg.boxes, seg.source);
         setSegmentOverlay({ image, boxes: seg.boxes, source: seg.source });
@@ -332,6 +341,7 @@ function WorkspaceApp() {
         finalCode = await enhanceCodeWithImages(c, provider, ctrl.signal);
         if (ctrl.signal.aborted || abortRef.current !== ctrl || projectRef.current.activeId !== screenId) return;
       }
+      if (opts.instruction && load(draftKey(screenId), '') === opts.instruction) save(draftKey(screenId), '');
       if (reviewEnabled) { setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else pushVersion(finalCode);
       endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built' });
       if (!reviewEnabled && autoQuality) setShowProductivity(true);
@@ -340,7 +350,12 @@ function WorkspaceApp() {
       const msg = e?.message || String(e);
       setApiError(msg);
       endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: msg });
+      // P1-05: a failed request keeps its context — the instruction returns
+      // to the composer and the screen's draft so Retry (or an edit) does
+      // not need retyping. The current design/version stays untouched.
+      if (opts.instruction?.trim()) { save(draftKey(screenId), opts.instruction); setPrompt(cur => (cur.trim() ? cur : opts.instruction!)); }
     } finally {
+      if (inFlightRef.current === requestKey) inFlightRef.current = null;
       if (abortRef.current === ctrl) {
         abortRef.current = null;
         setGenerating(false);
@@ -454,7 +469,7 @@ function WorkspaceApp() {
     if (!screen) return;
     stop(); window.clearTimeout(debounceRef.current); window.clearTimeout(saveSceneRef.current);
     setProject({ ...nextProject, activeId: id }); setVersions(screen.versions); setVIndex(screen.vIndex); setScreenScene(screen.scene);
-    setApiError(null); setStream(''); setPrompt(''); setChat(screen.chat ?? []);
+    setApiError(null); setStream(''); setPrompt(load(draftKey(id), '')); setChat(screen.chat ?? []);
     sigRef.current = sigOf(screen.scene?.elements || []);
     apiRef.current?.resetScene();
     if (screen.scene?.files) apiRef.current?.addFiles(Object.values(screen.scene.files));

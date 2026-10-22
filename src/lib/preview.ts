@@ -28,7 +28,7 @@ export function isArabicCode(code: string): boolean {
   return /[\u0600-\u06FF]/.test(code);
 }
 
-export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean; preserveInstrumentation?: boolean }, backend: BackendConfig = DEFAULT_BACKEND): string {
+export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean; preserveInstrumentation?: boolean; storageBridge?: boolean; storageSeed?: Record<string, string> | null }, backend: BackendConfig = DEFAULT_BACKEND): string {
   let source = code;
   if (editor && !editor.preserveInstrumentation) {
     try { source = instrumentPreview(code); } catch { /* Existing runtime error reporting handles invalid JSX. */ }
@@ -53,6 +53,45 @@ export function buildPreviewHtml(code: string, editor?: { token: string; tests?:
 <div id="root"></div>
 <div id="__s2ui_err"></div>
 <script>
+  // Storage guard (P1-01): preview documents are sandboxed without
+  // allow-same-origin, so native localStorage/sessionStorage access throws
+  // a SecurityError and used to crash generated apps that use storage (the
+  // sandboxed Alternatives preview was the reported case). Probe the native
+  // store; when unavailable, install an in-memory Storage with the same
+  // interface. With a storage bridge (the studio editor), the parent seeds
+  // the store per screen and receives snapshots back, so app data survives
+  // design edits there; in every other preview it lasts for the document's
+  // lifetime. Outside sandboxed previews (an exported standalone file) the
+  // native store works and is left untouched, so storage really persists.
+  (function () {
+    function createStore(seed, onChange) {
+      var map = new Map();
+      if (seed) for (var k in seed) map.set(k, String(seed[k]));
+      function dump() { var o = {}; map.forEach(function (v, key) { o[key] = v; }); return o; }
+      var store = {
+        getItem: function (key) { key = String(key); return map.has(key) ? map.get(key) : null; },
+        setItem: function (key, value) { map.set(String(key), String(value)); if (onChange) onChange(dump()); },
+        removeItem: function (key) { map.delete(String(key)); if (onChange) onChange(dump()); },
+        clear: function () { map.clear(); if (onChange) onChange(dump()); },
+        key: function (i) { var keys = Array.from(map.keys()); return i >= 0 && i < keys.length ? keys[i] : null; }
+      };
+      Object.defineProperty(store, 'length', { get: function () { return map.size; } });
+      return store;
+    }
+    function nativeWorks(name) {
+      try { var st = window[name]; var probe = '__s2ui_probe__'; st.setItem(probe, '1'); st.removeItem(probe); return true; } catch (e) { return false; }
+    }
+    function install(name, seed, onChange) {
+      if (nativeWorks(name)) return;
+      var store = createStore(seed, onChange);
+      try { Object.defineProperty(window, name, { configurable: true, value: store }); } catch (e) { try { window[name] = store; } catch (e2) { /* storage stays unavailable; generated code must tolerate it */ } }
+    }
+    var bridgeToken = ${editor?.storageBridge ? safeJson(editor.token) : 'null'};
+    var notify = null;
+    if (bridgeToken) { var timer = null; notify = function (data) { if (timer) clearTimeout(timer); timer = setTimeout(function () { parent.postMessage({ source: 's2ui-preview', type: 'storage', token: bridgeToken, data: data }, '*'); }, 200); }; }
+    install('localStorage', ${safeJson(editor?.storageSeed ?? null)}, notify);
+    install('sessionStorage', null, null);
+  })();
   window.__report = function (m) {
     var msg = String(m && m.message ? m.message : m);
     var el = document.getElementById('__s2ui_err');
