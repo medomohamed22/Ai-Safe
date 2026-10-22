@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 const values=new Map();globalThis.localStorage={getItem:k=>values.get(k)||null,setItem:(k,v)=>{values.set(k,v);localStorage[k]=v;},removeItem:k=>{values.delete(k);delete localStorage[k];}};
-const {validateSnapshot,snapshotWorkspace,restoreSnapshot}=await import('../src/lib/workspaces.ts');
+const {validateSnapshot,snapshotWorkspace,restoreSnapshot,friendlyStorageError}=await import('../src/lib/workspaces.ts');
+assert.match(friendlyStorageError(new Error('Failed to execute \'transaction\' : The database connection is closing.')),/browser database is busy/);assert.equal(friendlyStorageError(new Error('Cloud conflict')),'Cloud conflict');
 const {validateCloudConfig}=await import('../src/lib/cloudWorkspaces.ts');
 localStorage.setItem('s2ui.settings.v1',JSON.stringify({apiKey:'DO_NOT_BACK_UP'}));localStorage.setItem('s2ui.versions.v1',JSON.stringify(['old']));localStorage.setItem('s2ui.vindex.v1','0');
 const snapshot=snapshotWorkspace();assert.ok(!snapshot.entries['s2ui.settings.v1']);assert.equal(snapshot.entries['s2ui.versions.v1'][0],'old');

@@ -34,5 +34,10 @@ export async function putWorkspace(record:WorkspaceRecord){validateSnapshot(reco
 export async function acknowledgeCloudVersion(id:string,version:number){const connection=await db();await new Promise<void>((resolve,reject)=>{const tx=connection.transaction('projects','readwrite');const store=tx.objectStore('projects');const read=store.get(id);read.onsuccess=()=>{if(read.result)store.put({...read.result,cloudVersion:version});};tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});window.dispatchEvent(new Event('s2ui-workspaces-change'));}
 let queue:Promise<unknown>=Promise.resolve();
 export function saveCurrentWorkspace(){const task=async()=>{let id=load<string>(ACTIVE_WORKSPACE,'');if(!id){id=crypto.randomUUID();save(ACTIVE_WORKSPACE,id);}const previous=await getWorkspace(id);const record:WorkspaceRecord={id,name:previous?.name||'Untitled project',updatedAt:Date.now(),snapshot:snapshotWorkspace(),cloudVersion:previous?.cloudVersion||0};await putWorkspace(record);return record;};const next=queue.then(task,task);queue=next.catch(()=>{});return next;}
+export function friendlyStorageError(e: unknown): string {
+ const msg = e instanceof Error ? e.message : String(e ?? '');
+ if (/database connection is closing|indexeddb|idb|database/i.test(msg)) return 'The browser database is busy or was closed by another tab. Try again in a moment.';
+ return msg || 'Local storage failed.';
+}
 export async function newWorkspace(name:string){const record:WorkspaceRecord={id:crypto.randomUUID(),name:name.trim().slice(0,80)||'Untitled project',updatedAt:Date.now(),cloudVersion:0,snapshot:{version:1,entries:{}}};await putWorkspace(record);return record;}
 export async function openWorkspace(record:WorkspaceRecord,saveCurrent=true){if(saveCurrent&&load(ACTIVE_WORKSPACE,'')===record.id){await saveCurrentWorkspace();return;}window.dispatchEvent(new Event('s2ui-workspace-switch'));if(saveCurrent)await saveCurrentWorkspace();restoreSnapshot(record.snapshot);save(ACTIVE_WORKSPACE,record.id);location.reload();}

@@ -12,11 +12,11 @@ export interface ElementEdit {
   height?: number;
 }
 
-function sourceTree(code: string) {
+export function sourceTree(code: string) {
   return parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
 }
 
-function elements(tree: t.File) {
+export function elements(tree: t.File) {
   const nodes: t.JSXElement[] = [];
   t.traverseFast(tree, (node) => {
     if (t.isJSXElement(node) && t.isJSXIdentifier(node.openingElement.name) && /^[a-z]/.test(node.openingElement.name.name)) nodes.push(node);

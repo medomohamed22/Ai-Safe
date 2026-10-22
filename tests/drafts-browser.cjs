@@ -1,8 +1,9 @@
 const { chromium, chromePath } = require('./browser-runtime.cjs');
 const assert = require('node:assert/strict');
 // P1-05: a failed generation keeps the user's words. After a provider 503
-// the instruction returns to the composer and to the screen's stored draft;
-// a successful retry consumes the draft. The plan brief survives switching
+// that also fails the one automatic retry (F5), the instruction returns to
+// the composer and to the screen's stored draft; a successful manual retry
+// consumes the draft. The plan brief survives switching
 // productivity sections (the panel unmounts between sections).
 (async () => { const browser = await chromium.launch({ executablePath: chromePath, headless: true }); try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
@@ -10,7 +11,7 @@ const assert = require('node:assert/strict');
   let calls = 0;
   await page.route('https://provider.example.test/**', r => {
     calls++;
-    if (calls === 1) return r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { message: 'overloaded' } }) });
+    if (calls <= 2) return r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { message: 'overloaded' } }) });
     return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'export default function App(){return <h1>Recovered draft</h1>}' } }] }) });
   });
   await page.goto(process.env.S2UI_TEST_URL || 'http://127.0.0.1:5173/#studio');

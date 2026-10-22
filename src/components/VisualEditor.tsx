@@ -2,10 +2,10 @@ import { tr } from '../lib/i18n';
 import { useState } from 'react';
 import { applyElementEdit, describeElement, type ElementEdit } from '../lib/visualEdit';
 
-export function VisualEditor({ code, id, disabled, locks, onToggleLock, onApply, onRequest, onClose }: {
+export function VisualEditor({ code, id, disabled, locks, onToggleLock, onApply, onRequest, onAgentRequest, onClose }: {
   code: string; id: number; disabled: boolean;
   locks: string[]; onToggleLock: (snippet: string) => void;
-  onApply: (code: string) => void; onRequest: (instruction: string) => void; onClose: () => void;
+  onApply: (code: string) => void; onRequest: (instruction: string) => void; onAgentRequest?: (instruction: string, id: number) => void; onClose: () => void;
 }) {
   const info = describeElement(code, id);
   const [text, setText] = useState(info.text);
@@ -36,7 +36,11 @@ export function VisualEditor({ code, id, disabled, locks, onToggleLock, onApply,
         <label>{tr("Height (px)")}<input aria-label={tr("Height")} type="number" min="0" max="2000" placeholder={tr("Unchanged")} className={input} value={edit.height ?? ''} onChange={(e) => setEdit({ ...edit, height: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>
       </div>
       <button onClick={apply} className="rounded ui-primary px-3 py-2 font-medium">{tr("Apply to code")}</button>
-      <div className="flex gap-2"><input aria-label={tr("Selected element instruction")} placeholder={tr("Describe a change to this element…")} className={input} value={instruction} onChange={(e) => setInstruction(e.target.value)} /><button disabled={!instruction.trim()} className="shrink-0 rounded border border-[var(--ui-border)] px-2 disabled:opacity-40" onClick={() => onRequest(`Edit only the selected JSX element (and supporting logic if required). Preserve the rest of the UI and its behavior. Selected source:\n\n${info.snippet}\n\nRequested change: ${instruction.trim()}`)}>{tr("Edit with AI")}</button></div>
+      <div className="space-y-1.5">
+        <div className="flex gap-2"><input aria-label={tr("Selected element instruction")} placeholder={tr("Describe a change to this element…")} className={input} value={instruction} onChange={(e) => setInstruction(e.target.value)} /><button disabled={!instruction.trim()} className="shrink-0 rounded ui-primary px-2 disabled:opacity-40" onClick={() => { if (onAgentRequest) onAgentRequest(instruction.trim(), id); else onRequest(`Edit only the selected JSX element (and supporting logic if required). Preserve the rest of the UI and its behavior. Selected source:\n\n${info.snippet}\n\nRequested change: ${instruction.trim()}`); }}>{tr("Edit element only")}</button></div>
+        <p className="text-xs text-[var(--ui-muted)]">{tr("An agent reads this element and its context, edits only it, and verifies the result — the rest of the page stays exactly as it is.")}</p>
+        <button disabled={!instruction.trim()} className="text-xs text-[var(--ui-text)] underline disabled:opacity-40" onClick={() => onRequest(`Edit only the selected JSX element (and supporting logic if required). Preserve the rest of the UI and its behavior. Selected source:\n\n${info.snippet}\n\nRequested change: ${instruction.trim()}`)}>{tr("Regenerate the whole page instead")}</button>
+      </div>
     </fieldset>
     {error && <p role="alert" className="mt-2 text-[var(--ui-text)]">{tr(error)}</p>}
   </section>;

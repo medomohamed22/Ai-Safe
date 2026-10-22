@@ -18,6 +18,7 @@ import { freshStages, setStage, snapshotStages, type StageEvent, type StageId } 
 import { sourceChecks } from './lib/quality';
 import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
+import { ELEMENT_AGENT_SYSTEM, applyElementReplacement, countChangedLines, elementAgentPrompt, elementContext, parseAgentReply } from './lib/elementAgent';
 import { PRESETS, type PresetKey } from './lib/presets';
 import { ModelPicker } from './components/ModelPicker';
 import { SettingsModal } from './components/SettingsModal';
@@ -415,6 +416,7 @@ function WorkspaceApp() {
       const checks = sourceChecks(finalCode);
       const passedChecks = checks.filter((x) => x.passed).length;
       markStage('review', { status: 'done', detail: tr('{0}/{1} source checks passed', [passedChecks, checks.length]) + (passedChecks < checks.length ? ' · ' + checks.filter((x) => !x.passed).map((x) => x.name).join(', ') : '') });
+      setSegmentOverlay(null);
       if (reviewEnabled) { markStage('ship', { status: 'skipped', detail: tr('Held for your review') }); setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else { pushVersion(finalCode); markStage('ship', { status: 'done', detail: tr('New version saved') }); }
       endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built', stages: snapshotStages(stagesRef.current) });
       if (!reviewEnabled && autoQuality) setShowProductivity(true);
@@ -450,7 +452,70 @@ function WorkspaceApp() {
     setChat(prev => [...prev, msg].slice(-80));
     chatRunRef.current = { screenId: projectRef.current.activeId };
   };
-  const endChatRun = (msg: ChatMessage) => { if (!chatRunRef.current) return; chatRunRef.current = null; setChat(prev => [...prev, msg].slice(-80)); };
+  const endChatRun = (msg: ChatMessage) => { if (!chatRunRef.current) return; chatRunRef.current = null; setChat(prev => { const last = prev[prev.length - 1]; if (msg.kind === 'error' && last && last.role === 'ai' && last.kind === 'error') return [...prev.slice(0, -1), msg].slice(-80); return [...prev, msg].slice(-80); }); };
+  // Element Agent: a surgical edit of ONE selected element. The model reads
+  // the element + its context, returns only the replacement element, and the
+  // splice is verified before it can become a version — the rest of the page
+  // stays byte-identical. Escalations and failed verifications leave the
+  // page untouched.
+  const runElementAgent = async (instruction: string, elementId: number) => {
+    const s = settingsRef.current;
+    const provider = s.providers.find((p) => p.id === s.activeProviderId);
+    if (!provider || !s.activeModelId) { setApiError('Choose a provider and a model first (Settings → add API key → Fetch models).'); return; }
+    const current = codeRef.current;
+    if (!current || inFlightRef.current) return;
+    inFlightRef.current = 'element-agent';
+    setPlanGate(null);
+    beginChatRun(instruction);
+    showPreviewStage();
+    resetStages();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setGenerating(true);
+    setApiError(null);
+    try {
+      markStage('understand', { status: 'active' });
+      const ctx = elementContext(current, elementId);
+      markStage('understand', { status: 'done', detail: tr('Read the <{0}> element and its context', [ctx.tag]) });
+      markStage('plan', { status: 'skipped', detail: tr('Surgical edit — no plan needed') });
+      markStage('design', { status: 'skipped', detail: tr('Existing design kept') });
+      markStage('build', { status: 'active', model: s.activeModelId || undefined });
+      const locks = locksRef.current[projectRef.current.activeId] || [];
+      const reply = await generate({ provider, model: s.activeModelId, system: ELEMENT_AGENT_SYSTEM, userText: elementAgentPrompt(ctx, instruction), temperature: 0.3, signal: ctrl.signal, onToken: () => {} });
+      const parsed = parseAgentReply(reply);
+      if (parsed.kind === 'escalate') {
+        markStage('build', { status: 'skipped', detail: tr('Needs a full-page edit') });
+        endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: 'This change reaches beyond the selected element, so the agent left the page unchanged. Use "Regenerate the whole page instead" in the element editor to apply it.' });
+        return;
+      }
+      let next: string;
+      try {
+        next = applyElementReplacement(current, elementId, parsed.jsx, locks);
+      } catch (verifyError) {
+        markStage('review', { status: 'active', model: s.activeModelId || undefined });
+        const repair = await generate({ provider, model: s.activeModelId, system: ELEMENT_AGENT_SYSTEM, userText: elementAgentPrompt(ctx, instruction) + `\n\n## Your previous attempt failed verification\n${(verifyError as Error).message}\nPrevious attempt:\n\`\`\`jsx\n${parsed.jsx}\n\`\`\`\nReturn a corrected replacement element only.`, temperature: 0.2, signal: ctrl.signal, onToken: () => {} });
+        const reparsed = parseAgentReply(repair);
+        if (reparsed.kind === 'escalate') throw new Error('The agent could not contain this change to the selected element. Your page was not changed.');
+        next = applyElementReplacement(current, elementId, reparsed.jsx, locks);
+      }
+      markStage('build', { status: 'done', detail: tr('Only the selected element changed') });
+      markStage('assets', { status: 'skipped', detail: tr('No new assets needed') });
+      markStage('review', { status: 'done', detail: tr('Source checks passed') });
+      pushVersion(next);
+      markStage('ship', { status: 'done', detail: tr('{0} lines changed', [countChangedLines(current, next)]) });
+      endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built', stages: snapshotStages(stagesRef.current) });
+    } catch (e) {
+      if (ctrl.signal.aborted) return; // stop() already closed the chat run
+      const activeStage = stagesRef.current.find((x) => x.status === 'active');
+      if (activeStage) markStage(activeStage.id, { status: 'error' });
+      const msg = (e as Error)?.message || String(e);
+      setApiError(msg);
+      endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'error', text: msg });
+    } finally {
+      if (inFlightRef.current === 'element-agent') inFlightRef.current = null;
+      if (abortRef.current === ctrl) { abortRef.current = null; setGenerating(false); }
+    }
+  };
   const loadPresetRef = useRef<(key: PresetKey) => void>(() => {});
   useEffect(() => {
     if (!api || home || !draft || enteredDraft.current) return;
@@ -751,6 +816,7 @@ function WorkspaceApp() {
             onOpenSettings={() => setShowSettings(true)}
             onCodeChange={code => { assertLockedElements(code, locksRef.current[project.activeId] || []); pushVersion(code); }}
             onElementRequest={(instruction) => { beginChatRun(instruction); showPreviewStage(); runRef.current({ instruction }); }}
+            onElementAgent={(instruction, id) => { void runElementAgent(instruction, id); }}
             brand={brand}
             segmentOverlay={segmentOverlay}
             onCloseSegments={() => setSegmentOverlay(null)}
