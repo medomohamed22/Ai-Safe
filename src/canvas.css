@@ -258,3 +258,6 @@
    column's own content keeps the page direction. */
 .studio-split { direction:ltr; }
 [dir='rtl'] .chat-column, [dir='rtl'] .work-column { direction:rtl; }
+.page-art { height:150px; border-radius:16px; display:grid; place-items:center; background:#d9d9d5; color:#404040; overflow:hidden; transition:transform 350ms var(--motion-ease); }
+.inspiration-card:hover .page-art { transform:translateY(-5px); }
+.page-art-svg { width:72%; height:auto; }

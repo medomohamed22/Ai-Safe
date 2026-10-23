@@ -166,5 +166,13 @@ export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACK
 export async function projectZip(code: string, backend: BackendConfig = DEFAULT_BACKEND, project?: ScreenProject) {
   const zip = new JSZip();
   for (const [path, content] of Object.entries(projectFiles(code, backend, project))) zip.file(path, content);
+  try {
+    const { listBrandAssets } = await import('./brandAssets');
+    for (const a of await listBrandAssets()) {
+      const safe = a.name.replace(/[^\p{L}\p{N}._-]+/gu, '_');
+      if (a.kind === 'doc' && a.text) zip.file(`design-assets/${safe}`, a.text);
+      else if (a.dataUrl && a.dataUrl.includes(',')) zip.file(`design-assets/${safe}`, a.dataUrl.split(',')[1], { base64: true });
+    }
+  } catch { /* brand assets are an optional part of the export */ }
   return zip.generateAsync({ type: 'blob' });
 }
