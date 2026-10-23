@@ -32,3 +32,15 @@ test('English presets contain no Arabic text', () => {
     assert.ok(!textsOf(PRESETS[key]).some((t) => ARABIC.test(t)), `${key} unexpectedly contains Arabic`);
   }
 });
+
+test('AI Company demo template: a full landing page in drawing order', () => {
+  const els = PRESETS.aiCompany.elements;
+  assert.ok(els.length >= 70, `expected a rich sketch, got ${els.length} elements`);
+  const texts = textsOf(PRESETS.aiCompany);
+  for (const needle of ['NovaMind', 'AI agents that do', 'Simple pricing', 'Start building with NovaMind']) assert.ok(texts.some((t) => t.includes(needle)), `missing section text: ${needle}`);
+  assert.ok(!texts.some((t) => ARABIC.test(t)), 'the demo template is English');
+  const reds = els.filter((e) => e.strokeColor === '#e03131');
+  assert.ok(reds.length >= 9, 'red annotations + arrows guide the model');
+  const arrows = els.filter((e) => e.type === 'arrow');
+  assert.equal(arrows.length, 5, 'one arrow per annotation');
+});

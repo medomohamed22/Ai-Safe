@@ -69,7 +69,7 @@ const blobToDataUrl = (b: Blob) =>
     r.readAsDataURL(b);
   });
 
-const PRESET_ICONS = { dashboard: LayoutDashboard, landing: Globe, mobile: Smartphone, store: ShoppingBag, dashboardAr: LayoutDashboard, storeAr: ShoppingBag, mobileAr: Smartphone } as const;
+const PRESET_ICONS = { aiCompany: Sparkles, dashboard: LayoutDashboard, landing: Globe, mobile: Smartphone, store: ShoppingBag, dashboardAr: LayoutDashboard, storeAr: ShoppingBag, mobileAr: Smartphone } as const;
 
 interface RunOpts {
   instruction?: string;
@@ -821,12 +821,37 @@ function WorkspaceApp() {
     }
   }, []);
 
+  const drawTimer = useRef<number | null>(null);
+  const cancelDraw = () => { if (drawTimer.current) { window.clearInterval(drawTimer.current); drawTimer.current = null; } };
   const loadPreset = async (key: PresetKey) => {
+    cancelDraw();
     const a = apiRef.current;
     if (!a) return;
     setFocusPane('sketch');
     const { convertToExcalidrawElements } = await import('@excalidraw/excalidraw');
     const els = convertToExcalidrawElements(PRESETS[key].elements as any, { regenerateIds: true });
+    if (key === 'aiCompany') {
+      // The demo template draws itself, element by element in authoring
+      // order like a timelapse (~20s), then generates — made for recording
+      // the product video and for judges who want the one-click show.
+      a.updateScene({ elements: [] });
+      a.scrollToContent(els, { fitToContent: true });
+      const screenAtStart = projectRef.current.activeId;
+      const perTick = Math.max(1, Math.round(els.length / 100));
+      let shown = 0;
+      drawTimer.current = window.setInterval(() => {
+        if (projectRef.current.activeId !== screenAtStart) { cancelDraw(); return; }
+        shown = Math.min(els.length, shown + perTick);
+        a.updateScene({ elements: els.slice(0, shown) });
+        if (shown >= els.length) {
+          cancelDraw();
+          sigRef.current = sigOf(a.getSceneElements());
+          persistScene(a.getSceneElements(), a.getFiles());
+          setTimeout(() => runTracked({ fresh: true }), 150);
+        }
+      }, 200);
+      return;
+    }
     a.updateScene({ elements: els });
     a.scrollToContent(els, { fitToContent: true, animate: true });
     sigRef.current = sigOf(a.getSceneElements());
@@ -838,6 +863,7 @@ function WorkspaceApp() {
   loadPresetRef.current = loadPreset;
 
   const clearCanvas = () => {
+    cancelDraw();
     const a = apiRef.current;
     if (!a) return;
     a.updateScene({ elements: [] });
