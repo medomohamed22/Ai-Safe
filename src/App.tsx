@@ -33,7 +33,7 @@ const ScreenMap = lazy(() => import('./components/ScreenMap').then(m => ({ defau
 const SketchCanvas = lazy(() => import('./components/SketchCanvas'));
 import type { ChatMessage, ScreenProject } from './lib/screens';
 import { BrandPanel } from './components/BrandPanel';
-import { brandPrompt, DEFAULT_BRAND, type Brand } from './lib/brand';
+import { brandPrompt, normalizeBrand, type Brand } from './lib/brand';
 import { ReferencePanel, type ReferenceImage } from './components/ReferencePanel';
 import { AlternativesPanel, type DesignAlternative } from './components/AlternativesPanel';
 import { ReviewPage } from './components/ReviewPage';
@@ -131,7 +131,7 @@ function WorkspaceApp() {
   const productivityAbort = useRef<AbortController | null>(null);
   const [showScreens, setShowScreens] = useState(false);
   const [showScreenMap, setShowScreenMap] = useState(false);
-  const [brand, setBrand] = useState<Brand>(() => load(KEYS.brand, DEFAULT_BRAND));
+  const [brand, setBrand] = useState<Brand>(() => normalizeBrand(load<Partial<Brand>>(KEYS.brand, {})));
   const [showBrand, setShowBrand] = useState(false);
   const [reference, setReference] = useState<ReferenceImage | null>(() => load(KEYS.reference, null));
   const [showReference, setShowReference] = useState(false);
@@ -915,7 +915,12 @@ function WorkspaceApp() {
         return generate({ provider, model: s.activeModelId, system: system || SYSTEM_PROMPT + libraryPrompt() + backendPrompt(backendRef.current) + brandPrompt(brandRef.current) + lockPrompt(locksRef.current[project.activeId] || []), userText, imageDataUrls: images, temperature: s.temperature, signal: ctrl.signal, onToken: () => {} });
       }} />}
       {showBackend && <BackendPanel config={backend} onChange={setBackend} onClose={() => setShowBackend(false)} />}
-      {showBrand && <BrandPanel brand={brand} onChange={setBrand} onClose={() => setShowBrand(false)} />}
+      {showBrand && <BrandPanel brand={brand} onChange={setBrand} onClose={() => setShowBrand(false)} ask={async (userText, system, images) => {
+        const s = settingsRef.current; const provider = s.providers.find(p => p.id === s.activeProviderId);
+        if (!provider || !s.activeModelId) throw new Error('Connect a provider and model in Settings first.');
+        const ctrl = new AbortController();
+        return generate({ provider, model: s.activeModelId, system, userText, imageDataUrls: images, temperature: s.temperature, signal: ctrl.signal, onToken: () => {} });
+      }} />}
       {showReference && <ReferencePanel reference={reference} onChange={setReference} onClose={() => setShowReference(false)} />}
       {showAlternatives && <AlternativesPanel error={apiError} onStop={stop} alternatives={alternatives[project.activeId] || []} backend={backend} busy={generating} onClose={() => setShowAlternatives(false)} onChoose={code => { pushVersion(code); setShowAlternatives(false); }} />}
       {showScreens && <ScreensPanel project={liveProject} onOpenMap={() => { setShowScreens(false); setShowScreenMap(true); }} onClose={() => setShowScreens(false)} onSelect={(id) => { selectScreen(id); setShowScreens(false); }} onAdd={addScreen} onRename={(id, name) => setProject(prev => ({ ...prev, screens: prev.screens.map(s => s.id === id ? { ...s, name } : s) }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} onReorder={(id, dir) => setProject(prev => { const screens = [...prev.screens]; const i = screens.findIndex(x => x.id === id); const j = i + dir; if (i < 0 || j < 0 || j >= screens.length) return prev; [screens[i], screens[j]] = [screens[j], screens[i]]; return { ...prev, screens }; })} onDelete={(id) => { const snapshot = snapshotProject(); const next = { ...snapshot, screens: snapshot.screens.filter(s => s.id !== id), links: snapshot.links.filter(l => l.from !== id && l.to !== id) }; if (id === project.activeId) selectScreen(next.screens[0].id, next); else setProject(next); }} />}

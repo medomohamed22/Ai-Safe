@@ -1102,5 +1102,21 @@
   "Remove asset": "حذف الأصل",
   "The asset library is full (24 files).": "مكتبة الأصول ممتلئة (٢٤ ملفًا).",
   "Use palette as brand colors": "استخدم اللوحة كألوان للهوية",
-  "You are responsible for the license of fonts you upload.": "أنت مسؤول عن ترخيص الخطوط التي ترفعها."
+  "You are responsible for the license of fonts you upload.": "أنت مسؤول عن ترخيص الخطوط التي ترفعها.",
+  "Add at least one image, logo or document first.": "أضف صورة أو شعارًا أو مستندًا واحدًا على الأقل أولًا.",
+  "Brand board": "لوحة الهوية",
+  "Brand content language": "لغة محتوى الهوية",
+  "Brand display font": "خط العناوين للهوية",
+  "Brand voice": "نبرة الهوية",
+  "Build my design system": "ابنِ نظام التصميم",
+  "Building your design system…": "جارٍ بناء نظام التصميم…",
+  "Content language": "لغة المحتوى",
+  "Display font": "خط العناوين",
+  "From my files": "من ملفاتي",
+  "Same as body font": "نفس خط النص",
+  "The design-system builder did not return a usable result. Try again.": "لم يُرجع بانِي نظام التصميم نتيجة قابلة للاستخدام. حاول مرة أخرى.",
+  "Voice and tone": "النبرة والأسلوب",
+  "Your brand voice will appear here.": "ستظهر نبرة علامتك هنا.",
+  "e.g. Friendly and direct": "مثال: ودودة ومباشرة",
+  "Design system built from your assets.": "بُني نظام التصميم من أصولك."
 }
