@@ -220,7 +220,7 @@ function WorkspaceApp() {
   const sidebar = <StudioSidebar project={liveProject} collapsed={sidebarCollapsed} busy={generating}
     autoSync={settings.autoSync} hasReference={!!reference} hasAlternatives={!!alternatives[project.activeId]?.length}
     onProductivity={() => { setToolsOpen(false); setShowProductivity(true); }} onCollapse={() => setSidebarCollapsed(v => !v)} onScreens={() => { setToolsOpen(false); setShowScreens(true); }}
-    onBrand={() => { setToolsOpen(false); setShowBrand(true); }} onReference={() => { setToolsOpen(false); setShowReference(true); }}
+    brandActive={brand.enabled} onBrand={() => { setToolsOpen(false); setShowBrand(true); }} onReference={() => { setToolsOpen(false); setShowReference(true); }}
     onBackend={() => { setToolsOpen(false); setShowBackend(true); }} onAlternatives={() => { setToolsOpen(false); generateAlternatives(); }}
     onCompare={() => { setToolsOpen(false); setShowAlternatives(true); }} onSync={() => setSettings(s => ({ ...s, autoSync: !s.autoSync }))}
     onNavigate={id => { selectScreen(id); setToolsOpen(false); }} />;
@@ -415,7 +415,7 @@ function WorkspaceApp() {
       if (brandRef.current.enabled && !opts.fixError) {
         try {
           const assets = await listBrandAssets();
-          brandImages = [...assets.filter((a) => a.kind === 'logo' && a.dataUrl), ...assets.filter((a) => a.kind === 'image' && a.dataUrl)].slice(0, 2).map((a) => a.dataUrl as string);
+          brandImages = [...(brandRef.current.logo ? [brandRef.current.logo] : []), ...assets.filter((a) => a.kind === 'logo' && a.dataUrl).map((a) => a.dataUrl as string), ...assets.filter((a) => a.kind === 'image' && a.dataUrl).map((a) => a.dataUrl as string)].slice(0, 2);
         } catch { /* brand assets enhance a run; they never block it */ }
       }
       const full = await generate({
@@ -696,8 +696,9 @@ function WorkspaceApp() {
       };
       selectScreen(mainId, flowProject);
       await awaitActive(mainId);
-      const jobs = [{ id: mainId, brief: pageBrief(suggestion, null, lang, brandRef.current.name) },
-        ...suggestion.cases.map((c, i) => ({ id: caseScreens[i]!.id, brief: pageBrief(suggestion, c, lang, brandRef.current.name) }))];
+      const groupNames = [title, ...suggestion.cases.map((cs, i) => caseScreens[i]!.name)];
+      const jobs = [{ id: mainId, brief: pageBrief(suggestion, null, lang, brandRef.current.name, groupNames) },
+        ...suggestion.cases.map((c, i) => ({ id: caseScreens[i]!.id, brief: pageBrief(suggestion, c, lang, brandRef.current.name, groupNames) }))];
       for (const job of jobs) {
         selectScreen(job.id, flowProject);
         await awaitActive(job.id);

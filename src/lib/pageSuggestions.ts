@@ -77,13 +77,17 @@ export function resolveContentLanguage(brand: Brand, assets: BrandAsset[], uiLan
   return uiLanguage === 'ar' ? 'ar' : 'en';
 }
 
-export function pageBrief(s: PageSuggestion, c: PageCase | null, lang: 'ar' | 'en', brandName: string): string {
-  if (lang === 'ar') {
-    return c
+export function pageBrief(s: PageSuggestion, c: PageCase | null, lang: 'ar' | 'en', brandName: string, siblings: string[] = []): string {
+  const base = lang === 'ar'
+    ? (c
       ? `ابنِ ${s.titleAr} في «${c.titleAr}»: ${c.briefAr}. حافظ على نفس التخطيط والهوية البصرية ولغة المحتوى في الصفحة الرئيسية، وغيّر فقط ما تتطلبه هذه الحالة.`
-      : `ابنِ ${s.titleAr} كاملة واحترافية${brandName ? ` لصالح «${brandName}»` : ''}، ملتزمة بنظام التصميم والهوية المحفوظة ولغة المحتوى. محتوى واقعي وتفاعلات شغالة لهذه الصفحة.`;
-  }
-  return c
-    ? `Build the ${s.titleEn} in its "${c.titleEn}" state: ${c.briefEn}. Keep the same layout, brand identity and content language as the main ${s.titleEn}, changing only what this state requires.`
-    : `Build a complete, polished ${s.titleEn}${brandName ? ` for "${brandName}"` : ''}, following the saved brand identity and content language. Realistic content and working interactions for this page.`;
+      : `ابنِ ${s.titleAr} كاملة واحترافية${brandName ? ` لصالح «${brandName}»` : ''}، ملتزمة بنظام التصميم والهوية المحفوظة ولغة المحتوى. محتوى واقعي وتفاعلات شغالة لهذه الصفحة.`)
+    : (c
+      ? `Build the ${s.titleEn} in its "${c.titleEn}" state: ${c.briefEn}. Keep the same layout, brand identity and content language as the main ${s.titleEn}, changing only what this state requires.`
+      : `Build a complete, polished ${s.titleEn}${brandName ? ` for "${brandName}"` : ''}, following the saved brand identity and content language. Realistic content and working interactions for this page.`);
+  if (siblings.length < 2) return base;
+  const list = siblings.join(' · ');
+  return base + (lang === 'ar'
+    ? `\nتنقّل المجموعة: هذه الشاشة واحدة من مجموعة مترابطة: ${list}. أي عنصر يوصل لشاشة أخرى في المجموعة (مثل رابط «نسيت كلمة المرور» أو «العودة لتسجيل الدخول») اجعله يستدعي عند الضغط: window.s2uiNavigate && window.s2uiNavigate('اسم الشاشة بالظبط كما في القائمة') — الدالة جاهزة في المعاينة — بدل ما يبدّل حالة داخلية أو يستخدم رابط عادي. التفاعلات داخل الشاشة نفسها تفضل حالة داخلية عادية.`
+    : `\nGROUP NAVIGATION: this screen is one of a linked group: ${list}. Any element that leads to another screen in the group (a "Forgot password" link, a "Back to sign in" link, a success confirmation's continue action) must call window.s2uiNavigate && window.s2uiNavigate('<the exact screen name from the list>') on click — the preview provides this function — instead of switching internal state or using a plain link. Interactions inside this screen stay internal state as usual.`);
 }

@@ -29,7 +29,10 @@ export function pageGroupHtml(project: ScreenProject, rootId: string, backend: B
   const root = project.screens.find((s) => s.id === rootId);
   const name = (root?.name || 'page').replace(/[^\p{L}\p{N} -]+/gu, '').trim() || 'page';
   const buttons = screens.map((s, i) => `<button data-i="${i}" class="${i === 0 ? 'on' : ''}">${s.name.replace(/</g, '&lt;')}</button>`).join('');
-  const frames = screens.map((s, i) => `<iframe data-i="${i}" title="${escapeAttr(s.name)}" sandbox="allow-scripts allow-forms" ${i === 0 ? '' : 'hidden'} srcdoc="${escapeAttr(buildPreviewHtml(screenCode(s), undefined, backend))}"></iframe>`).join('\n');
+  const frames = screens.map((s, i) => {
+    const navTargets = screens.filter((x) => x.id !== s.id).map((x) => ({ id: x.id, name: x.name, label: x.name.split('—').pop()?.trim() || x.name }));
+    return `<iframe data-i="${i}" title="${escapeAttr(s.name)}" sandbox="allow-scripts allow-forms" ${i === 0 ? '' : 'hidden'} srcdoc="${escapeAttr(buildPreviewHtml(screenCode(s), { token: '', preserveInstrumentation: true, navTargets }, backend))}"></iframe>`;
+  }).join('\n');
   const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${name.replace(/</g, '&lt;')} — page group</title>
@@ -53,6 +56,15 @@ ${frames}
     try { history.replaceState(null, '', '#s' + i); } catch (e) {}
   }
   btns.forEach(function (b, i) { b.addEventListener('click', function () { show(i); }); });
+  var names = ${JSON.stringify(screens.map((s) => s.name))};
+  var ids = ${JSON.stringify(screens.map((s) => s.id))};
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || d.source !== 's2ui-preview' || d.type !== 'navigate') return;
+    var i = ids.indexOf(d.id);
+    if (i < 0) i = names.indexOf(d.target);
+    if (i >= 0) show(i);
+  });
   var start = parseInt((location.hash || '').replace('#s', ''), 10);
   if (start >= 0 && start < frames.length) show(start);
 </script>

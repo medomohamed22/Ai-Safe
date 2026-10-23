@@ -28,7 +28,7 @@ export function isArabicCode(code: string): boolean {
   return /[\u0600-\u06FF]/.test(code);
 }
 
-export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean; preserveInstrumentation?: boolean; storageBridge?: boolean; storageSeed?: Record<string, string> | null; theme?: { font?: string; compact?: boolean }; fontCss?: string }, backend: BackendConfig = DEFAULT_BACKEND): string {
+export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean; preserveInstrumentation?: boolean; storageBridge?: boolean; storageSeed?: Record<string, string> | null; theme?: { font?: string; compact?: boolean }; fontCss?: string; navTargets?: { id: string; name: string; label?: string }[] }, backend: BackendConfig = DEFAULT_BACKEND): string {
   let source = code;
   if (editor && !editor.preserveInstrumentation) {
     try { source = instrumentPreview(code); } catch { /* Existing runtime error reporting handles invalid JSX. */ }
@@ -36,6 +36,40 @@ export function buildPreviewHtml(code: string, editor?: { token: string; tests?:
   try { source = materializeAssets(materializeLibrary(source)); } catch (e) { source = `export default function App(){ throw new Error(${JSON.stringify((e as Error).message)}) }`; }
   const rtl = isArabicCode(source);
   const themeFont = editor?.theme?.font ? editor.theme.font.replace(/[^a-zA-Z0-9 ,.'-]/g, '') : '';
+  // Linked-screen navigation: generated group screens move between each
+  // other through window.s2uiNavigate (the generation briefs wire it), and a
+  // click fallback routes plain links/buttons whose text names a sibling
+  // screen. The host (studio preview or an exported page group) listens for
+  // the 'navigate' message and performs the switch. Disabled while the
+  // visual editor is capturing clicks.
+  const navScript = editor?.navTargets?.length ? `<script>
+  window.s2uiNavigate = function (target) { parent.postMessage({ source: 's2ui-preview', type: 'navigate', target: String(target) }, '*'); };
+  (function () {
+    var NAV = ${safeJson(editor.navTargets)};
+    var navEditing = false;
+    window.addEventListener('message', function (e) { if (e.source === parent && e.data && e.data.type === 'edit-mode') navEditing = !!e.data.enabled; });
+    function navNorm(s) { return (s || '').replace(/[\u061f?!.\u060c,;:]/g, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+    document.addEventListener('click', function (e) {
+      if (navEditing) return;
+      var el = e.target && e.target.closest && e.target.closest('a,button,[role="button"]');
+      if (!el) return;
+      var text = navNorm(el.textContent);
+      if (!text) return;
+      for (var i = 0; i < NAV.length; i++) {
+        var t = NAV[i];
+        var cands = [t.label, t.name, (t.name || '').split('\u2014').pop(), (t.name || '').split(' - ').pop()];
+        for (var j = 0; j < cands.length; j++) {
+          var n = navNorm(cands[j]);
+          if (n.length >= 3 && (text === n || (text.indexOf(n) === 0 && text.length - n.length <= 3))) {
+            e.preventDefault();
+            parent.postMessage({ source: 's2ui-preview', type: 'navigate', id: t.id, target: t.name }, '*');
+            return;
+          }
+        }
+      }
+    }, true);
+  })();
+</script>` : '';
   return `<!DOCTYPE html>
 <html${rtl ? ' lang="ar" dir="rtl"' : ''}>
 <head>
@@ -106,7 +140,7 @@ export function buildPreviewHtml(code: string, editor?: { token: string; tests?:
   ${backendBootstrap(backend)}
   ${editor?.tests ? `(${installTestRunner.toString()})(${safeJson(editor.token)}, (${auditDocument.toString()}));` : ''}
 </script>
-${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important; outline-offset: 3px; }</style>
+${editor?.token ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important; outline-offset: 3px; }</style>
 <script>
   (function () {
     var token = ${safeJson(editor.token)};
@@ -273,7 +307,7 @@ ${editor ? `<style>[data-s2ui-selected] { outline: 3px solid #6366f1 !important;
     ['click', 'dblclick', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'submit', 'keydown', 'input', 'change'].forEach(function (name) { window.addEventListener(name, intercept, true); });
   })();
 </script>` : ''}
-<script type="module">
+${navScript}<script type="module">
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
