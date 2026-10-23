@@ -17,6 +17,8 @@ import { enhanceCodeWithImages, findImageSlots, imageModelFor } from './lib/imag
 import { formatElementMap, segmentSketch, type SegmentOverlayData } from './lib/segment';
 import { freshStages, setStage, snapshotStages, type StageEvent, type StageId } from './lib/pipeline';
 import { brandConformance, sourceChecks } from './lib/quality';
+import { runFullQualityCheck } from './lib/qualityRun';
+import type { ScenarioResult } from './lib/interactionTests';
 import { buildFontFaceCss, listBrandAssets } from './lib/brandAssets';
 import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
@@ -130,6 +132,10 @@ function WorkspaceApp() {
   const [pendingChange,setPendingChange] = useState<{base:string;next:string;scope:string}|null>(null);
   useEffect(() => save('s2ui.review-before-apply',reviewEnabled),[reviewEnabled]);
   const [autoQuality, setAutoQuality] = useState(() => load('s2ui.quality.auto', false));
+  // Post-generation quality checks run in the BACKGROUND and report onto
+  // the preview — the studio no longer opens itself over the result.
+  const [qualityNotice, setQualityNotice] = useState<{ screenId: string; running: boolean; rows?: ScenarioResult[] } | null>(null);
+  const qualityRunRef = useRef(0);
   useEffect(() => save('s2ui.quality.auto', autoQuality), [autoQuality]);
   const [showProductivity, setShowProductivity] = useState(false);
   const productivityAbort = useRef<AbortController | null>(null);
@@ -464,7 +470,11 @@ function WorkspaceApp() {
       setSegmentOverlay(null);
       if (reviewEnabled) { markStage('ship', { status: 'skipped', detail: tr('Held for your review') }); setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else { pushVersion(finalCode); markStage('ship', { status: 'done', detail: tr('New version saved') }); }
       endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built', stages: snapshotStages(stagesRef.current) });
-      if (!reviewEnabled && autoQuality) setShowProductivity(true);
+      if (!reviewEnabled && autoQuality) {
+        const token = ++qualityRunRef.current;
+        setQualityNotice({ screenId, running: true });
+        void runFullQualityCheck(finalCode, backendRef.current).then((rows) => { if (qualityRunRef.current === token) setQualityNotice({ screenId, running: false, rows }); }).catch(() => { if (qualityRunRef.current === token) setQualityNotice(null); });
+      }
     } catch (e: any) {
       if (ctrl.signal.aborted) return;
       const activeStage = stagesRef.current.find((x) => x.status === 'active');
@@ -773,7 +783,7 @@ function WorkspaceApp() {
     const screen = nextProject.screens.find(s => s.id === id);
     if (!screen) return;
     stop(); window.clearTimeout(debounceRef.current); window.clearTimeout(saveSceneRef.current);
-    setProject({ ...nextProject, activeId: id }); setVersions(screen.versions); setVIndex(screen.vIndex); setScreenScene(screen.scene);
+    setQualityNotice(null); setProject({ ...nextProject, activeId: id }); setVersions(screen.versions); setVIndex(screen.vIndex); setScreenScene(screen.scene);
     setApiError(null); setStream(''); setPrompt(load(draftKey(id, workspaceScope), '')); setChat(screen.chat ?? []); setPlanGate(null); resetStages();
     sigRef.current = sigOf(screen.scene?.elements || []);
     apiRef.current?.resetScene();
@@ -958,6 +968,9 @@ function WorkspaceApp() {
             onToggleLock={snippet => setLocks(prev => ({ ...prev, [project.activeId]: (prev[project.activeId] || []).includes(snippet) ? prev[project.activeId].filter(s => s !== snippet) : [...(prev[project.activeId] || []), snippet] }))}
             project={liveProject}
             onNavigate={selectScreen}
+            qualityNotice={qualityNotice && qualityNotice.screenId === project.activeId ? qualityNotice : null}
+            onOpenQuality={() => { setProductivityStart('Quality'); setShowProductivity(true); }}
+            onDismissQuality={() => setQualityNotice(null)}
             backend={backend}
             code={code}
             generating={generating}
@@ -1000,7 +1013,7 @@ function WorkspaceApp() {
         <button aria-label={tr("Show chat workspace")} aria-pressed={mobilePane === 'instructions'} onClick={() => setMobilePane('instructions')}><MessageSquare size={20} /><span>{tr("Chat")}</span>{generating && <i />}</button>
       </nav>
       {toolsOpen && createPortal(<div role="dialog" aria-modal="true" aria-label={tr("Workspace tools")} className="studio-tools-overlay items-center"><section className="studio-tools-sheet"><div className="sheet-heading"><strong>{tr("Workspace tools")}</strong><button className="ui-icon" data-dialog-close onClick={() => setToolsOpen(false)} aria-label={tr("Close workspace tools")}><X size={20} /></button></div>{sidebar}</section></div>, document.body)}
-      {showProductivity && <ProductivityPanel startSection={productivityStart} reviewEnabled={reviewEnabled} onReviewEnabled={setReviewEnabled} review={pendingChange} onRejectReview={() => setPendingChange(null)} onAcceptReview={(next,base) => { if (codeRef.current !== base || pendingChange && pendingChange.scope !== project.activeId) throw new Error('Source or screen changed. Reject this stale review and regenerate.'); assertLockedElements(next,locksRef.current[project.activeId]||[]); pushVersion(next); setPendingChange(null); }} getSketch={exportSketch} model={settings.activeModelId || ''} reference={reference?.dataUrl} scope={project.activeId} autoQuality={autoQuality} onAutoQuality={setAutoQuality} code={code} backend={backend} onClose={() => { productivityAbort.current?.abort(); setShowProductivity(false); setProductivityStart(undefined); }} onAdopt={next => { assertLockedElements(next, locksRef.current[project.activeId] || []); pushVersion(next); }} ask={async (userText, system, images) => {
+      {showProductivity && <ProductivityPanel contextLabel={`${liveProject.screens.find((s) => s.id === project.activeId)?.name || ''} · App.jsx ${Math.max(1, Math.round(code.length / 1024))} KB`} startSection={productivityStart} reviewEnabled={reviewEnabled} onReviewEnabled={setReviewEnabled} review={pendingChange} onRejectReview={() => setPendingChange(null)} onAcceptReview={(next,base) => { if (codeRef.current !== base || pendingChange && pendingChange.scope !== project.activeId) throw new Error('Source or screen changed. Reject this stale review and regenerate.'); assertLockedElements(next,locksRef.current[project.activeId]||[]); pushVersion(next); setPendingChange(null); }} getSketch={exportSketch} model={settings.activeModelId || ''} reference={reference?.dataUrl} scope={project.activeId} autoQuality={autoQuality} onAutoQuality={setAutoQuality} code={code} backend={backend} onClose={() => { productivityAbort.current?.abort(); setShowProductivity(false); setProductivityStart(undefined); }} onAdopt={next => { assertLockedElements(next, locksRef.current[project.activeId] || []); pushVersion(next); }} ask={async (userText, system, images) => {
         const s = settingsRef.current; const provider = s.providers.find(p => p.id === s.activeProviderId);
         if (!provider || !s.activeModelId) throw new Error('Connect a provider and model in Settings first.');
         productivityAbort.current?.abort(); const ctrl = new AbortController(); productivityAbort.current = ctrl;

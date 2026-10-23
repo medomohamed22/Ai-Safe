@@ -1176,5 +1176,12 @@
   "02 · Generate": "02 · التوليد",
   "03 · Preview": "03 · المعاينة",
   "· One run": "· تشغيل واحد",
-  "Runs your explicit scenarios in a fresh demo preview. Actions: exists, click, fill, expectText. Use CSS selectors or the text form tag:has-text('Visible text'). An invalid selector is reported as a setup error, not an app failure. Scenarios run in order and share state; external fetch/XHR is blocked. A passing smoke test does not prove every feature works.": "يُشغّل السيناريوهات الصريحة في معاينة تجريبية جديدة. الإجراءات: exists وclick وfill وexpectText. استخدم محددات CSS أو صيغة النص tag:has-text('النص الظاهر'). المحدد غير الصالح يُبلَّغ كخطأ إعداد لا كفشل في التطبيق. تعمل السيناريوهات بالترتيب وتتشارك الحالة؛ وتُحظر طلبات fetch/XHR الخارجية. نجاح اختبار الدخان لا يثبت أن كل المزايا تعمل."
+  "Runs your explicit scenarios in a fresh demo preview. Actions: exists, click, fill, expectText. Use CSS selectors or the text form tag:has-text('Visible text'). An invalid selector is reported as a setup error, not an app failure. Scenarios run in order and share state; external fetch/XHR is blocked. A passing smoke test does not prove every feature works.": "يُشغّل السيناريوهات الصريحة في معاينة تجريبية جديدة. الإجراءات: exists وclick وfill وexpectText. استخدم محددات CSS أو صيغة النص tag:has-text('النص الظاهر'). المحدد غير الصالح يُبلَّغ كخطأ إعداد لا كفشل في التطبيق. تعمل السيناريوهات بالترتيب وتتشارك الحالة؛ وتُحظر طلبات fetch/XHR الخارجية. نجاح اختبار الدخان لا يثبت أن كل المزايا تعمل.",
+  "Working on: {0}": "الشاشة الحالية: {0}",
+  "Run checks after generation — results appear on the preview, without leaving it": "تشغيل الفحوص بعد الإنشاء — النتائج تظهر على المعاينة دون مغادرتها",
+  "Runs the production bundle check, rendering, overflow at three widths, basic labels and your acceptance scenarios — in a network-blocked demo preview.": "يُشغّل فحص حزمة الإنتاج والعرض والفيض عند ثلاثة عروض والتسميات الأساسية وسيناريوهات القبول — في معاينة تجريبية محجوبة الشبكة.",
+  "Running quality checks in the background…": "جارٍ تشغيل فحوص الجودة في الخلفية…",
+  "Quality checks: {0} passed": "فحوص الجودة: نجح {0}",
+  "{0} failed": "فشل {0}",
+  "View details": "عرض التفاصيل"
 }
