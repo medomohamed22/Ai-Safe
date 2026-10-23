@@ -17,6 +17,7 @@ const ALLOWED_HOSTS = [
   'api.deepinfra.com',
   'api.mistral.ai',
   'api.figma.com',
+  'is.gd',
 ];
 
 const FORWARD_HEADERS = ['authorization', 'content-type', 'accept', 'x-goog-api-key', 'http-referer', 'x-title', 'x-figma-token', 'x-s2ui-demo'];

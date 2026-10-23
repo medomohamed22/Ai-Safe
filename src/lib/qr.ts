@@ -41,3 +41,28 @@ export function qrSvgPath(matrix: boolean[][]): string {
   });
   return d;
 }
+
+/** Renders the QR for `text` to a PNG and downloads it (512px, quiet zone
+ *  included, so phone cameras read it from the file too). */
+export function downloadQrPng(text: string, filename = 'published-app-qr.png'): boolean {
+  const matrix = qrMatrix(text);
+  if (!matrix) return false;
+  const scale = Math.max(4, Math.floor(512 / (matrix.length + 8)));
+  const size = (matrix.length + 8) * scale;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return false;
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#000000';
+  matrix.forEach((row, r) => { row.forEach((dark, c) => { if (dark) ctx.fillRect((c + 4) * scale, (r + 4) * scale, scale, scale); }); });
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }, 'image/png');
+  return true;
+}
