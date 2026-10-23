@@ -82,12 +82,24 @@ Return the full updated file.`;
   return `There is no sketch. Build a complete, interactive React + Tailwind UI for this request: "${instr}"`;
 }
 
+/** A short, valid stand-in for an embedded image the model should never
+ *  have pasted: an SVG swatch in the product accent. */
+export const EMBEDDED_IMAGE_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' rx='18' fill='%232563eb'/%3E%3C/svg%3E";
+
+/** Defense in depth for the brand-logo incident: models sometimes paste a
+ *  data URL (or hallucinate a base64 image payload) into an <img src>, which
+ *  bloats the code by tens of thousands of characters and breaks builds.
+ *  Replace any long base64 data URI with the small placeholder above. */
+export function sanitizeGeneratedCode(code: string): string {
+  return code.replace(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]{200,}/g, EMBEDDED_IMAGE_PLACEHOLDER);
+}
+
 /** Pulls the code out of a (possibly still streaming) model answer. */
 export function extractCode(text: string): string {
   let t = text.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/, '');
   const blocks = [...t.matchAll(/```[\w-]*[^\n]*\n([\s\S]*?)```/g)].map((m) => m[1]);
-  if (blocks.length) return blocks.sort((a, b) => b.length - a.length)[0].trim();
+  if (blocks.length) return sanitizeGeneratedCode(blocks.sort((a, b) => b.length - a.length)[0].trim());
   const open = t.match(/```[\w-]*[^\n]*\n([\s\S]*)$/);
-  if (open) return open[1].trim();
-  return t.trim();
+  if (open) return sanitizeGeneratedCode(open[1].trim());
+  return sanitizeGeneratedCode(t.trim());
 }

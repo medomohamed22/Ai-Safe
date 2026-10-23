@@ -83,6 +83,21 @@ export function PreviewPane(p: Props) {
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGenerationDetails, setShowGenerationDetails] = useState(false);
+  // The building animation is driven by the AI's actual response: which
+  // component it is writing right now, how much has streamed, and how long
+  // the run has been going.
+  const streamFacts = useMemo(() => {
+    const names = [...p.stream.matchAll(/(?:function|const)\s+([A-Z][A-Za-z0-9_]*)/g)].map((m) => m[1]);
+    return { current: names.length ? names[names.length - 1] : '', progress: Math.min(1, p.stream.length / 16000) };
+  }, [p.stream]);
+  const [genSeconds, setGenSeconds] = useState(0);
+  useEffect(() => {
+    if (!p.generating) { setGenSeconds(0); return; }
+    const started = Date.now();
+    const timer = window.setInterval(() => setGenSeconds(Math.floor((Date.now() - started) / 1000)), 500);
+    return () => window.clearInterval(timer);
+  }, [p.generating]);
+  const maskedStream = useMemo(() => p.stream.replace(/(data:[^"'\s]{120,}|[A-Za-z0-9+/]{240,}={0,2})/g, '•••'), [p.stream]);
   const stageRef = useRef<HTMLDivElement>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [previewReady, setPreviewReady] = useState(false);
@@ -372,15 +387,15 @@ export function PreviewPane(p: Props) {
         {p.generating && !p.streamCode && <div className="generation-overlay" role="status" aria-live="polite">
           <div className="generation-heading"><span className="generation-icon"><Sparkles size={20}/></span><div><strong>{tr("Bringing your idea to life")}</strong><p>{tr("Generating with ")}{p.modelLabel}</p></div><button onClick={p.onStop} className="ui-button"><Square size={11}/>{tr("Stop")}</button></div>
           <div className="generation-center">
-            <div className="generation-art" aria-hidden="true"><div className="generation-art-sketch"><span/><span/><span/></div><Sparkles className="generation-art-spark" size={24}/><div className="generation-art-page"><span/><span/><span/><span/></div></div>
-            <strong>{p.stream.length ? 'Building your interface' : 'Understanding your sketch'}</strong>
-            <p>{p.stream.length ? 'Creating components and interactions…' : 'Preparing a beautiful, working preview…'}</p>
-            <div className="generation-progress"><span/></div>
-            <div className="generation-steps"><span className="is-active">01 · Analyze</span><span className={p.stream.length ? 'is-active' : ''}>02 · Generate</span><span>03 · Preview</span></div>
-            <button className="generation-details-toggle" onClick={() => setShowGenerationDetails(v => !v)} aria-expanded={showGenerationDetails}>{showGenerationDetails ? 'Hide code details' : 'View code details'} <Code2 size={13}/></button>
-            {showGenerationDetails && <pre ref={streamRef} className="generation-code">{p.stream.slice(-3000) || 'Waiting for model output…'}</pre>}
+            <div className="generation-art" aria-hidden="true"><div className="generation-art-sketch"><span/><span/><span/></div><Sparkles className="generation-art-spark" size={24}/><div className="generation-art-page">{[0, 1, 2, 3].map((i) => <span key={i} className={streamFacts.progress * 4 > i ? 'is-lit' : ''} style={{ transitionDelay: `${i * 90}ms` }} />)}</div></div>
+            <strong>{p.stream.length ? tr("Building your interface") : tr("Understanding your sketch")}</strong>
+            <p>{streamFacts.current ? tr("Now building: {0}", [streamFacts.current]) : p.stream.length ? tr("Creating components and interactions…") : tr("Preparing a beautiful, working preview…")}</p>
+            <div className="generation-progress"><span className={p.stream.length ? 'is-live' : ''} style={p.stream.length ? { width: `${Math.max(4, Math.round(streamFacts.progress * 100))}%` } : undefined} /></div>
+            <div className="generation-steps"><span className="is-active">{tr("01 · Analyze")}</span><span className={p.stream.length ? 'is-active' : ''}>{tr("02 · Generate")}</span><span>{tr("03 · Preview")}</span></div>
+            <button className="generation-details-toggle" onClick={() => setShowGenerationDetails(v => !v)} aria-expanded={showGenerationDetails}>{showGenerationDetails ? tr("Hide code details") : tr("View code details")} <Code2 size={13}/></button>
+            {showGenerationDetails && <pre ref={streamRef} className="generation-code">{maskedStream.slice(-3000) || tr("Waiting for model output…")}</pre>}
           </div>
-          <span className="generation-caption">{p.stream.length ? p.stream.length.toLocaleString() + ' characters received' : 'Your project is being created'}</span>
+          <span className="generation-caption">{p.stream.length ? tr("{0} characters received", [p.stream.length.toLocaleString()]) : tr("Your project is being created")}{genSeconds > 0 ? ` · ${genSeconds}s` : ''}</span>
         </div>}
       </div>
       {directError && tab === 'preview' && <p role="alert" className="direct-error">{tr(directError)}</p>}

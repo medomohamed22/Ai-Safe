@@ -314,3 +314,8 @@ iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review p
 .generation-center .generation-code { width:100%; flex:none; max-height:120px; min-height:65px; background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:10px; padding:10px; text-align:left; }
 @media(max-width:600px) { .preview-tool-text { display:none; } .preview-viewbar { gap:4px; } .preview-viewbar .segmented button { padding:6px; } .preview-actions .element-select span { display:none; } .preview-actions .element-select { min-width:38px; justify-content:center; } .generation-art { transform:scale(.85); } .preview-fullscreen { inset:0!important; border-radius:0; } }
 @media(prefers-reduced-motion:reduce) { .generation-art-sketch,.generation-art-page,.generation-art-spark,.generation-progress>span { animation:none!important; } }
+.generation-progress>span.is-live { animation:none; transition:width .6s ease }
+.generation-art-page span { transition:background .5s ease, opacity .5s ease }
+.generation-art-page span.is-lit { background:var(--ui-accent); opacity:.9 }
+.generation-art-spark { animation:spark-pulse 1.6s ease-in-out infinite }
+@keyframes spark-pulse { 0%,100% { transform:scale(1); opacity:.65 } 50% { transform:scale(1.22); opacity:1 } }
