@@ -17,10 +17,16 @@ export function designSystemMarkdown(brand: Brand): string {
   lines.push(`- Secondary: ${brand.secondary}`);
   lines.push(`- Background: ${brand.background}`);
   lines.push(`- Text: ${brand.text}`);
+  lines.push(`- Surface: ${brand.surface}`);
+  lines.push(`- Muted: ${brand.muted}`);
+  lines.push(`- Success: ${brand.success}`);
+  lines.push(`- Warning: ${brand.warning}`);
+  lines.push(`- Danger: ${brand.danger}`);
   lines.push('');
   lines.push('## Typography');
   lines.push('');
   lines.push(`- Font: ${brand.font}`);
+  if (brand.displayFont) lines.push(`- Display font: ${brand.displayFont}`);
   lines.push('');
   lines.push('## Shape');
   lines.push('');
@@ -29,6 +35,8 @@ export function designSystemMarkdown(brand: Brand): string {
   lines.push('## Direction');
   lines.push('');
   lines.push(`- Layout: ${brand.direction}`);
+  lines.push(`- Content language: ${brand.language}`);
+  if (brand.voice) lines.push(`- Voice: ${brand.voice}`);
   lines.push('');
   lines.push('## Rules');
   lines.push('');
@@ -53,8 +61,16 @@ export function parseDesignSystem(text: string): Partial<Brand> {
   const secondary = color('Secondary'); if (secondary) out.secondary = secondary;
   const background = color('Background'); if (background) out.background = background;
   const textColor = color('Text'); if (textColor) out.text = textColor;
+  const surface = color('Surface'); if (surface) out.surface = surface;
+  const muted = color('Muted'); if (muted) out.muted = muted;
+  const success = color('Success'); if (success) out.success = success;
+  const warning = color('Warning'); if (warning) out.warning = warning;
+  const danger = color('Danger'); if (danger) out.danger = danger;
   const font = grab(/^-?\s*Font:\s*(.+)$/mi); if (font) out.font = font.slice(0, 60);
   const radius = grab(/^-?\s*Radius:\s*(\d+)\s*(?:px)?\s*$/mi); if (radius) out.radius = Math.max(0, Math.min(80, Number(radius)));
   const layout = grab(/^-?\s*Layout:\s*(ltr|rtl)\s*$/mi); if (layout) out.direction = layout as Brand['direction'];
+  const displayFont = grab(/^-?\s*Display font:\s*(.+)$/mi); if (displayFont) out.displayFont = displayFont.slice(0, 60);
+  const language = grab(/^-?\s*Content language:\s*(ar|en|auto)\s*$/mi); if (language) out.language = language as Brand['language'];
+  const voice = grab(/^-?\s*Voice:\s*(.+)$/mi); if (voice) out.voice = voice.slice(0, 200);
   return out;
 }
