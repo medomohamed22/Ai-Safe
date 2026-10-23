@@ -1,6 +1,6 @@
 import { tr, screenLabel } from '../lib/i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { LayoutGrid, Link2, Maximize, Minus, Plus, X } from 'lucide-react';
+import { Download, LayoutGrid, Link2, Maximize, Minus, Plus, X } from 'lucide-react';
 import { exportToBlob } from '@excalidraw/excalidraw';
 import type { ScreenLink, ScreenProject } from '../lib/screens';
 import { screenCode } from '../lib/screens';
@@ -26,13 +26,15 @@ const sceneSig = (scene: any) =>
 // boot), navigation links drawn as connectors that can be created and edited
 // right on the map, drag to pan/arrange, scroll to zoom. Card arrangement
 // persists through the project's mapPositions.
-export function ScreenMap({ project, onClose, onSelect, onAdd, onPositions, onLinks }: {
+import { pageGroupScreens } from '../lib/pageGroup';
+export function ScreenMap({ project, onClose, onSelect, onAdd, onPositions, onLinks, onExportGroup }: {
   project: ScreenProject;
   onClose: () => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onPositions: (positions: Record<string, MapPoint>) => void;
   onLinks: (links: ScreenLink[]) => void;
+  onExportGroup?: () => void;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<Record<string, MapPoint>>(() => resolvePositions(project));
@@ -305,6 +307,7 @@ export function ScreenMap({ project, onClose, onSelect, onAdd, onPositions, onLi
         <div className="screen-map-tools">
           <button className="ui-button" onClick={onAdd}><Plus size={14} />{tr('Add screen')}</button>
           <button className="ui-button" aria-pressed={linking} onClick={() => (linking ? exitLinking() : (cancelEditor(), setLinking(true)))}><Link2 size={14} />{tr('Link screens')}</button>
+          <button className="ui-button" disabled={!pageGroupScreens(project, project.activeId).length} title={tr('One HTML file with this page and its linked states')} onClick={() => onExportGroup?.()}><Download size={14} />{tr('Export page group')}</button>
           <button className="ui-button" onClick={autoArrange}><LayoutGrid size={14} />{tr('Auto-arrange')}</button>
           <button className="ui-icon" aria-label={tr('Zoom out')} title={tr('Zoom out')} onClick={() => zoomBy(0.85)}><Minus size={15} /></button>
           <button className="ui-button screen-map-pct" aria-label={tr('Fit view')} title={tr('Fit view')} onClick={() => fitView(effective)}>{Math.round(view.k * 100)}%</button>

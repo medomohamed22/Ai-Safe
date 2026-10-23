@@ -1,4 +1,4 @@
-import { tr, screenLabel } from './lib/i18n';
+import { getLanguage, tr, screenLabel } from './lib/i18n';
 import {useLanguage} from './components/LanguageToggle';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // Excalidraw loads lazily with the studio canvas (item 18): no static import here.
@@ -32,6 +32,9 @@ import { backendPrompt, DEFAULT_BACKEND, type BackendConfig } from './lib/backen
 import { ScreensPanel } from './components/ScreensPanel';
 const ScreenMap = lazy(() => import('./components/ScreenMap').then(m => ({ default: m.ScreenMap })));
 const SketchCanvas = lazy(() => import('./components/SketchCanvas'));
+import { screenCode, type Screen } from './lib/screens';
+import { PAGE_SUGGESTIONS, pageBrief, resolveContentLanguage } from './lib/pageSuggestions';
+import { pageGroupHtml } from './lib/pageGroup';
 import type { ChatMessage, ScreenProject } from './lib/screens';
 import { BrandPanel } from './components/BrandPanel';
 import { brandPrompt, normalizeBrand, type Brand } from './lib/brand';
@@ -620,6 +623,13 @@ function WorkspaceApp() {
       if (hasModel) setPrompt('');
     }
   }, [api, home]);
+  useEffect(() => {
+    if (home || !api) return;
+    const id = sessionStorage.getItem('s2ui.start-page');
+    if (!id) return;
+    sessionStorage.removeItem('s2ui.start-page');
+    void runPageFlow(id);
+  }, [api, home]);
   const startDesign = async (text:string, mode:'web'|'app', reference=false) => {
     if (starting) return;
     setStarting(true);
@@ -641,6 +651,70 @@ function WorkspaceApp() {
       location.hash = 'studio';
       await openWorkspace(record,false);
     } finally { setStarting(false); }
+  };
+  const startPageFlow = async (id: string) => {
+    if (starting) return;
+    const suggestion = PAGE_SUGGESTIONS.find((x) => x.id === id);
+    if (!suggestion) return;
+    setStarting(true);
+    try {
+      await saveCurrentWorkspace();
+      const record = await newWorkspace(suggestion.titleEn);
+      sessionStorage.setItem('s2ui.start-page', id);
+      location.hash = 'studio';
+      await openWorkspace(record, false);
+    } finally { setStarting(false); }
+  };
+  const pageFlowRef = useRef(false);
+  const runPageFlow = async (suggestionId: string) => {
+    const suggestion = PAGE_SUGGESTIONS.find((s) => s.id === suggestionId);
+    if (!suggestion || pageFlowRef.current) return;
+    pageFlowRef.current = true;
+    try { sessionStorage.removeItem('s2ui.start-page'); } catch { /* private mode */ }
+    try {
+      const assets = await listBrandAssets().catch(() => []);
+      const lang = resolveContentLanguage(brandRef.current, assets, getLanguage());
+      const title = lang === 'ar' ? suggestion.titleAr : suggestion.titleEn;
+      const snap = snapshotProject();
+      const only = snap.screens.length === 1 ? snap.screens[0] : null;
+      const reuse = !!only && !screenCode(only);
+      const mainId = reuse ? (only as Screen).id : crypto.randomUUID();
+      const mainScreen: Screen = reuse ? { ...(only as Screen), name: title } : { id: mainId, name: title, versions: [], vIndex: -1, scene: null, chat: [] };
+      const caseScreens: Screen[] = suggestion.cases.map((c) => ({ id: crypto.randomUUID(), name: `${title} — ${lang === 'ar' ? c.titleAr : c.titleEn}`, versions: [], vIndex: -1, scene: null, chat: [] }));
+      const links = [...snap.links];
+      suggestion.cases.forEach((c, i) => {
+        links.push({ from: mainId, to: caseScreens[i].id, label: lang === 'ar' ? c.titleAr : c.titleEn });
+        links.push({ from: caseScreens[i].id, to: mainId, label: title });
+      });
+      // Thread the project explicitly: selectScreen's default snapshot is a
+      // render closure, which stays stale for the whole async flow — passing
+      // the project (refreshed from the ref after each run) is what makes the
+      // switches land on the screens this flow created.
+      let flowProject: ScreenProject = { ...snap, screens: reuse ? [mainScreen, ...caseScreens] : [...snap.screens, mainScreen, ...caseScreens], links };
+      const awaitActive = async (id: string) => {
+        for (let i = 0; i < 50 && projectRef.current.activeId !== id; i++) await new Promise((r) => setTimeout(r, 200));
+      };
+      selectScreen(mainId, flowProject);
+      await awaitActive(mainId);
+      const jobs = [{ id: mainId, brief: pageBrief(suggestion, null, lang, brandRef.current.name) },
+        ...suggestion.cases.map((c, i) => ({ id: caseScreens[i]!.id, brief: pageBrief(suggestion, c, lang, brandRef.current.name) }))];
+      for (const job of jobs) {
+        selectScreen(job.id, flowProject);
+        await awaitActive(job.id);
+        const before = projectRef.current.screens.find((s) => s.id === job.id)?.chat?.length || 0;
+        runTracked({ instruction: job.brief });
+        // A run completes by appending exactly one AI message (built, error or stopped) to this screen's thread.
+        const deadline = Date.now() + 180000;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 500));
+          const screen = projectRef.current.screens.find((s) => s.id === job.id);
+          if (!screen) break;
+          if ((screen.chat || []).slice(before).some((m) => m.role === 'ai')) break;
+        }
+        flowProject = projectRef.current;
+      }
+      selectScreen(mainId, projectRef.current);
+    } finally { pageFlowRef.current = false; }
   };
   const openDesign = async (record:WorkspaceRecord) => {
     if (starting) return;
@@ -800,7 +874,7 @@ function WorkspaceApp() {
   const modelLabel = settings.activeModelId ?? '';
 
   return (<>
-    {home && <DesignHome busy={starting} onStart={startDesign} onStartSketch={startSketch} onContinue={enterStudio} onOpen={openDesign}
+    {home && <DesignHome busy={starting} onStart={startDesign} onStartSketch={startSketch} onStartPage={startPageFlow} brandEnabled={brand.enabled} brandName={brand.name} onContinue={enterStudio} onOpen={openDesign}
       model={<ModelPicker settings={settings} onSelect={(pid,mid)=>setSettings(s=>({...s,activeProviderId:pid,activeModelId:mid}))} onOpenSettings={()=>setShowSettings(true)}/>}
       actions={<><ThemeToggle/><button className="ui-icon" aria-label={tr("Settings")} title={tr("Settings")} onClick={()=>setShowSettings(true)}><Settings size={18}/></button></>}/>}
     <div className="workspace-shell studio-shell canvas-studio" style={home ? {display:'none'} : undefined} data-mobile-pane={mobilePane}>
@@ -941,7 +1015,7 @@ function WorkspaceApp() {
       {showReference && <ReferencePanel reference={reference} onChange={setReference} onClose={() => setShowReference(false)} />}
       {showAlternatives && <AlternativesPanel error={apiError} onStop={stop} alternatives={alternatives[project.activeId] || []} backend={backend} busy={generating} onClose={() => setShowAlternatives(false)} onChoose={code => { pushVersion(code); setShowAlternatives(false); }} />}
       {showScreens && <ScreensPanel project={liveProject} onOpenMap={() => { setShowScreens(false); setShowScreenMap(true); }} onClose={() => setShowScreens(false)} onSelect={(id) => { selectScreen(id); setShowScreens(false); }} onAdd={addScreen} onRename={(id, name) => setProject(prev => ({ ...prev, screens: prev.screens.map(s => s.id === id ? { ...s, name } : s) }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} onReorder={(id, dir) => setProject(prev => { const screens = [...prev.screens]; const i = screens.findIndex(x => x.id === id); const j = i + dir; if (i < 0 || j < 0 || j >= screens.length) return prev; [screens[i], screens[j]] = [screens[j], screens[i]]; return { ...prev, screens }; })} onDelete={(id) => { const snapshot = snapshotProject(); const next = { ...snapshot, screens: snapshot.screens.filter(s => s.id !== id), links: snapshot.links.filter(l => l.from !== id && l.to !== id) }; if (id === project.activeId) selectScreen(next.screens[0].id, next); else setProject(next); }} />}
-      {showScreenMap && <Suspense fallback={null}><ScreenMap project={liveProject} onClose={() => setShowScreenMap(false)} onSelect={(id) => { selectScreen(id); setShowScreenMap(false); }} onAdd={() => { const base = 'New screen'; let name = base; let i = 2; while (liveProject.screens.some(s => s.name === name)) name = `${base} ${i++}`; addScreen(name); }} onPositions={(positions) => setProject(prev => ({ ...prev, mapPositions: positions }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} /></Suspense>}
+      {showScreenMap && <Suspense fallback={null}><ScreenMap project={liveProject} onClose={() => setShowScreenMap(false)} onSelect={(id) => { selectScreen(id); setShowScreenMap(false); }} onAdd={() => { const base = 'New screen'; let name = base; let i = 2; while (liveProject.screens.some(s => s.name === name)) name = `${base} ${i++}`; addScreen(name); }} onPositions={(positions) => setProject(prev => ({ ...prev, mapPositions: positions }))} onLinks={(links) => setProject(prev => ({ ...prev, links }))} onExportGroup={() => { const out = pageGroupHtml(liveProject, liveProject.activeId, backend); if (!out) return; const url = URL.createObjectURL(new Blob([out.html], { type: 'text/html' })); const a = document.createElement('a'); a.href = url; a.download = out.filename; a.click(); URL.revokeObjectURL(url); }} /></Suspense>}
     </div>
     {showSettings && <SettingsModal settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />}
     </>
