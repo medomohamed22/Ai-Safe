@@ -1161,5 +1161,20 @@
   "No colors or fonts could be read from that page.": "تعذّرت قراءة أي ألوان أو خطوط من هذه الصفحة.",
   "That file is not a Sketch2UI design system.": "هذا الملف ليس نظام تصميم من Sketch2UI.",
   "Could not read that site (it answered {0}).": "تعذّرت قراءة هذا الموقع (ردّ بـ{0}).",
-  "Screens in this group": "شاشات هذه المجموعة"
+  "Screens in this group": "شاشات هذه المجموعة",
+  "Building your interface": "جارٍ بناء واجهتك",
+  "Understanding your sketch": "جارٍ فهم رسمتك",
+  "Now building: {0}": "يُبنى الآن: {0}",
+  "Creating components and interactions…": "جارٍ إنشاء المكونات والتفاعلات…",
+  "Preparing a beautiful, working preview…": "جارٍ تجهيز معاينة جميلة وشغالة…",
+  "View code details": "عرض تفاصيل الكود",
+  "Hide code details": "إخفاء تفاصيل الكود",
+  "Waiting for model output…": "في انتظار مخرجات النموذج…",
+  "{0} characters received": "تم استلام {0} حرف",
+  "Your project is being created": "مشروعك يُنشأ الآن",
+  "01 · Analyze": "01 · التحليل",
+  "02 · Generate": "02 · التوليد",
+  "03 · Preview": "03 · المعاينة",
+  "· One run": "· تشغيل واحد",
+  "Runs your explicit scenarios in a fresh demo preview. Actions: exists, click, fill, expectText. Use CSS selectors or the text form tag:has-text('Visible text'). An invalid selector is reported as a setup error, not an app failure. Scenarios run in order and share state; external fetch/XHR is blocked. A passing smoke test does not prove every feature works.": "يُشغّل السيناريوهات الصريحة في معاينة تجريبية جديدة. الإجراءات: exists وclick وfill وexpectText. استخدم محددات CSS أو صيغة النص tag:has-text('النص الظاهر'). المحدد غير الصالح يُبلَّغ كخطأ إعداد لا كفشل في التطبيق. تعمل السيناريوهات بالترتيب وتتشارك الحالة؛ وتُحظر طلبات fetch/XHR الخارجية. نجاح اختبار الدخان لا يثبت أن كل المزايا تعمل."
 }
