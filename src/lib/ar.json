@@ -1183,5 +1183,6 @@
   "Running quality checks in the background…": "جارٍ تشغيل فحوص الجودة في الخلفية…",
   "Quality checks: {0} passed": "فحوص الجودة: نجح {0}",
   "{0} failed": "فشل {0}",
-  "View details": "عرض التفاصيل"
+  "View details": "عرض التفاصيل",
+  "Dismiss": "تجاهل"
 }
