@@ -1145,5 +1145,20 @@
   "Edit profile": "تعديل الملف",
   "Security state": "حالة الأمان",
   "Payment error": "خطأ الدفع",
-  "Order success": "نجاح الطلب"
+  "Order success": "نجاح الطلب",
+  "Import & share": "الاستيراد والمشاركة",
+  "Import a brand from a website": "استيراد هوية من موقع إلكتروني",
+  "Website address": "عنوان الموقع",
+  "Import": "استيراد",
+  "Export design system": "تصدير نظام التصميم",
+  "Import design system": "استيراد نظام التصميم",
+  "Export brand board": "تصدير لوحة الهوية",
+  "Imported {0} colors and {1} fonts from the site.": "تم استيراد {0} لون و{1} خط من الموقع.",
+  "Design system imported: {0} assets restored.": "تم استيراد نظام التصميم: تمت استعادة {0} أصل.",
+  "Enter a valid website address first.": "أدخل عنوان موقع صالحًا أولًا.",
+  "Only http and https addresses can be imported.": "يمكن استيراد عناوين http وhttps فقط.",
+  "Could not reach that site from here — check the address and try again.": "تعذّر الوصول إلى هذا الموقع من هنا — تحقق من العنوان وحاول مجددًا.",
+  "No colors or fonts could be read from that page.": "تعذّرت قراءة أي ألوان أو خطوط من هذه الصفحة.",
+  "That file is not a Sketch2UI design system.": "هذا الملف ليس نظام تصميم من Sketch2UI.",
+  "Could not read that site (it answered {0}).": "تعذّرت قراءة هذا الموقع (ردّ بـ{0})."
 }

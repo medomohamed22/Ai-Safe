@@ -7,9 +7,11 @@ import { readReference } from '../lib/images';
 import { designSystemMarkdown, parseDesignSystem } from '../lib/designSystem';
 import { addBrandAsset, detectTextLanguage, fontFamilyFromName, listBrandAssets, newAssetId, removeBrandAsset, validateAssetFile, type BrandAsset, type BrandAssetKind } from '../lib/brandAssets';
 import { buildDesignSystem, type AskFn } from '../lib/designBuild';
+import { importBrandFromUrl, siteBrandPatch, serializeDesignSystem, parseDesignSystemFile, brandBoardHtml } from '../lib/brandImport';
 import { Sparkles } from 'lucide-react';
 import { luminance, paletteFromImage } from '../lib/palette';
 
+function downloadFile(name: string, text: string, type: string) { const url = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url); }
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(r.error); r.readAsDataURL(file); });
 }
@@ -35,6 +37,30 @@ export function BrandPanel({ brand, onChange, onClose, ask }: { brand: Brand; on
   const [assetError, setAssetError] = useState('');
   const refreshAssets = () => { listBrandAssets().then(setAssets).catch((e) => setAssetError((e as Error).message)); };
   useEffect(refreshAssets, []);
+  const [siteUrl, setSiteUrl] = useState('');
+  const [sharing, setSharing] = useState(false);
+  const importFromSite = async () => {
+    setSharing(true); setError('');
+    try {
+      const site = await importBrandFromUrl(siteUrl);
+      onChange({ ...brand, ...siteBrandPatch(site), enabled: true });
+      setError(tr('Imported {0} colors and {1} fonts from the site.', [String(site.colors.length), String(site.fonts.length)]));
+    } catch (err) { setError((err as Error).message); }
+    finally { setSharing(false); }
+  };
+  const importSystem = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const system = parseDesignSystemFile(await file.text());
+      onChange({ ...system.brand, enabled: true });
+      const known = new Set(assets.map(a => a.id));
+      const fresh = system.assets.filter(a => !known.has(a.id));
+      let count = assets.length;
+      for (const asset of fresh) { await addBrandAsset(asset, count).then(() => { count += 1; }).catch(() => { /* quota/full: keep importing the rest */ }); }
+      if (fresh.length) setAssets(await listBrandAssets());
+      setError(tr('Design system imported: {0} assets restored.', [String(fresh.length)]));
+    } catch (err) { setError((err as Error).message); }
+  };
   const addFiles = async (kind: BrandAssetKind, files: FileList | null) => {
     if (!files?.length) return;
     setAssetError('');
@@ -107,6 +133,15 @@ export function BrandPanel({ brand, onChange, onClose, ask }: { brand: Brand; on
     <div className="space-y-1"><span className="text-xs font-semibold">{tr("Brand board")}</span><div className="flex flex-wrap gap-1.5">{(['primary', 'secondary', 'background', 'surface', 'text', 'muted', 'success', 'warning', 'danger'] as const).map(key => <span key={key} className="flex items-center gap-1 rounded border border-[var(--ui-border)] px-1.5 py-1 text-[10px]"><span className="h-3.5 w-3.5 rounded-sm border border-[var(--ui-border)]" style={{ background: brand[key] }} />{tr(key)} <bdi>{brand[key]}</bdi></span>)}</div>
     <p dir={brand.direction} style={{ fontFamily: brand.displayFont || brand.font }} className="text-base font-bold">{brand.name || tr("Your brand")}</p>
     <p dir={brand.direction} style={{ fontFamily: brand.font }} className="text-xs text-[var(--ui-muted)]">{brand.voice || tr("Your brand voice will appear here.")}</p></div>
+    <div className="space-y-2 border-t border-[var(--ui-border)] pt-3">
+      <h3 className="text-sm font-semibold">{tr("Import & share")}</h3>
+      <label className="block text-xs">{tr("Import a brand from a website")}<span className="mt-1 flex gap-2"><input aria-label={tr("Website address")} className={input} value={siteUrl} onChange={e => setSiteUrl(e.target.value)} placeholder="https://example.com" /><button type="button" disabled={sharing || !siteUrl.trim()} onClick={() => void importFromSite()} className="shrink-0 rounded border border-[var(--ui-border)] px-3 py-1.5 text-xs disabled:opacity-50">{tr("Import")}</button></span></label>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => downloadFile('design-system.json', serializeDesignSystem(brand, assets), 'application/json')} className="rounded border border-[var(--ui-border)] px-3 py-1.5 text-xs">{tr("Export design system")}</button>
+        <label className="rounded border border-[var(--ui-border)] px-3 py-1.5 text-xs">{tr("Import design system")}<LocalizedFileInput aria-label={tr("Import design system")} accept="application/json,.json" onChange={e => void importSystem(e.target.files?.[0])} /></label>
+        <button type="button" onClick={() => downloadFile('brand-board.html', brandBoardHtml(brand, assets), 'text/html')} className="rounded border border-[var(--ui-border)] px-3 py-1.5 text-xs">{tr("Export brand board")}</button>
+      </div>
+    </div>
     <p className="text-xs text-[var(--ui-muted)]">{tr("Saved locally and included in generation requests. Existing code updates when you generate; applying the brand does not rewrite code by itself.")}</p>
     {error && <p role="alert" className="text-[var(--ui-text)]">{tr(error)}</p>}
   </section></div>;

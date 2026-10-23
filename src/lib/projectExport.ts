@@ -5,6 +5,7 @@ import { backendBootstrap, DEFAULT_BACKEND, type BackendConfig } from './backend
 import { screenFiles, type ScreenProject } from './screens';
 import { DEFAULT_BRAND } from './brand';
 import { designSystemMarkdown } from './designSystem';
+import { designTokens } from './brandImport';
 import { KEYS, load } from './storage';
 
 function detectExtraDependencies(sources: string[]): Record<string, string> {
@@ -157,7 +158,7 @@ export function projectFiles(code: string, backend: BackendConfig = DEFAULT_BACK
     'README.md': '# Sketch2UI exported project\n\nRun `npm install`, then `npm run dev`. Build with `npm run build`. Commit the generated package-lock.json after installation.\n\nUpload these contents to GitHub; import in Vercel as Vite with build `npm run build`, output `dist`.\n\n## Backend handoff\n\nApp.jsx preserves the generated source and its service adapters. Start with BACKEND.md — it lists the configured endpoints (or the proposed contract), the screens, and the connection checklist. DESIGN.md (included when a brand identity was saved) carries the design system, and HANDOFF.md summarizes how the project was built: screens, versions, and the decisions in the build conversation. Review the API base URL and backend authentication/CORS before real API use. Demo data is not a production database. No backend or API secrets are included in this export.\n\nReview generated dependencies and external image URLs before production use.\n',
   };
   const brand = load(KEYS.brand, DEFAULT_BRAND);
-  if (brand.enabled) files['DESIGN.md'] = designSystemMarkdown(brand);
+  if (brand.enabled) { files['DESIGN.md'] = designSystemMarkdown(brand); files['design-tokens.json'] = JSON.stringify(designTokens(brand), null, 2); }
   files['HANDOFF.md'] = handoffDocument(project);
   for (const name of Object.keys(files)) if (name.endsWith('.jsx')) files[name] = materializeAssets(materializeLibrary(files[name]));
   return files;
