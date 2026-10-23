@@ -63,6 +63,7 @@ interface Props {
   onElementAgent: (instruction: string, ids: number[], mode: 'edit' | 'insert') => void;
   onSaveToLibrary: (snippet: string, tag: string) => string;
   versions: string[];
+  fontCss?: string;
   streamCode?: string;
   segmentOverlay?: SegmentOverlayData | null;
   onCloseSegments?: () => void;
@@ -161,7 +162,7 @@ export function PreviewPane(p: Props) {
   const themeFont = tweaks.font || (p.brand.enabled ? p.brand.font : '');
   const displayCode = p.generating && p.streamCode ? p.streamCode : p.code;
   const token = useMemo(() => crypto.randomUUID(), [displayCode]);
-  const html = useMemo(() => (displayCode ? buildPreviewHtml(displayCode, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId), theme: { font: themeFont || undefined, compact: tweaks.compact } }, p.backend) : ''), [displayCode, token, p.backend, libraryRevision, p.project.activeId, themeFont, tweaks.compact]);
+  const html = useMemo(() => (displayCode ? buildPreviewHtml(displayCode, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId), theme: { font: themeFont || undefined, compact: tweaks.compact }, fontCss: p.fontCss || undefined }, p.backend) : ''), [displayCode, token, p.backend, libraryRevision, p.project.activeId, themeFont, tweaks.compact]);
   const sendMode = (enabled: boolean) => iframeRef.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled }, '*');
 
   useEffect(() => { sendMode(editing && !p.generating && tab === 'preview'); }, [editing, p.generating, tab, token]);

@@ -64,6 +64,21 @@ export function fontFamilyFromName(name: string): string {
   return name.replace(/\.(woff2|woff|ttf|otf)$/i, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Custom font';
 }
 
+const FONT_FORMATS: Record<string, string> = { woff2: 'woff2', woff: 'woff', ttf: 'truetype', otf: 'opentype' };
+
+/** @font-face CSS for uploaded font assets whose family is one of `families` — embeds the file itself, so previews render in the real brand font. */
+export function buildFontFaceCss(assets: BrandAsset[], families: string[]): string {
+  const wanted = new Set(families.filter(Boolean));
+  return assets
+    .filter((a) => a.kind === 'font' && a.dataUrl && a.fontFamily && wanted.has(a.fontFamily))
+    .map((a) => {
+      const ext = (a.name.split('.').pop() || '').toLowerCase();
+      const family = (a.fontFamily as string).replace(/['\\]/g, '');
+      return `@font-face { font-family: '${family}'; src: url("${a.dataUrl}") format('${FONT_FORMATS[ext] || 'woff2'}'); font-display: swap; }`;
+    })
+    .join('\n');
+}
+
 export function newAssetId(): string {
   try { return crypto.randomUUID(); } catch { return `asset-${Date.now()}-${Math.floor(Math.random() * 1e6)}`; }
 }

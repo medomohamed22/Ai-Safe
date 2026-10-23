@@ -16,7 +16,8 @@ import { createDemoProvider, generate } from './lib/providers';
 import { enhanceCodeWithImages, findImageSlots, imageModelFor } from './lib/imageGen';
 import { formatElementMap, segmentSketch, type SegmentOverlayData } from './lib/segment';
 import { freshStages, setStage, snapshotStages, type StageEvent, type StageId } from './lib/pipeline';
-import { sourceChecks } from './lib/quality';
+import { brandConformance, sourceChecks } from './lib/quality';
+import { buildFontFaceCss, listBrandAssets } from './lib/brandAssets';
 import { DEMO_CHECKED_KEY, DEMO_DISMISSED_KEY, fetchDemoStatus } from './lib/demo';
 import { SYSTEM_PROMPT, buildUserPrompt, extractCode } from './lib/prompts';
 import { ELEMENT_AGENT_INSERT_SYSTEM, ELEMENT_AGENT_SYSTEM, applyAgentEdit, countChangedLines, elementAgentPrompt, elementContext, elementInsertPrompt, parseAgentReply, type ElementContext } from './lib/elementAgent';
@@ -145,6 +146,13 @@ function WorkspaceApp() {
   useEffect(() => save(KEYS.reference, reference), [reference]);
   const brandRef = useRef(brand); brandRef.current = brand;
   useEffect(() => save(KEYS.brand, brand), [brand]);
+  const [brandFontCss, setBrandFontCss] = useState('');
+  useEffect(() => {
+    if (!brand.enabled || (!brand.font && !brand.displayFont)) { setBrandFontCss(''); return; }
+    let live = true;
+    listBrandAssets().then((assets) => { if (live) setBrandFontCss(buildFontFaceCss(assets, [brand.font, brand.displayFont])); }).catch(() => { if (live) setBrandFontCss(''); });
+    return () => { live = false; };
+  }, [brand.enabled, brand.font, brand.displayFont, showBrand]);
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [versions, setVersions] = useState<string[]>(initialScreen.versions);
@@ -400,12 +408,19 @@ function WorkspaceApp() {
     setApiError(null);
     try {
       markStage('build', { status: 'active', model: s.activeModelId || undefined });
+      let brandImages: string[] = [];
+      if (brandRef.current.enabled && !opts.fixError) {
+        try {
+          const assets = await listBrandAssets();
+          brandImages = [...assets.filter((a) => a.kind === 'logo' && a.dataUrl), ...assets.filter((a) => a.kind === 'image' && a.dataUrl)].slice(0, 2).map((a) => a.dataUrl as string);
+        } catch { /* brand assets enhance a run; they never block it */ }
+      }
       const full = await generate({
         provider,
         model: s.activeModelId,
         system: SYSTEM_PROMPT + libraryPrompt() + planPrompt(load(planKey(screenId), null)) + brandPrompt(brandRef.current) + lockPrompt(locksRef.current[screenId] || []),
-        userText: buildUserPrompt({ hasImage: !!image, currentCode: current, instruction: opts.instruction || (styleReference && !image ? 'Create an interface based on the attached style reference.' : undefined), fixError: opts.fixError }) + backendPrompt(backendRef.current) + (styleReference ? `\nIMAGE ROLES: ${image ? 'Image 1 is the wireframe and controls layout. Image 2' : 'Image 1'} is a visual style reference. ${styleReference.instruction}\nDo not render designer annotations as content. Saved brand identity takes precedence over conflicting reference colors.\n` : '') + (segmentMap ? `\n${segmentMap}\n` : ''),
-        imageDataUrls: [image, styleReference?.dataUrl].filter((value): value is string => !!value),
+        userText: buildUserPrompt({ hasImage: !!image, currentCode: current, instruction: opts.instruction || (styleReference && !image ? 'Create an interface based on the attached style reference.' : undefined), fixError: opts.fixError }) + backendPrompt(backendRef.current) + (styleReference ? `\nIMAGE ROLES: ${image ? 'Image 1 is the wireframe and controls layout. Image 2' : 'Image 1'} is a visual style reference. ${styleReference.instruction}\nDo not render designer annotations as content. Saved brand identity takes precedence over conflicting reference colors.\n` : '') + (segmentMap ? `\n${segmentMap}\n` : '') + (brandImages.length ? `\nBRAND REFERENCE IMAGES: ${brandImages.length} image(s) of the saved brand (logo / reference material) are attached after the sketch. Match their colors, shapes and logo treatment; the sketch still controls layout when present.\n` : ''),
+        imageDataUrls: [image, styleReference?.dataUrl, ...brandImages].filter((value): value is string => !!value),
         temperature: s.temperature,
         signal: ctrl.signal,
         onToken: (t) => {
@@ -440,8 +455,9 @@ function WorkspaceApp() {
       } else markStage('assets', { status: 'skipped', detail: tr('Auto-images off') });
       if (opts.instruction && load(draftKey(screenId, workspaceScope), '') === opts.instruction) save(draftKey(screenId, workspaceScope), '');
       const checks = sourceChecks(finalCode);
+      const offPalette = brandRef.current.enabled ? brandConformance(finalCode, [brandRef.current.primary, brandRef.current.secondary, brandRef.current.background, brandRef.current.text, brandRef.current.surface, brandRef.current.muted, brandRef.current.success, brandRef.current.warning, brandRef.current.danger]).offPalette : [];
       const passedChecks = checks.filter((x) => x.passed).length;
-      markStage('review', { status: 'done', detail: tr('{0}/{1} source checks passed', [passedChecks, checks.length]) + (passedChecks < checks.length ? ' · ' + checks.filter((x) => !x.passed).map((x) => x.name).join(', ') : '') });
+      markStage('review', { status: 'done', detail: tr('{0}/{1} source checks passed', [passedChecks, checks.length]) + (passedChecks < checks.length ? ' · ' + checks.filter((x) => !x.passed).map((x) => x.name).join(', ') : '') + (offPalette.length ? ' · ' + tr('{0} colors outside the brand palette', [offPalette.length]) : '') });
       setSegmentOverlay(null);
       if (reviewEnabled) { markStage('ship', { status: 'skipped', detail: tr('Held for your review') }); setPendingChange({base:current,next:finalCode,scope:screenId}); setShowProductivity(true); } else { pushVersion(finalCode); markStage('ship', { status: 'done', detail: tr('New version saved') }); }
       endChatRun({ id: crypto.randomUUID(), role: 'ai', kind: 'built', stages: snapshotStages(stagesRef.current) });
@@ -512,7 +528,7 @@ function WorkspaceApp() {
       markStage('plan', { status: 'skipped', detail: tr('Surgical edit — no plan needed') });
       markStage('design', { status: 'skipped', detail: tr('Existing design kept') });
       markStage('build', { status: 'active', model: s.activeModelId || undefined });
-      const system = mode === 'insert' ? ELEMENT_AGENT_INSERT_SYSTEM : ELEMENT_AGENT_SYSTEM;
+      const system = (mode === 'insert' ? ELEMENT_AGENT_INSERT_SYSTEM : ELEMENT_AGENT_SYSTEM) + brandPrompt(brandRef.current);
       const promptFor = (ctx: ElementContext) => (mode === 'insert' ? elementInsertPrompt(ctx, instruction) : elementAgentPrompt(ctx, instruction));
       const applyFor = (code: string, id: number, edit: { jsx: string; addState?: string }) => applyAgentEdit(code, id, edit, locks, mode);
       let working = current;
@@ -870,6 +886,7 @@ function WorkspaceApp() {
             backend={backend}
             code={code}
             generating={generating}
+            fontCss={brandFontCss}
             stream={stream}
             modelLabel={modelLabel}
             apiError={apiError}
