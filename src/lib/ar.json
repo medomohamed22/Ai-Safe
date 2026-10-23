@@ -1184,5 +1184,7 @@
   "Quality checks: {0} passed": "فحوص الجودة: نجح {0}",
   "{0} failed": "فشل {0}",
   "View details": "عرض التفاصيل",
-  "Dismiss": "تجاهل"
+  "Dismiss": "تجاهل",
+  "AI Company (Demo)": "شركة ذكاء اصطناعي (عرض تجريبي)",
+  " · Watch it draw itself": " · شاهدها تُرسم بنفسها"
 }

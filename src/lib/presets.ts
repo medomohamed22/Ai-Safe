@@ -358,7 +358,100 @@ const mobileAr: El[] = [
   A(-55, 622, 45, 0),
 ];
 
+// Demo template (fictional AI company): drawn element-by-element like a
+// timelapse when loaded — see the animated reveal in App.loadPreset. The
+// array order IS the drawing order: top to bottom, section by section.
+const aiCompany: El[] = [
+  R(0, 0, 1000, 1560, undefined, { roundness: null }),
+  // nav
+  E(36, 24, 34, 34),
+  T(80, 30, 'NovaMind', 24),
+  T(400, 34, 'Product   Platform   Pricing   Docs', 17),
+  R(852, 20, 118, 42, 'Start free'),
+  L(0, 84, [[0, 0], [1000, 0]]),
+  // hero
+  R(60, 112, 250, 34, 'NEW · NovaMind 2.0 is live'),
+  T(60, 176, 'AI agents that do\nthe busywork for you', 40),
+  T(60, 268, 'NovaMind plugs an AI team into your tools —\nthey triage, draft and follow up, you approve.', 19),
+  R(60, 344, 300, 50, 'you@company.com'),
+  R(374, 344, 150, 50, 'Get started'),
+  T(60, 410, 'Free for 14 days · No card required', 14),
+  // chat window mock
+  R(580, 150, 360, 330),
+  T(596, 162, 'NovaMind Assistant', 16),
+  L(580, 196, [[0, 0], [360, 0]]),
+  R(596, 214, 220, 44, 'Draft the Q3 report'),
+  R(660, 270, 250, 58, 'Done — summary + charts\nare in your drive'),
+  R(596, 340, 240, 44, 'Send it to the team'),
+  E(600, 404, 8, 8),
+  E(616, 404, 8, 8),
+  E(632, 404, 8, 8),
+  R(596, 428, 328, 38, 'Ask anything…'),
+  // logo strip
+  L(0, 520, [[0, 0], [1000, 0]]),
+  T(60, 540, 'Powering busy teams at', 15),
+  R(60, 572, 150, 44, 'Acme'),
+  R(240, 572, 150, 44, 'Globex'),
+  R(420, 572, 150, 44, 'Initech'),
+  R(600, 572, 150, 44, 'Umbrella'),
+  R(780, 572, 150, 44, 'Stark'),
+  // features
+  T(60, 652, 'Everything an AI team needs', 26),
+  R(60, 696, 280, 170),
+  E(80, 716, 40, 40),
+  T(80, 768, 'Agents that act', 20),
+  T(80, 800, 'They finish tasks in your\ntools, not just chat.', 15),
+  R(360, 696, 280, 170),
+  E(380, 716, 40, 40),
+  T(380, 768, 'Workflows on rails', 20),
+  T(380, 800, 'Approvals, budgets and\naudit on every step.', 15),
+  R(660, 696, 280, 170),
+  E(680, 716, 40, 40),
+  T(680, 768, 'Analytics that explain', 20),
+  T(680, 800, 'See hours saved and\nwhat the agents did.', 15),
+  // pricing
+  T(60, 906, 'Simple pricing', 26),
+  R(60, 950, 280, 210),
+  T(80, 970, 'Starter', 20),
+  T(80, 1006, '$0', 30),
+  T(80, 1052, '3 agents\nCommunity support', 15),
+  R(80, 1108, 240, 40, 'Start free'),
+  R(360, 950, 280, 210),
+  T(380, 970, 'Pro', 20),
+  T(380, 1006, '$29 / mo', 30),
+  T(380, 1052, 'Unlimited agents\nPriority support', 15),
+  R(380, 1108, 240, 40, 'Go Pro'),
+  R(660, 950, 280, 210),
+  T(680, 970, 'Scale', 20),
+  T(680, 1006, 'Custom', 30),
+  T(680, 1052, 'SSO + audit log\nDedicated manager', 15),
+  R(680, 1108, 240, 40, 'Talk to sales'),
+  // testimonial
+  T(60, 1210, '\u201cNovaMind gave me my Fridays back.\u201d', 24),
+  E(60, 1256, 44, 44),
+  T(116, 1268, 'Sara · COO, Globex', 16),
+  // final call to action
+  R(60, 1330, 880, 110),
+  T(90, 1362, 'Start building with NovaMind', 24),
+  R(700, 1360, 200, 48, 'Try it free'),
+  // footer
+  L(0, 1480, [[0, 0], [1000, 0]]),
+  T(60, 1500, '© 2026 NovaMind        Product · Company · Legal', 15),
+  // annotations
+  T(1060, 190, 'dark theme, violet\ngradient hero', 20, RED),
+  A(1050, 215, -95, -30),
+  T(1060, 420, 'live chat demo with\ntyping animation', 20, RED),
+  A(1050, 445, -95, 25),
+  T(1060, 720, 'cards lift on hover', 20, RED),
+  A(1050, 742, -110, 0),
+  T(1060, 990, 'monthly / yearly\ntoggle that works', 20, RED),
+  A(1050, 1012, -110, 0),
+  T(1060, 1360, 'button scrolls\nto pricing', 20, RED),
+  A(1050, 1382, -110, 0),
+];
+
 export const PRESETS = {
+  aiCompany: { label: 'AI Company (Demo)', elements: aiCompany },
   dashboard: { label: 'Dashboard', elements: dashboard },
   landing: { label: 'Landing Page', elements: landing },
   mobile: { label: 'Mobile App', elements: mobile },
