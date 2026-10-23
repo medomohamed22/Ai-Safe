@@ -44,3 +44,7 @@
 
 .quality-group { margin-top: 14px; }
 .quality-group h4 { margin: 0 0 6px; font-size: 13px; letter-spacing: .01em; }
+.productivity-context { margin-top:6px; font-size:12px; color:var(--ui-muted) }
+.productivity-tabs { position:sticky; top:-24px; z-index:3; flex-wrap:nowrap; overflow-x:auto; padding:14px 0 10px; background:var(--ui-bg); scrollbar-width:thin }
+.productivity-tabs>.productivity-tab { display:inline-flex; align-items:center; gap:7px; flex:none; border-radius:999px; padding:8px 14px; min-height:38px; font-size:13px }
+.productivity-tabs>.productivity-tab[aria-pressed='true'] { background:var(--ui-accent); border-color:transparent; color:#fff }

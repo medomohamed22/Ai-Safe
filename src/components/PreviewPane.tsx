@@ -2,7 +2,7 @@ import { tr } from '../lib/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AlertTriangle, Maximize2, Minimize2, MoreHorizontal, Eye,
+  AlertTriangle, Maximize2, Minimize2, MoreHorizontal, Eye, BadgeCheck, X,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -30,6 +30,7 @@ import type { SegmentOverlayData } from '../lib/segment';
 import { backendBootstrap } from '../lib/backend';
 import { TestsPanel } from './TestsPanel';
 import type { ScreenProject } from '../lib/screens';
+import { resultStatus } from '../lib/interactionTests';
 import { GitHubPanel } from './GitHubPanel';
 import { SharePanel } from './SharePanel';
 import { PublishPanel } from './PublishPanel';
@@ -41,6 +42,9 @@ interface Props {
   onToggleLock: (snippet: string) => void;
   project: ScreenProject;
   onNavigate: (id: string) => void;
+  qualityNotice?: { running: boolean; rows?: import('../lib/interactionTests').ScenarioResult[] } | null;
+  onOpenQuality?: () => void;
+  onDismissQuality?: () => void;
   backend: BackendConfig;
   brand: Brand;
   code: string;
@@ -401,6 +405,7 @@ export function PreviewPane(p: Props) {
       {directError && tab === 'preview' && <p role="alert" className="direct-error">{tr(directError)}</p>}
       {editing && tab === 'preview' && selected !== null && <VisualEditor locks={p.locks} onToggleLock={p.onToggleLock} key={token + ':' + selectedIds.join(',')} code={p.code} id={selected} ids={selectedIds.length ? selectedIds : [selected]} disabled={p.generating} onApply={p.onCodeChange} onRequest={p.onElementRequest} onAgentRequest={p.onElementAgent} onSaveToLibrary={p.onSaveToLibrary} onClose={() => { setSelected(null); setSelectedIds([]); }} />}
       </div>
+      {p.qualityNotice && <div className="quality-notice" role="status">{p.qualityNotice.running ? <><Loader2 className="animate-spin" size={14} /><span>{tr("Running quality checks in the background…")}</span></> : <><BadgeCheck size={14} /><span>{tr("Quality checks: {0} passed", [String((p.qualityNotice.rows || []).filter((r) => resultStatus(r) === 'passed').length)])}{(p.qualityNotice.rows || []).some((r) => resultStatus(r) === 'failed') ? ` · ${tr("{0} failed", [String((p.qualityNotice.rows || []).filter((r) => resultStatus(r) === 'failed').length)])}` : ''}</span><button className="ui-button" onClick={p.onOpenQuality}>{tr("View details")}</button></>}<button className="ui-icon quality-notice-close" onClick={p.onDismissQuality} aria-label={tr("Dismiss")}><X size={13} /></button></div>}
       <div className="panel-footnote preview-footnote"><span className="status-dot" />{tab === 'preview' ? tr("Interactive preview") : tr("Your generated source")}<span>{p.code ? tr("Ready to refine") : tr("Waiting for your first idea")}</span></div>
     </div>
   );
