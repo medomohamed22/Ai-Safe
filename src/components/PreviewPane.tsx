@@ -29,7 +29,7 @@ import type { BackendConfig } from '../lib/backend';
 import type { SegmentOverlayData } from '../lib/segment';
 import { backendBootstrap } from '../lib/backend';
 import { TestsPanel } from './TestsPanel';
-import { screenNavigation, type ScreenProject } from '../lib/screens';
+import type { ScreenProject } from '../lib/screens';
 import { GitHubPanel } from './GitHubPanel';
 import { SharePanel } from './SharePanel';
 import { PublishPanel } from './PublishPanel';
@@ -159,10 +159,27 @@ export function PreviewPane(p: Props) {
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey); };
   }, [showTweaks]);
+  const groupScreens = useMemo(() => {
+    const ids = new Set<string>([p.project.activeId]);
+    p.project.links.forEach((l) => { if (l.from === p.project.activeId) ids.add(l.to); if (l.to === p.project.activeId) ids.add(l.from); });
+    if (ids.size < 2) return [] as { id: string; name: string; label: string; active: boolean }[];
+    const labelFor = (id: string) => {
+      const out = p.project.links.find((l) => l.from === p.project.activeId && l.to === id);
+      if (out) return out.label;
+      const inc = p.project.links.find((l) => l.to === p.project.activeId && l.from === id);
+      if (inc) return inc.label;
+      const into = p.project.links.find((l) => l.to === id && ids.has(l.from));
+      if (into) return into.label;
+      return p.project.screens.find((s) => s.id === id)?.name || '';
+    };
+    return p.project.screens.filter((s) => ids.has(s.id)).map((s) => ({ id: s.id, name: s.name, label: labelFor(s.id), active: s.id === p.project.activeId }));
+  }, [p.project]);
+  const navTargets = useMemo(() => groupScreens.filter((s) => !s.active).map((s) => ({ id: s.id, name: s.name, label: s.label })), [groupScreens]);
+  const projectRef = useRef(p.project); projectRef.current = p.project;
   const themeFont = tweaks.font || (p.brand.enabled ? p.brand.font : '');
   const displayCode = p.generating && p.streamCode ? p.streamCode : p.code;
   const token = useMemo(() => crypto.randomUUID(), [displayCode]);
-  const html = useMemo(() => (displayCode ? buildPreviewHtml(displayCode, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId), theme: { font: themeFont || undefined, compact: tweaks.compact }, fontCss: p.fontCss || undefined }, p.backend) : ''), [displayCode, token, p.backend, libraryRevision, p.project.activeId, themeFont, tweaks.compact]);
+  const html = useMemo(() => (displayCode ? buildPreviewHtml(displayCode, { token, storageBridge: true, storageSeed: readSeed(p.project.activeId), theme: { font: themeFont || undefined, compact: tweaks.compact }, fontCss: p.fontCss || undefined, navTargets }, p.backend) : ''), [displayCode, token, p.backend, libraryRevision, p.project.activeId, themeFont, tweaks.compact, navTargets]);
   const sendMode = (enabled: boolean) => iframeRef.current?.contentWindow?.postMessage({ type: 'edit-mode', token, enabled }, '*');
 
   useEffect(() => { sendMode(editing && !p.generating && tab === 'preview'); }, [editing, p.generating, tab, token]);
@@ -194,6 +211,14 @@ export function PreviewPane(p: Props) {
       if (d?.source !== 's2ui-preview') return;
       if (d.type === 'error') { setRuntimeError((prev) => prev ?? String(d.message)); setPreviewReady(true); }
       if (d.type === 'ready') { setPreviewReady(true); sendMode(editingRef.current && !p.generating && tab === 'preview'); }
+      if (d.type === 'navigate') {
+        const proj = projectRef.current;
+        const norm = (s: unknown) => String(s || '').replace(/[\u061f?!.\u060c,;:]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const byId = typeof d.id === 'string' ? proj.screens.find((s) => s.id === d.id) : undefined;
+        const target = byId || proj.screens.find((s) => norm(s.name) === norm(d.target)) || proj.screens.find((s) => norm(s.name.split('—').pop()) === norm(d.target));
+        if (target && target.id !== proj.activeId) p.onNavigate(target.id);
+        return;
+      }
       if (d.type === 'storage' && d.token === token && d.data && typeof d.data === 'object' && !Array.isArray(d.data)) {
         try { const text = JSON.stringify(d.data); if (text.length <= 512000) localStorage.setItem(storageKey(activeScreenRef.current), text); } catch { /* quota or serialization: the in-document store keeps working */ }
       }
@@ -317,7 +342,7 @@ export function PreviewPane(p: Props) {
       {exportError && <p role="alert" className="mx-3 my-2 text-xs">{tr(exportError)}</p>}
       {exportNotice && <p role="status" className="export-notice">{exportNotice}</p>}
       {p.apiError && <div role="alert" className="preview-error"><AlertTriangle size={15} /><span>{tr(p.apiError)}</span>{p.onRetryError && <button className="preview-error-retry" onClick={p.onRetryError}><RotateCcw size={13} />{tr("Retry")}</button>}<button onClick={p.onDismissError} aria-label={tr("Dismiss error")}>✕</button></div>}
-      {!!screenNavigation(p.project).length && <nav aria-label={tr("Screen navigation")} className="screen-navigation">{screenNavigation(p.project).map((link, i) => <button key={i} className="ui-button" onClick={() => p.onNavigate(link.id)}>{link.label}<ArrowUpRight size={12} /></button>)}</nav>}
+      {!!groupScreens.length && <nav aria-label={tr("Screens in this group")} className="screen-navigation">{groupScreens.map((s) => <button key={s.id} className={`ui-button screen-tab${s.active ? ' screen-tab-active' : ''}`} aria-current={s.active ? 'page' : undefined} onClick={() => { if (!s.active) p.onNavigate(s.id); }}>{s.label}{!s.active && <ArrowUpRight size={12} />}</button>)}</nav>}
       {showTests && createPortal(<TestsPanel code={p.code} backend={p.backend} onClose={() => setShowTests(false)} />, document.body)}
       {showGitHub && createPortal(<GitHubPanel files={exportFiles} onClose={() => setShowGitHub(false)} />, document.body)}
       {showPublish && createPortal(<PublishPanel project={p.project} backend={p.backend} onClose={() => setShowPublish(false)} />, document.body)}

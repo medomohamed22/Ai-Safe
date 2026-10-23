@@ -37,3 +37,14 @@ assert.ok(out && out.html.includes('Log in page — Error state') && (out.html.m
 assert.ok(!out.html.includes('Unrelated'), 'unlinked screens stay out');
 assert.equal(pageGroupHtml({ activeId: 'x', screens: [{ id: 'x', name: 'Empty', versions: [], vIndex: -1, scene: null }], links: [] }, 'x'), null, 'nothing generated yet, nothing to export');
 console.log('PASS page-suggestions: six bilingual page types with state briefs, language resolution (system > documents > UI), and a one-file page-group export scoped to linked screens.');
+
+// Linked-group briefs wire cross-screen navigation through s2uiNavigate.
+const groupNames = ['Log in page', 'Log in page — Error state', 'Log in page — Forgot password', 'Log in page — Success state'];
+const mainBrief = pageBrief(login, null, 'en', '', groupNames);
+assert.ok(mainBrief.includes('GROUP NAVIGATION') && mainBrief.includes('s2uiNavigate'), 'the main brief wires group navigation');
+assert.ok(mainBrief.includes('Log in page — Forgot password'), 'the main brief names the sibling screens exactly');
+const caseBrief = pageBrief(login, login.cases[1], 'en', '', groupNames);
+assert.ok(caseBrief.includes('s2uiNavigate'), 'case briefs wire the way back');
+const arBrief = pageBrief(login, null, 'ar', '', groupNames);
+assert.ok(arBrief.includes('s2uiNavigate'), 'Arabic briefs wire group navigation too');
+assert.ok(pageBrief(login, null, 'en', '').includes('GROUP NAVIGATION') === false, 'no group, no navigation block');

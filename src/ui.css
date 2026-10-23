@@ -200,6 +200,8 @@ iframe[title='Live preview'],iframe[title='Test preview'],iframe[title='Review p
 .preview-error-retry { display:inline-flex; align-items:center; gap:5px; flex-shrink:0; min-height:28px; padding:3px 10px; border:1px solid var(--ui-line); border-radius:999px; font-size:11px; font-weight:500; color:var(--ui-text); background:var(--ui-surface); cursor:pointer }
 .screen-navigation { display:flex; flex-wrap:wrap; gap:6px; border-bottom:1px solid var(--ui-border); padding:7px 12px }
 .screen-navigation .ui-button { min-height:26px; font-size:10px }
+.screen-navigation .screen-tab-active { background:var(--ui-accent); border-color:transparent; color:#fff }
+.sidebar-action .sidebar-dot { width:7px; height:7px; border-radius:50%; background:var(--ui-accent); margin-inline-start:auto; flex:none }
 .preview-stage { position:relative; flex:1; min-height:0; overflow:auto; background-color:var(--ui-bg); background-image:radial-gradient(var(--ui-grid) .6px,transparent .6px); background-size:14px 14px }
 .preview-tab-content { height:100%; min-height:0; animation:surface-enter 180ms ease }
 .preview-tab-content[hidden],.code-surface[hidden] { display:none }

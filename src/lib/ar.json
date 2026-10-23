@@ -1160,5 +1160,6 @@
   "Could not reach that site from here — check the address and try again.": "تعذّر الوصول إلى هذا الموقع من هنا — تحقق من العنوان وحاول مجددًا.",
   "No colors or fonts could be read from that page.": "تعذّرت قراءة أي ألوان أو خطوط من هذه الصفحة.",
   "That file is not a Sketch2UI design system.": "هذا الملف ليس نظام تصميم من Sketch2UI.",
-  "Could not read that site (it answered {0}).": "تعذّرت قراءة هذا الموقع (ردّ بـ{0})."
+  "Could not read that site (it answered {0}).": "تعذّرت قراءة هذا الموقع (ردّ بـ{0}).",
+  "Screens in this group": "شاشات هذه المجموعة"
 }
