@@ -28,7 +28,7 @@ export function isArabicCode(code: string): boolean {
   return /[\u0600-\u06FF]/.test(code);
 }
 
-export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean; preserveInstrumentation?: boolean; storageBridge?: boolean; storageSeed?: Record<string, string> | null; theme?: { font?: string; compact?: boolean } }, backend: BackendConfig = DEFAULT_BACKEND): string {
+export function buildPreviewHtml(code: string, editor?: { token: string; tests?: boolean; preserveInstrumentation?: boolean; storageBridge?: boolean; storageSeed?: Record<string, string> | null; theme?: { font?: string; compact?: boolean }; fontCss?: string }, backend: BackendConfig = DEFAULT_BACKEND): string {
   let source = code;
   if (editor && !editor.preserveInstrumentation) {
     try { source = instrumentPreview(code); } catch { /* Existing runtime error reporting handles invalid JSX. */ }
@@ -46,7 +46,7 @@ export function buildPreviewHtml(code: string, editor?: { token: string; tests?:
 <script type="importmap">${safeJson({ imports: IMPORT_MAP })}</script>
 <style>
   html, body { margin: 0; min-height: 100%; }
-  body { font-family: ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }${themeFont ? `\n  body, body * { font-family: ${themeFont}, ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, sans-serif !important; }` : ''}${editor?.theme?.compact ? `\n  html { font-size: 15px; }` : ''}
+  body { font-family: ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }${themeFont ? `\n  body, body * { font-family: ${themeFont}, ${rtl ? "'Cairo', " : ''}Inter, ui-sans-serif, system-ui, sans-serif !important; }` : ''}${editor?.theme?.compact ? `\n  html { font-size: 15px; }` : ''}${editor?.fontCss ? '\n' + editor.fontCss : ''}
   #__s2ui_err { display:none; position:fixed; inset:auto 12px 12px 12px; background:#1f0f12; color:#fecaca; border:1px solid #7f1d1d; border-radius:10px; padding:12px 14px; font:12px/1.5 ui-monospace, monospace; white-space:pre-wrap; max-height:40vh; overflow:auto; z-index:2147483647; }
 </style>
 </head>
