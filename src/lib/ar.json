@@ -1186,5 +1186,9 @@
   "View details": "عرض التفاصيل",
   "Dismiss": "تجاهل",
   "AI Company (Demo)": "شركة ذكاء اصطناعي (عرض تجريبي)",
-  " · Watch it draw itself": " · شاهدها تُرسم بنفسها"
+  " · Watch it draw itself": " · شاهدها تُرسم بنفسها",
+  "Shortening link…": "جارٍ تقصير الرابط…",
+  "Download QR": "تنزيل رمز QR",
+  "The short-link service is unavailable, so the full link is shown.": "خدمة تقصير الروابط غير متاحة، لذا يُعرض الرابط الكامل.",
+  "The QR code could not be created.": "تعذّر إنشاء رمز QR."
 }
