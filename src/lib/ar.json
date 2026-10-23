@@ -1086,5 +1086,21 @@
   "{0} elements selected": "{0} عناصر محددة",
   "~{0} tokens": "~{0} رمز",
   "~{0} tokens · ~{1} sec": "~{0} رمز · ~{1} ثانية",
-  "Element changed; state added to its component": "تغيّر العنصر؛ وأُضيفت حالة إلى مكوّنه"
+  "Element changed; state added to its component": "تغيّر العنصر؛ وأُضيفت حالة إلى مكوّنه",
+  "Add a document": "إضافة مستند",
+  "Add a font": "إضافة خط",
+  "Add a logo file": "إضافة ملف شعار",
+  "Add images": "إضافة صور",
+  "Assets are stored locally in this browser and are used when your design system is built and applied.": "الأصول محفوظة محليًا في هذا المتصفح وتُستخدم عند بناء نظام التصميم وتطبيقه.",
+  "Design assets": "أصول التصميم",
+  "Documents (.md)": "المستندات (.md)",
+  "Extracted palette": "لوحة الألوان المستخرجة",
+  "Fonts": "الخطوط",
+  "Images": "الصور",
+  "Logo files": "ملفات الشعار",
+  "Mixed": "مختلط",
+  "Remove asset": "حذف الأصل",
+  "The asset library is full (24 files).": "مكتبة الأصول ممتلئة (٢٤ ملفًا).",
+  "Use palette as brand colors": "استخدم اللوحة كألوان للهوية",
+  "You are responsible for the license of fonts you upload.": "أنت مسؤول عن ترخيص الخطوط التي ترفعها."
 }
